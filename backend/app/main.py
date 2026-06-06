@@ -210,7 +210,7 @@ def match_speakers_with_voiceprints(speaker_embeddings: dict) -> dict:
 
 def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict) -> dict:
     """
-    Use local Ollama to match unmatched speakers using shownotes and first 5 minutes of transcript
+    Use local Ollama or Online Standard API to match unmatched speakers using shownotes and first 5 minutes of transcript
     """
     if not unmatched_speakers:
         return {}
@@ -218,7 +218,7 @@ def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers
     try:
         import httpx
         import json
-        from app.config import OLLAMA_URL, OLLAMA_MODEL
+        from app.config import config
         
         # 1. Prepare shownotes
         shownotes = metadata.get("shownotes", "").strip()
@@ -259,15 +259,34 @@ def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers
 3. 如果根据文本无法推断出某些 ID 对应的人名，请对应返回 null，例如：{{"SPEAKER_00": null}}。
 """
 
-        # Determine the api_url for standard chat completions
-        base_url = OLLAMA_URL.rstrip('/')
-        if '/v1' not in base_url:
-            api_url = f"{base_url}/v1/chat/completions"
+        # Dynamic engine selection based on config
+        summary_mode = config.get("summary_mode", "local")
+        headers = {"Content-Type": "application/json"}
+        
+        if summary_mode == "online":
+            api_key = config.get("online_summary_api_key", "").strip()
+            base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
+            target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
+            
+            api_url = f"{base_url.rstrip('/')}/chat/completions"
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            print(f"📡 [LOG] 智能人名推断启动【在线模式】 - 接口: {api_url} | 模型: {target_model}")
         else:
-            api_url = f"{base_url}/chat/completions"
+            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+            target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
+            
+            base_url = ollama_url.rstrip('/')
+            if '/v1' not in base_url and '11434' not in base_url:
+                api_url = f"{base_url}/v1/chat/completions"
+            elif '11434' in base_url and '/v1' not in base_url:
+                api_url = f"{base_url}/v1/chat/completions"
+            else:
+                api_url = f"{base_url}/chat/completions"
+            print(f"🤖 [LOG] 智能人名推断启动【本地模式】 - 接口: {api_url} | 模型: {target_model}")
             
         payload = {
-            "model": OLLAMA_MODEL,
+            "model": target_model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -275,7 +294,6 @@ def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers
             "temperature": 0.1
         }
         
-        headers = {"Content-Type": "application/json"}
         with httpx.Client(timeout=45.0, trust_env=False) as client:
             r = client.post(api_url, headers=headers, json=payload)
             
