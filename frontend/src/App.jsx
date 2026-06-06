@@ -839,11 +839,41 @@ export default function App() {
               </span>
             </div>
           )}
+
+          {/* 大模型服务状态 */}
+          {perfData?.llm_status && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '4px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>大模型状态:</span>
+              <span style={{ 
+                color: perfData.llm_status === 'connected' ? 'var(--success)' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)'), 
+                fontWeight: '700' 
+              }}>
+                {perfData.llm_status === 'connected' ? '🟢 已联通' : (perfData.llm_status === 'online_mode' ? '☁️ 云端 API' : '🔴 本地未开启')}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ==================== 💻 右侧主内容区域 ==================== */}
       <div style={{ flex: '1', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        {/* 本地大模型未开启提示条 */}
+        {perfData?.llm_status === 'offline' && (
+          <div style={{ 
+            background: 'rgba(239, 68, 68, 0.15)', 
+            borderBottom: '1px solid var(--error)', 
+            color: 'var(--error)', 
+            padding: '10px 32px', 
+            fontSize: '13px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            fontWeight: '600',
+            zIndex: '5'
+          }}>
+            <span>⚠️ 本地大模型未开启提示：检测到当前选择“本地模式”，但本地推理接口端口（Ollama/LM Studio）处于未启动状态，总结任务将无法进行。请启动对应本地端口，或在“系统设置”中切换为云端模式。</span>
+          </div>
+        )}
         
         {/* TOP BAR */}
         <div style={{ height: '70px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 32px', justifyContent: 'space-between' }}>

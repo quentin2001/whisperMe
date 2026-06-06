@@ -759,6 +759,27 @@ def get_performance():
     except Exception:
         pass
 
+    # 6. 检测本地大模型接口连接状况 (仅在用户选择本地模式时检测)
+    llm_status = "online_mode"
+    try:
+        from app.config import config
+        summary_mode = config.get("summary_mode", "local")
+        if summary_mode == "local":
+            import socket
+            import urllib.parse
+            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+            parsed = urllib.parse.urlparse(ollama_url)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 11434
+            
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.3) # 限制 300ms 快速超时，不阻塞 API
+            s.connect((host, port))
+            s.close()
+            llm_status = "connected"
+    except Exception:
+        llm_status = "offline"
+
     return {
         "cpu": cpu_percent,
         "ram": {
@@ -782,7 +803,8 @@ def get_performance():
         },
         "queue": {
             "size": queue_size
-        }
+        },
+        "llm_status": llm_status
     }
 
 @app.delete("/api/tasks/{task_id}")
