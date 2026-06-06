@@ -416,16 +416,24 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not task:
             print(f"⚠️ [LOG] 检测到任务 {task_id} 已被删除，队列自动抛弃执行。")
             return
+            
         # Step 1: 下载音频与获取元数据
         db.update_task(task_id, status="downloading", progress=10.0)
         
         def download_progress_callback(percent):
+            # 实时检查任务是否已被删除，如果是则抛出异常以中断下载流
+            if not db.get_task(task_id):
+                raise Exception("TASK_CANCELLED")
             # 将下载进度 (0-100) 映射到数据库任务 progress 字段 (10-30)
             mapped_progress = 10.0 + (percent / 100.0) * 20.0
             db.update_task(task_id, progress=round(mapped_progress, 1))
             
         local_mp3, metadata = downloader.download_url_audio(url, progress_callback=download_progress_callback)
         
+        # 双重检查
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
+            
         # 将解析到的播客元数据回写数据库
         db.update_task(
             task_id, 
@@ -436,19 +444,30 @@ def run_podcast_pipeline(task_id: str, url: str):
         )
         
         # Step 2: 音频格式预处理（16kHz Mono WAV）
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="transcribing", progress=40.0)
         standardized_wav = downloader.preprocess_audio(local_mp3)
         
         # 在数据库中记录音频相对于服务端的播放路径 (e.g. /audio/hash.mp3)
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         audio_filename = os.path.basename(local_mp3)
         db.update_task(task_id, audio_url=f"/audio/{audio_filename}", progress=45.0)
 
         # Step 3: PyAnnote 声纹分割
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         diar_data = transcriber.run_diarization(standardized_wav)
         db.update_task(task_id, progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
+            
         def progress_callback(current_progress):
+            if not db.get_task(task_id):
+                raise Exception("TASK_CANCELLED")
             db.update_task(task_id, progress=current_progress)
 
         asr_mode = task.get("asr_mode", "local")
@@ -461,6 +480,8 @@ def run_podcast_pipeline(task_id: str, url: str):
         db.update_task(task_id, transcript=merged_transcript, progress=75.0)
 
         # Step 4.5: 提取声纹特征特征，并进行智能特征及上下文改名
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         try:
             print("⏳ [LOG] 正在提取发言人声纹特征向量...")
             speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
@@ -469,15 +490,18 @@ def run_podcast_pipeline(task_id: str, url: str):
             # 运行智能改名流水线
             auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
         except Exception as emb_ex:
+            if str(emb_ex) == "TASK_CANCELLED":
+                raise emb_ex
             print(f"⚠️ [LOG 警告] 提取声纹特征或智能改名失败: {emb_ex}")
 
         # Step 4.8: 对仅说语气词/短词的发言人自动打上“未识别语气词”标签
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         try:
             apply_interjection_labels(task_id, merged_transcript)
         except Exception as label_ex:
             print(f"⚠️ [LOG 警告] 自动标记语气词发言人失败: {label_ex}")
 
-        # 物理销毁临时超大标准化 WAV 音频，仅留原始压缩 MP3 供前端播放
         # 物理销毁临时超大标准化 WAV 音频，仅留原始压缩 MP3 供前端播放
         if standardized_wav and os.path.exists(standardized_wav):
             try:
@@ -486,12 +510,16 @@ def run_podcast_pipeline(task_id: str, url: str):
             except Exception as fe:
                 print(f"⚠️ [LOG 警告] 无法物理清理临时 WAV 文件: {fe}")
 
-        # Step 5: 调用本地 Ollama 进行长剧本摘要与口碑分析
+        # Step 5: 调用本地 Ollama / 在线大模型进行长剧本摘要与口碑分析
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="summarizing", progress=80.0)
         summary_report = summarizer.summarize(metadata, merged_transcript)
         db.update_task(task_id, summary=summary_report, progress=95.0)
 
         # 标志任务已彻底成功
+        if not db.get_task(task_id):
+            raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="completed", progress=100.0)
 
         # Step 6: 消息/邮件提醒
@@ -510,6 +538,17 @@ def run_podcast_pipeline(task_id: str, url: str):
         )
 
     except Exception as e:
+        # 如果任务在中途已经被物理删除，静默跳过其余数据库和通知逻辑，物理销毁所有临时生成的音频，释放资源
+        task_exists = db.get_task(task_id) is not None
+        if not task_exists or str(e) == "TASK_CANCELLED":
+            print(f"🗑️ [LOG] 检测到任务 {task_id} 在运行期间已被用户删除，物理流程彻底中止并安全释放磁盘。")
+            if local_mp3 and os.path.exists(local_mp3):
+                try:
+                    os.remove(local_mp3)
+                except Exception:
+                    pass
+            return
+            
         print(f"❌ [🚨 任务异常中断] 任务 {task_id} 崩盘: {e}")
         traceback.print_exc()
         db.update_task(task_id, status="failed", error_message=str(e), progress=100.0)

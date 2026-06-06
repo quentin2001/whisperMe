@@ -47,10 +47,10 @@ class PodcastNotifier:
         try:
             next_kws = ['核心主旨', '目标受众', '含金量评级', '推荐等级', '核心观点', '议题提炼', '发言人', '听众口碑', '事实一致性', '1.', '2.', '3.', '4.', '5.']
 
-            theme = extract_section(summary_md, ['核心主旨', '主旨'], next_kws)
-            audience = extract_section(summary_md, ['目标受众', '受众'], next_kws)
+            theme = convert_markdown_inline(extract_section(summary_md, ['核心主旨', '主旨'], next_kws))
+            audience = convert_markdown_inline(extract_section(summary_md, ['目标受众', '受众'], next_kws))
             rating_desc = extract_section(summary_md, ['含金量评级与判定理由', '含金量评级', '评级'], next_kws)
-            recommend = extract_section(summary_md, ['推荐等级', '收听建议', '推荐'], next_kws)
+            recommend = convert_markdown_inline(extract_section(summary_md, ['推荐等级', '收听建议', '推荐'], next_kws))
 
             # 提取含金量评级字母
             score = "A"
@@ -62,7 +62,7 @@ class PodcastNotifier:
                 if score_match:
                     score = score_match.group(0).replace("*", "").strip()
 
-            rating_desc_clean = re.sub(r'因此，?评级为.*$', '', rating_desc).strip()
+            rating_desc_clean = convert_markdown_inline(re.sub(r'因此，?评级为.*$', '', rating_desc).strip())
 
             # 提取发言人姓名
             host, guest = extract_speakers(summary_md, next_kws)
@@ -177,6 +177,14 @@ class PodcastNotifier:
             return False
 
 # 辅助解析与提取函数
+def convert_markdown_inline(text):
+    import re
+    if not text:
+        return ""
+    # 将 markdown 粗体 **文字** 转换成 HTML 的 strong 加粗标签，并附加醒目的暖色高亮
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong style="color: #ff9e64;">\1</strong>', text)
+    return text
+
 def extract_section(text, keywords, next_keywords, default_val=''):
     import re
     for kw in keywords:
@@ -184,7 +192,8 @@ def extract_section(text, keywords, next_keywords, default_val=''):
         match = re.search(pattern, text)
         if match:
             val = match.group(1).strip()
-            val = re.sub(r'^[:：\s\*\-]+', '', val).strip()
+            # 保留星号以允许 inline markdown 渲染，只剥离开头的冒号、横杠与空格
+            val = re.sub(r'^[:：\-\s]+', '', val).strip()
             return val
     return default_val
 
@@ -198,18 +207,20 @@ def format_markdown_to_html_cards(markdown_text):
     
     intro = parts[0].strip()
     if intro and not intro.startswith("##"):
-        card_htmls.append(f"<p style='color: #d4d4d8; font-size: 14px; margin-bottom: 15px;'>{intro}</p>")
+        intro_clean = convert_markdown_inline(intro)
+        card_htmls.append(f"<p style='color: #d4d4d8; font-size: 14px; margin-bottom: 15px;'>{intro_clean}</p>")
         
     for part in parts[1:]:
         if not part.strip():
             continue
         lines = part.strip().split("\n")
-        title = lines[0].strip()
+        title = convert_markdown_inline(lines[0].strip())
         body = "\n".join(lines[1:]).strip()
         
         body_html = body
         body_html = re.sub(r'^\s*[\-\*]\s*\*\*([^*]+)\*\*[：:]*(.*)', r'<p style="margin: 6px 0; font-size: 13px; line-height: 1.5; color: #a1a1aa;"><strong style="color: #bb9af2;">\1：</strong>\2</p>', body_html, flags=re.MULTILINE)
         body_html = re.sub(r'^\s*[\-\*]\s*(.+)', r'<p style="margin: 6px 0; font-size: 13px; line-height: 1.5; color: #d4d4d8;">• \1</p>', body_html, flags=re.MULTILINE)
+        body_html = convert_markdown_inline(body_html)
         body_html = body_html.replace("\n", "<br>")
         
         card = f"""
@@ -225,10 +236,48 @@ def format_markdown_to_html_cards(markdown_text):
 def extract_speakers(summary_md, next_kws):
     import re
     sec3 = extract_section(summary_md, ['发言人画像与立场分析', '角色定位', '发言人'], next_kws)
-    host_match = re.search(r'主持人[：:\s]*\*{0,2}([^<\n\*，,。]+)\*{0,2}', sec3)
-    guest_match = re.search(r'嘉宾[：:\s]*\*{0,2}([^<\n\*，,。]+)\*{0,2}', sec3)
-    host = host_match.group(1).strip() if host_match else "未定位"
-    guest = guest_match.group(1).strip() if guest_match else "未定位"
-    host = re.sub(r'[\*\-\s,，]+$', '', host).strip()
-    guest = re.sub(r'[\*\-\s,，]+$', '', guest).strip()
+    host = "未定位"
+    guest = "未定位"
+    
+    for line in sec3.split('\n'):
+        line_str = line.strip()
+        if not line_str:
+            continue
+        if '主持人' in line_str or '主播' in line_str:
+            bold_matches = re.findall(r'\*\*([^*]+)\*\*', line_str)
+            if len(bold_matches) >= 2:
+                host = bold_matches[1].strip()
+            elif len(bold_matches) == 1:
+                if line_str.startswith('**主持人') or line_str.startswith('**主播'):
+                    colon_match = re.search(r'[：:]\s*(.*)', line_str)
+                    if colon_match:
+                        host = colon_match.group(1).strip()
+                else:
+                    host = bold_matches[0].strip()
+            else:
+                colon_match = re.search(r'[：:]\s*(.*)', line_str)
+                if colon_match:
+                    host = colon_match.group(1).strip()
+                    
+        elif '嘉宾' in line_str:
+            bold_matches = re.findall(r'\*\*([^*]+)\*\*', line_str)
+            if len(bold_matches) >= 2:
+                guest = bold_matches[1].strip()
+            elif len(bold_matches) == 1:
+                if line_str.startswith('**嘉宾'):
+                    colon_match = re.search(r'[：:]\s*(.*)', line_str)
+                    if colon_match:
+                        guest = colon_match.group(1).strip()
+                else:
+                    guest = bold_matches[0].strip()
+            else:
+                colon_match = re.search(r'[：:]\s*(.*)', line_str)
+                if colon_match:
+                    guest = colon_match.group(1).strip()
+                    
+    # 清理 Speaker_xx 等声纹分割临时标签后缀以及各种多余字符
+    host = re.sub(r'\s*[\(\uff08][sS][pP][eE][aA][kK][eE][rR]_\d+[\uff09\)]', '', host).strip()
+    guest = re.sub(r'\s*[\(\uff08][sS][pP][eE][aA][kK][eE][rR]_\d+[\uff09\)]', '', guest).strip()
+    host = re.sub(r'^[\-\*\s]+', '', host).strip()
+    guest = re.sub(r'^[\-\*\s]+', '', guest).strip()
     return host, guest
