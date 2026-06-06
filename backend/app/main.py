@@ -599,6 +599,7 @@ def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
 def get_performance():
     import subprocess
     import torch
+    from app.config import PROJECT_DIR
     
     cpu_percent = 0.0
     ram_total_gb = 0.0
@@ -608,6 +609,9 @@ def get_performance():
     vram_total_mb = 0.0
     vram_used_mb = 0.0
     vram_percent = 0.0
+    gpu_name = "NVIDIA GPU"
+    gpu_util = 0.0
+    gpu_temp = 0.0
     
     # 1. 查询 CPU 占用率
     try:
@@ -636,10 +640,11 @@ def get_performance():
     except Exception:
         pass
 
-    # 3. 查询显卡显存 VRAM
+    # 3. 查询显卡及显存 VRAM 详细信息
     has_gpu = torch.cuda.is_available()
     if has_gpu:
         try:
+            # 3.1 查显存
             vram_out = subprocess.check_output(
                 "nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader,nounits", 
                 shell=True
@@ -649,8 +654,53 @@ def get_performance():
                 vram_total_mb = float(parts[0].strip())
                 vram_used_mb = float(parts[1].strip())
                 vram_percent = round((vram_used_mb / vram_total_mb) * 100, 1)
+                
+            # 3.2 查 GPU 物理名称 (动态匹配用户显卡，拒绝硬编码)
+            gpu_name_out = subprocess.check_output(
+                "nvidia-smi --query-gpu=name --format=csv,noheader", 
+                shell=True
+            ).decode("utf-8", errors="ignore").strip()
+            if gpu_name_out:
+                gpu_name = gpu_name_out
+                
+            # 3.3 查 GPU 核心计算负载
+            gpu_util_out = subprocess.check_output(
+                "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits", 
+                shell=True
+            ).decode("utf-8", errors="ignore").strip()
+            if gpu_util_out:
+                gpu_util = float(gpu_util_out)
+                
+            # 3.4 查 GPU 核心温度
+            gpu_temp_out = subprocess.check_output(
+                "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits", 
+                shell=True
+            ).decode("utf-8", errors="ignore").strip()
+            if gpu_temp_out:
+                gpu_temp = float(gpu_temp_out)
         except Exception:
             pass
+
+    # 4. 查询磁盘存储空间 (项目所在分区)
+    disk_total_gb = 0.0
+    disk_used_gb = 0.0
+    disk_percent = 0.0
+    try:
+        total, used, free = shutil.disk_usage(str(PROJECT_DIR))
+        disk_total_gb = round(total / (1024**3), 1)
+        disk_used_gb = round(used / (1024**3), 1)
+        disk_percent = round((used / total) * 100, 1)
+    except Exception:
+        pass
+
+    # 5. 查询任务排队状况
+    queue_size = 0
+    try:
+        queue_size = queue_manager.task_queue.qsize()
+        if queue_manager.get_current_task_id() is not None:
+            queue_size += 1
+    except Exception:
+        pass
 
     return {
         "cpu": cpu_percent,
@@ -663,7 +713,18 @@ def get_performance():
             "total": vram_total_mb,
             "used": vram_used_mb,
             "percent": vram_percent,
-            "has_gpu": has_gpu
+            "has_gpu": has_gpu,
+            "gpu_name": gpu_name,
+            "gpu_util": gpu_util,
+            "gpu_temp": gpu_temp
+        },
+        "disk": {
+            "total": disk_total_gb,
+            "used": disk_used_gb,
+            "percent": disk_percent
+        },
+        "queue": {
+            "size": queue_size
         }
     }
 

@@ -594,6 +594,7 @@ export default function App() {
           flexDirection: 'column',
           gap: '8px'
         }}>
+          {/* CPU & RAM */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)' }}>CPU 占用率:</span>
             <span style={{ color: '#fff', fontWeight: '600' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
@@ -606,29 +607,78 @@ export default function App() {
             </span>
           </div>
 
+          {/* GPU 性能指标 */}
           {perfData?.vram?.has_gpu ? (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>显存 (RTX 3070):</span>
-                <span style={{ 
-                  color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : '#fff'),
-                  fontWeight: '600' 
-                }}>
-                  {Math.round(perfData.vram.used / 102.4) / 10}G / {Math.round(perfData.vram.total / 1024)}G
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: '0.8' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '140px' }} title={perfData.vram.gpu_name}>
+                  {perfData.vram.gpu_name}
+                </span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: '600' }}>
+                  {perfData.vram.gpu_temp}°C
                 </span>
               </div>
-              <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden' }}>
-                <div style={{ 
-                  width: `${perfData.vram.percent}%`, 
-                  height: '100%', 
-                  background: perfData.vram.percent > 85 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--accent))' 
-                }}></div>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>GPU 核心负载:</span>
+                <span style={{ color: '#fff', fontWeight: '600' }}>{perfData.vram.gpu_util}%</span>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>显存占用 (VRAM):</span>
+                  <span style={{ 
+                    color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : '#fff'),
+                    fontWeight: '600' 
+                  }}>
+                    {(perfData.vram.used / 1024).toFixed(1)}G / {(perfData.vram.total / 1024).toFixed(1)}G
+                  </span>
+                </div>
+                <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    width: `${perfData.vram.percent}%`, 
+                    height: '100%', 
+                    background: perfData.vram.percent > 85 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--accent))' 
+                  }}></div>
+                </div>
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--error)' }}>
               <span>GPU 运行状态:</span>
               <span>未启用 (CPU)</span>
+            </div>
+          )}
+
+          {/* 存储空间 (Disk) */}
+          {perfData?.disk && (
+            <div style={{ marginTop: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>存储空间 (Disk):</span>
+                <span style={{ color: '#fff', fontWeight: '600' }}>
+                  {perfData.disk.used}G / {perfData.disk.total}G
+                </span>
+              </div>
+              <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden' }}>
+                <div style={{ 
+                  width: `${perfData.disk.percent}%`, 
+                  height: '100%', 
+                  background: 'linear-gradient(90deg, #10b981, #059669)' 
+                }}></div>
+              </div>
+            </div>
+          )}
+
+          {/* 队列状况 */}
+          {perfData?.queue && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '2px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>排队中任务:</span>
+              <span style={{ 
+                color: perfData.queue.size > 0 ? 'var(--primary)' : 'var(--text-muted)', 
+                fontWeight: '700' 
+              }}>
+                {perfData.queue.size} 个
+              </span>
             </div>
           )}
         </div>
