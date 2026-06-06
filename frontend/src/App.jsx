@@ -157,7 +157,7 @@ const PRESETS = {
   light: {
     'Default Light': { background: '#FDF6E3', foreground: '#586E75', primary: '#268BD2', accent: '#CB4B16' },
     'Pure White': { background: '#FFFFFF', foreground: '#111827', primary: '#3B82F6', accent: '#8B5CF6' },
-    'Soft Green': { background: '#F0F9FF', foreground: '#1E293B', primary: '#0D9488', accent: '#D97706' }
+    'Soft Green': { background: '#F0FDF4', foreground: '#1E293B', primary: '#0D9488', accent: '#D97706' }
   },
   dark: {
     'Default Dark': { background: '#272822', foreground: '#F8F8F2', primary: '#66D9EF', accent: '#F92672' },
@@ -319,6 +319,10 @@ export default function App() {
         } else if (bgLower === '#fdf6e3') {
           bgSurface = '#eee8d5';
           bgSurfaceHover = '#e4ddca';
+        } else if (bgLower === '#f0fdf4') {
+          bgBase = '#f0fdf4';
+          bgSurface = '#ffffff';
+          bgSurfaceHover = '#f1fbf4';
         } else {
           bgBase = '#f1f7fc';
           bgSurface = '#ffffff';
@@ -711,9 +715,10 @@ export default function App() {
               className="btn-ghost" 
               style={{ 
                 justifyContent: 'flex-start', 
-                background: activeTab === 'dashboard' ? 'rgba(255,255,255,0.06)' : 'transparent',
-                borderColor: activeTab === 'dashboard' ? 'var(--border-hover)' : 'transparent',
-                color: activeTab === 'dashboard' ? '#fff' : 'var(--text-secondary)'
+                background: activeTab === 'dashboard' ? 'var(--primary-glow)' : 'transparent',
+                borderColor: activeTab === 'dashboard' ? 'var(--primary)' : 'transparent',
+                color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'dashboard' ? '700' : '500'
               }}
             >
               <Icons.Home />
@@ -725,9 +730,10 @@ export default function App() {
               className="btn-ghost" 
               style={{ 
                 justifyContent: 'flex-start', 
-                background: activeTab === 'config' ? 'rgba(255,255,255,0.06)' : 'transparent',
-                borderColor: activeTab === 'config' ? 'var(--border-hover)' : 'transparent',
-                color: activeTab === 'config' ? '#fff' : 'var(--text-secondary)'
+                background: activeTab === 'config' ? 'var(--primary-glow)' : 'transparent',
+                borderColor: activeTab === 'config' ? 'var(--primary)' : 'transparent',
+                color: activeTab === 'config' ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'config' ? '700' : '500'
               }}
             >
               <Icons.Settings />
@@ -780,7 +786,7 @@ export default function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>显存占用 (VRAM):</span>
                   <span style={{ 
-                    color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : '#fff'),
+                    color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : 'var(--text-primary)'),
                     fontWeight: '600' 
                   }}>
                     {(perfData.vram.used / 1024).toFixed(1)}G / {(perfData.vram.total / 1024).toFixed(1)}G
@@ -1182,7 +1188,7 @@ export default function App() {
                       background: 'transparent', 
                       border: 'none', 
                       padding: '16px', 
-                      color: detailSubTab === 'summary' ? '#fff' : 'var(--text-secondary)',
+                      color: detailSubTab === 'summary' ? 'var(--primary)' : 'var(--text-secondary)',
                       fontWeight: detailSubTab === 'summary' ? '700' : '500',
                       borderBottom: detailSubTab === 'summary' ? '2px solid var(--primary)' : 'none',
                       cursor: 'pointer'
@@ -1197,7 +1203,7 @@ export default function App() {
                       background: 'transparent', 
                       border: 'none', 
                       padding: '16px', 
-                      color: detailSubTab === 'shownotes' ? '#fff' : 'var(--text-secondary)',
+                      color: detailSubTab === 'shownotes' ? 'var(--primary)' : 'var(--text-secondary)',
                       fontWeight: detailSubTab === 'shownotes' ? '700' : '500',
                       borderBottom: detailSubTab === 'shownotes' ? '2px solid var(--primary)' : 'none',
                       cursor: 'pointer'
@@ -1212,7 +1218,7 @@ export default function App() {
                       background: 'transparent', 
                       border: 'none', 
                       padding: '16px', 
-                      color: detailSubTab === 'speakers' ? '#fff' : 'var(--text-secondary)',
+                      color: detailSubTab === 'speakers' ? 'var(--primary)' : 'var(--text-secondary)',
                       fontWeight: detailSubTab === 'speakers' ? '700' : '500',
                       borderBottom: detailSubTab === 'speakers' ? '2px solid var(--primary)' : 'none',
                       cursor: 'pointer'
