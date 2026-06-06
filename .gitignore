@@ -1,0 +1,52 @@
+# whisperMe - Git Ignore Configurations
+
+# 1. Credentials & Configuration (🛡️ CRITICAL - DO NOT SECURELY UN-IGNORE)
+config.json
+
+# 2. Local Databases & User Data
+tasks_db.json
+speaker_fingerprints.json
+
+# 3. Audio Cache, Sandbox & Exports
+downloads/
+temp_sandbox/
+transcripts/
+
+# 4. Large Machine Learning Models & Cache
+models/
+hf_cache_models/
+
+# 5. Virtual Environments (Python)
+venv/
+.env
+.venv
+env/
+ENV/
+
+# 6. Python Cache & Build Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# 7. Frontend Dependency & Build folders
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/.next/
+frontend/build/
+
+# 8. Local Scratch scripts
+scratch/
+
+# 9. Editor & OS Specific Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

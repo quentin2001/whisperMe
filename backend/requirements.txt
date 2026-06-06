@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+httpx
+beautifulsoup4
+yt-dlp
+faster-whisper
+pyannote.audio==3.1.1
+plyer

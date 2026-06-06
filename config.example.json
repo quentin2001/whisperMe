@@ -1,0 +1,23 @@
+{
+  "ffmpeg_path": "C:\\Users\\yourname\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_...\\bin\\ffmpeg.exe",
+  "ffmpeg_bin_dir": "C:\\Users\\yourname\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_...\\bin",
+  "local_whisper_model_path": "E:\\models\\whisper\\model_large_v3",
+  "hf_token": "YOUR_HUGGING_FACE_READ_TOKEN_HERE",
+  "ollama_url": "http://127.0.0.1:11434",
+  "ollama_model": "qwen2.5:7b-instruct",
+  "smtp_server": "smtp.qq.com",
+  "smtp_port": 465,
+  "smtp_username": "YOUR_EMAIL@qq.com",
+  "smtp_password": "YOUR_SMTP_AUTHORIZATION_CODE",
+  "smtp_sender": "YOUR_EMAIL@qq.com",
+  "notification_email": "YOUR_EMAIL@qq.com",
+  "enable_win_notification": true,
+  "asr_mode": "local",
+  "online_api_key": "YOUR_ONLINE_ASR_API_KEY",
+  "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
+  "online_model": "mimo-v2.5-asr",
+  "summary_mode": "local",
+  "online_summary_api_key": "YOUR_LLM_SUMMARY_API_KEY",
+  "online_summary_base_url": "https://api.openai.com/v1",
+  "online_summary_model": "gpt-4o-mini"
+}
