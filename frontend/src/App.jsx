@@ -153,6 +153,19 @@ function MarkdownRenderer({ text }) {
   return <div className="markdown-body">{renderedElements}</div>;
 }
 
+const PRESETS = {
+  light: {
+    'Default Light': { background: '#FDF6E3', foreground: '#586E75', accent: '#CB4B16' },
+    'Pure White': { background: '#FFFFFF', foreground: '#111827', accent: '#4F46E5' },
+    'Soft Green': { background: '#F0F9FF', foreground: '#1E293B', accent: '#0D9488' }
+  },
+  dark: {
+    'Default Dark': { background: '#272822', foreground: '#F8F8F2', accent: '#F92672' },
+    'Antigravity Slate': { background: '#0F172A', foreground: '#F8FAFC', accent: '#38BDF8' },
+    'Midnight Obsidian': { background: '#0B0F19', foreground: '#E2E8F0', accent: '#8B5CF6' }
+  }
+};
+
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 export default function App() {
@@ -211,6 +224,105 @@ export default function App() {
 
   // 硬件性能监控数据
   const [perfData, setPerfData] = useState(null);
+
+  // 主题与外观模式状态定义
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem('themeMode') || 'dark';
+  });
+
+  const [lightTheme, setLightTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lightTheme');
+      return saved ? JSON.parse(saved) : PRESETS.light['Default Light'];
+    } catch (e) {
+      return PRESETS.light['Default Light'];
+    }
+  });
+
+  const [darkTheme, setDarkTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('darkTheme');
+      return saved ? JSON.parse(saved) : PRESETS.dark['Default Dark'];
+    } catch (e) {
+      return PRESETS.dark['Default Dark'];
+    }
+  });
+
+  const [lightPresetName, setLightPresetName] = useState(() => {
+    return localStorage.getItem('lightPresetName') || 'Default Light';
+  });
+
+  const [darkPresetName, setDarkPresetName] = useState(() => {
+    return localStorage.getItem('darkPresetName') || 'Default Dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('themeMode', themeMode);
+    localStorage.setItem('lightTheme', JSON.stringify(lightTheme));
+    localStorage.setItem('darkTheme', JSON.stringify(darkTheme));
+    localStorage.setItem('lightPresetName', lightPresetName);
+    localStorage.setItem('darkPresetName', darkPresetName);
+
+    const hexToRgb = (hex) => {
+      if (!hex) return { r: 122, g: 162, b: 247 };
+      const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+      const fullHex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 122, g: 162, b: 247 };
+    };
+
+    const applyColors = () => {
+      const activeMode = themeMode === 'system' 
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : themeMode;
+      
+      const colors = activeMode === 'dark' ? darkTheme : lightTheme;
+      const root = document.documentElement;
+      
+      root.style.setProperty('--bg-base', colors.background);
+      root.style.setProperty('--text-primary', colors.foreground);
+      root.style.setProperty('--primary', colors.accent);
+      root.style.setProperty('--accent', colors.accent);
+      
+      const fgRgb = hexToRgb(colors.foreground);
+      const accRgb = hexToRgb(colors.accent);
+      
+      root.style.setProperty('--text-secondary', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, 0.65)`);
+      root.style.setProperty('--text-muted', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, 0.4)`);
+      root.style.setProperty('--primary-glow', `rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.15)`);
+      root.style.setProperty('--accent-glow', `rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.15)`);
+      
+      if (activeMode === 'dark') {
+        root.style.setProperty('--bg-surface', 'rgba(255, 255, 255, 0.03)');
+        root.style.setProperty('--bg-surface-hover', 'rgba(255, 255, 255, 0.06)');
+        root.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.06)');
+        root.style.setProperty('--border-hover', 'rgba(255, 255, 255, 0.12)');
+      } else {
+        root.style.setProperty('--bg-surface', 'rgba(255, 255, 255, 0.55)');
+        root.style.setProperty('--bg-surface-hover', 'rgba(255, 255, 255, 0.8)');
+        root.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.06)');
+        root.style.setProperty('--border-hover', 'rgba(0, 0, 0, 0.12)');
+      }
+    };
+
+    applyColors();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      if (themeMode === 'system') {
+        applyColors();
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    };
+  }, [themeMode, lightTheme, darkTheme, lightPresetName, darkPresetName]);
 
   // 获取硬件性能监控
   const fetchPerformance = async () => {
@@ -1224,6 +1336,369 @@ export default function App() {
             <div className="glass-panel" style={{ maxWidth: '780px', margin: '0 auto', padding: '30px' }}>
               <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
+                {/* 0. 外观主题设置 (Appearance) */}
+                <div style={{ marginBottom: '10px' }}>
+                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px' }}>🎨 主题外观设置 (Appearance)</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>配置系统的视觉主题与色彩显示偏好。</p>
+                  
+                  {/* Mode Select */}
+                  <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px', background: 'rgba(0,0,0,0.1)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '13.5px', color: '#fff', fontWeight: '500' }}>显示模式 (Appearance)</span>
+                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>选择浅色、深色，或跟随系统。</span>
+                      </div>
+                      <select
+                        value={themeMode}
+                        onChange={(e) => setThemeMode(e.target.value)}
+                        className="glass-input"
+                        style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: '#fff' }}
+                      >
+                        <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
+                        <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
+                        <option value="system" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>System (跟随系统)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Light & Dark Theme Editors side-by-side */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    
+                    {/* Light Theme Panel */}
+                    <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                        ☀️ 浅色主题配置 (Light Theme)
+                      </h4>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>预设方案 (Preset)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setLightTheme(PRESETS.light[lightPresetName]);
+                            }}
+                            title="重置为当前预设默认颜色"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '15px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 0.2s'
+                            }}
+                          >
+                            ↶
+                          </button>
+                          <select
+                            value={lightPresetName}
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              setLightPresetName(name);
+                              setLightTheme(PRESETS.light[name]);
+                            }}
+                            className="glass-input"
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                          >
+                            {Object.keys(PRESETS.light).map(k => (
+                              <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Background Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>背景色 (Background)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: lightTheme.background,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={lightTheme.background} 
+                              onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={lightTheme.background} 
+                            onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Foreground Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>前景色 (Foreground)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: lightTheme.foreground,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={lightTheme.foreground} 
+                              onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={lightTheme.foreground} 
+                            onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Accent Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>强调色 (Accent)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: lightTheme.accent,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={lightTheme.accent} 
+                              onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={lightTheme.accent} 
+                            onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Dark Theme Panel */}
+                    <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                        🌙 深色主题配置 (Dark Theme)
+                      </h4>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>预设方案 (Preset)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setDarkTheme(PRESETS.dark[darkPresetName]);
+                            }}
+                            title="重置为当前预设默认颜色"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '15px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 0.2s'
+                            }}
+                          >
+                            ↶
+                          </button>
+                          <select
+                            value={darkPresetName}
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              setDarkPresetName(name);
+                              setDarkTheme(PRESETS.dark[name]);
+                            }}
+                            className="glass-input"
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                          >
+                            {Object.keys(PRESETS.dark).map(k => (
+                              <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Background Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>背景色 (Background)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: darkTheme.background,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={darkTheme.background} 
+                              onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={darkTheme.background} 
+                            onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Foreground Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>前景色 (Foreground)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: darkTheme.foreground,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={darkTheme.foreground} 
+                              onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={darkTheme.foreground} 
+                            onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Accent Color */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>强调色 (Accent)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '4px',
+                            backgroundColor: darkTheme.accent,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <input 
+                              type="color" 
+                              value={darkTheme.accent} 
+                              onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })} 
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '-5px',
+                                width: '34px',
+                                height: '34px',
+                                opacity: 0,
+                                cursor: 'pointer'
+                              }} 
+                            />
+                          </div>
+                          <input 
+                            type="text" 
+                            value={darkTheme.accent} 
+                            onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })}
+                            className="glass-input" 
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+                </div>
+
                 {/* 1. 本地程序物理路径 */}
                 <div>
                   <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🛠️ 本地核心组件路径</h3>
