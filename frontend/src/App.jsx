@@ -184,8 +184,412 @@ const getSourceLabel = (task) => {
 
 const BACKEND_URL = "http://127.0.0.1:8000";
 
+const TRANSLATIONS = {
+  'zh-CN': {
+    'dashboard': '我的播客库',
+    'settings': '系统设置',
+    'center_sub': '本地播客声纹自动化处理中心',
+    'cpu': 'CPU 占用率',
+    'ram': '系统内存 (RAM)',
+    'gpu_name_lbl': '显卡名称',
+    'gpu_temp_lbl': '核心温度',
+    'gpu_load': 'GPU 核心负载',
+    'vram': '显存占用 (VRAM)',
+    'gpu_cpu': 'GPU 运行状态',
+    'gpu_cpu_off': '未启用 (CPU)',
+    'disk': '存储空间 (Disk)',
+    'queue_tasks': '排队中任务',
+    'asr_engine': '转录 (ASR)',
+    'llm_engine': '总结 (LLM)',
+    'connected': '🟢 本地已联通',
+    'online_mode': '☁️ 云端 API',
+    'offline': '🔴 本地未开启',
+    'my_podcast_lib': '我的播客库',
+    'transcribe_asr': '转录 (ASR)',
+    'summary_llm': '总结 (LLM)',
+    'local': '本地',
+    'online': '在线',
+    'local_trans': '本地模式',
+    'online_trans': '在线模式',
+    'input_placeholder': '粘贴小宇宙或Bilibili链接...',
+    'fetch_audio': '抓取音频',
+    'upload_audio': '上传音频',
+    'initiating': '发起中...',
+    'uploading': '上传中...',
+    'empty_lib': '您的播客库空空如也',
+    'empty_lib_sub': '在右上方输入播客单集链接或点击“上传音频”，即可开始体验自动排队、声纹切分与 AI 总结服务',
+    'local_asr_badge': '本地转录',
+    'online_asr_badge': '在线转录',
+    'failed': '处理失败',
+    'completed': '已完成',
+    'warning_llm_off': '⚠️ 本地 AI 总结大模型 (LLM) 未开启提示：检测到当前选择“本地总结模式”，但本地推理接口端口（Ollama/LM Studio）处于未启动状态，总结任务将无法进行。请启动对应本地端口，或在“系统设置”中切换为云端模式。',
+    'back': '返回',
+    'script_dialogue': '剧本对话流',
+    'script_dialogue_sub': '点击说话人旁的编辑图标可修改昵称，点击对话行跳转音频',
+    'script_loading': '正在为您进行 GPU 识别...',
+    'script_loading_sub': '转录完成后此处将按顺序显示剧本。',
+    'script_empty': '暂无剧本数据，可能是降级未包含声纹/识别出错',
+    'ai_report': 'AI 总结报告',
+    'shownotes_comments': 'Shownotes & 热门评论',
+    'speaker_list': '说话人声纹特征库',
+    'regenerate_summary': '重新生成 AI 报告',
+    'sys_config_header': '系统设置',
+    'tab_appearance': '🎨 外观与语言',
+    'tab_asr': '🎙️ 语音转录 (ASR)',
+    'tab_llm': '📝 AI 总结 (LLM)',
+    'tab_notifications': '✉️ 消息通知 (SMTP)',
+    'theme_appearance': '🎨 主题外观设置 (Appearance)',
+    'theme_sub': '配置系统的视觉主题与色彩显示偏好。',
+    'display_mode': '显示模式 (Appearance)',
+    'display_mode_sub': '选择浅色、深色，或跟随系统。',
+    'light_theme_title': '☀️ 浅色主题配置 (Light Theme)',
+    'dark_theme_title': '🌙 深色主题配置 (Dark Theme)',
+    'preset': '预设方案 (Preset)',
+    'bg_color': '背景色 (Background)',
+    'fg_color': '前景色 (Foreground)',
+    'accent_color': '强调色 (Accent)',
+    'language_setting': '🌐 语言设置 (Language)',
+    'language_setting_sub': '选择系统界面的显示语言。',
+    'select_lang': '系统语言 (Language)',
+    'auto_save_chk': '💡 自动保存更改',
+    'save_status_saving': '⏳ 正在自动保存...',
+    'save_status_saved': '✅ 配置已自动保存并实时应用',
+    'save_status_unsaved': '✍️ 正在修改，稍后将自动保存...',
+    'save_status_unsaved_manual': '⚠️ 有未保存的更改',
+    'save_status_error': '❌ 保存失败，请检查网络与后端',
+    'save_status_idle': '✨ 配置已加载',
+    'save_btn': '保存参数配置',
+    'ffmpeg_exe_path': 'FFmpeg 物理主程序路径 (.exe)',
+    'ffmpeg_bin_dir': 'FFmpeg Bin 二进制文件夹目录',
+    'whisper_path': '本地 Whisper 大模型路径 (如 model_large_v3)',
+    'hf_token_lbl': 'Hugging Face User Access Token (以 hf_ 开头，声纹识别必需)',
+    'hf_token_placeholder': '如果您需要声纹分角色功能，请在此粘贴 HF Token',
+    'hf_token_sub': '* 说明：请确保您在 Hugging Face 账号中已经接受了 pyannote/speaker-diarization-3.1 模型的共享协议。不填将直接熔断降级为单轨道转录，不崩盘。',
+    'mimo_key_lbl': 'Mimo / OpenAI 兼容 API Key (密钥)',
+    'mimo_key_placeholder': '在此粘贴您的 tp-xxxxxx 密钥',
+    'mimo_url_lbl': '在线 API Base URL (请求网关)',
+    'mimo_model_lbl': '在线 ASR 模型代号',
+    'local_api_url': '本地 API 地址 (Ollama/LM Studio)',
+    'local_model_id': '所选分析模型代号',
+    'online_api_url': '在线 API 代理地址 (Base URL)',
+    'online_model_id': '在线分析模型代号 (Model ID)',
+    'online_api_key': '在线 API 授权秘钥 (API Key)',
+    'smtp_server': 'SMTP 服务器（如 smtp.qq.com）',
+    'smtp_port': 'SMTP 端口',
+    'smtp_user': '邮箱登录用户名',
+    'smtp_pass': '邮箱 SMTP 授权码/授权密钥',
+    'smtp_sender': '发送人签名邮箱',
+    'smtp_receiver': '提醒接收人目标邮箱',
+    'enable_win_notify': '开启 Windows 右下角桌面气泡推送提醒',
+    'summarizing': '本地大模型正在拼命为您总结中...',
+    'summarizing_sub': '这会占用少量显卡显存并执行推理，大约需要 30-90 秒。'
+  },
+  'zh-TW': {
+    'dashboard': '我的播客庫',
+    'settings': '系統設定',
+    'center_sub': '在地播客聲紋自動化處理中心',
+    'cpu': 'CPU 使用率',
+    'ram': '系統記憶體 (RAM)',
+    'gpu_name_lbl': '顯示卡名稱',
+    'gpu_temp_lbl': '核心溫度',
+    'gpu_load': 'GPU 核心負載',
+    'vram': '顯示記憶體 (VRAM)',
+    'gpu_cpu': 'GPU 運行狀態',
+    'gpu_cpu_off': '未啟用 (CPU)',
+    'disk': '儲存空間 (Disk)',
+    'queue_tasks': '排隊中任務',
+    'asr_engine': '轉錄 (ASR)',
+    'llm_engine': '總結 (LLM)',
+    'connected': '🟢 在地已聯通',
+    'online_mode': '☁️ 雲端 API',
+    'offline': '🔴 在地未開啟',
+    'my_podcast_lib': '我的播客庫',
+    'transcribe_asr': '轉錄 (ASR)',
+    'summary_llm': '總結 (LLM)',
+    'local': '在地',
+    'online': '線上',
+    'local_trans': '在地模式',
+    'online_trans': '線上模式',
+    'input_placeholder': '貼上小宇宙或Bilibili連結...',
+    'fetch_audio': '擷取音訊',
+    'upload_audio': '上傳音訊',
+    'initiating': '發起中...',
+    'uploading': '上傳中...',
+    'empty_lib': '您的播客庫空空如也',
+    'empty_lib_sub': '在右上方輸入播客單集連結或點擊「上傳音訊」，即可開始體驗自動排隊、聲紋切分與 AI 總結服務',
+    'local_asr_badge': '在地轉錄',
+    'online_asr_badge': '線上轉錄',
+    'failed': '處理失敗',
+    'completed': '已完成',
+    'warning_llm_off': '⚠️ 在地 AI 總結大模型 (LLM) 未開啟提示：檢測到當前選擇「在地總結模式」，但在地推理介面端口（Ollama/LM Studio）處於未啟動狀態，總結任務將無法進行。請啟動對應在地端口，或在「系統設定」中切換為雲端模式。',
+    'back': '返回',
+    'script_dialogue': '劇本對話流',
+    'script_dialogue_sub': '點擊說話人旁的編輯圖示可修改暱稱，點擊對話行跳轉音訊',
+    'script_loading': '正在為您進行 GPU 識別...',
+    'script_loading_sub': '轉錄完成後此處將按順序顯示劇本。',
+    'script_empty': '暫無劇本資料，可能是降級未包含聲紋/識別出錯',
+    'ai_report': 'AI 總結報告',
+    'shownotes_comments': 'Shownotes & 熱門評論',
+    'speaker_list': '說話人聲紋特徵庫',
+    'regenerate_summary': '重新生成 AI 報告',
+    'sys_config_header': '系統設定',
+    'tab_appearance': '🎨 外觀與語言',
+    'tab_asr': '🎙️ 語音轉錄 (ASR)',
+    'tab_llm': '📝 AI 總結 (LLM)',
+    'tab_notifications': '✉️ 消息通知 (SMTP)',
+    'theme_appearance': '🎨 主題外觀設置 (Appearance)',
+    'theme_sub': '配置系統的視覺主題與色彩顯示偏好。',
+    'display_mode': '顯示模式 (Appearance)',
+    'display_mode_sub': '選擇淺色、深色，或跟隨系統。',
+    'light_theme_title': '☀️ 淺色主題配置 (Light Theme)',
+    'dark_theme_title': '🌙 深色主題配置 (Dark Theme)',
+    'preset': '預設方案 (Preset)',
+    'bg_color': '背景色 (Background)',
+    'fg_color': '前景色 (Foreground)',
+    'accent_color': '強調色 (Accent)',
+    'language_setting': '🌐 語言設置 (Language)',
+    'language_setting_sub': '選擇系統介面的顯示語言。',
+    'select_lang': '系統語言 (Language)',
+    'auto_save_chk': '💡 自動保存更改',
+    'save_status_saving': '⏳ 正在自動保存...',
+    'save_status_saved': '✅ 配置已自動保存並即時應用',
+    'save_status_unsaved': '✍️ 正在修改，稍後將自動保存...',
+    'save_status_unsaved_manual': '⚠️ 有未保存的更改',
+    'save_status_error': '❌ 保存失敗，請檢查網路與後端',
+    'save_status_idle': '✨ 配置已載入',
+    'save_btn': '保存參數配置',
+    'ffmpeg_exe_path': 'FFmpeg 物理主程序路徑 (.exe)',
+    'ffmpeg_bin_dir': 'FFmpeg Bin 二進位資料夾目錄',
+    'whisper_path': '在地 Whisper 大模型路徑 (如 model_large_v3)',
+    'hf_token_lbl': 'Hugging Face User Access Token (以 hf_ 開頭，聲紋識別必需)',
+    'hf_token_placeholder': '如果您需要聲紋分角色功能，請在此貼上 HF Token',
+    'hf_token_sub': '* 說明：請確保您在 Hugging Face 帳號中已經接受了 pyannote/speaker-diarization-3.1 模型的共享協議。不填將直接熔斷降級為單軌道轉錄，不崩盤。',
+    'mimo_key_lbl': 'Mimo / OpenAI 相容 API Key (金鑰)',
+    'mimo_key_placeholder': '在此貼上您的 tp-xxxxxx 金鑰',
+    'mimo_url_lbl': '線上 API Base URL (請求網關)',
+    'mimo_model_lbl': '線上 ASR 模型代號',
+    'local_api_url': '在地 API 地址 (Ollama/LM Studio)',
+    'local_model_id': '所選分析模型代號',
+    'online_api_url': '線上 API 代理地址 (Base URL)',
+    'online_model_id': '線上分析模型代號 (Model ID)',
+    'online_api_key': '線上 API 授權金鑰 (API Key)',
+    'smtp_server': 'SMTP 伺服器（如 smtp.qq.com）',
+    'smtp_port': 'SMTP 端口',
+    'smtp_user': '郵箱登入使用者名稱',
+    'smtp_pass': '郵箱 SMTP 授權碼/授權金鑰',
+    'smtp_sender': '發送人簽名郵箱',
+    'smtp_receiver': '提醒接收人目標郵箱',
+    'enable_win_notify': '開啟 Windows 右下角桌面氣泡推送提醒',
+    'summarizing': '在地大模型正在拼命為您總結中...',
+    'summarizing_sub': '這會佔用少量顯卡顯存並執行推理，大約需要 30-90 秒。'
+  },
+  'en-US': {
+    'dashboard': 'My Podcast Library',
+    'settings': 'Settings',
+    'center_sub': 'Local Podcast Voiceprint Automation Center',
+    'cpu': 'CPU Usage',
+    'ram': 'System Memory (RAM)',
+    'gpu_name_lbl': 'GPU Name',
+    'gpu_temp_lbl': 'GPU Temp',
+    'gpu_load': 'GPU Core Load',
+    'vram': 'VRAM Usage',
+    'gpu_cpu': 'GPU Status',
+    'gpu_cpu_off': 'Not Enabled (CPU)',
+    'disk': 'Disk Space',
+    'queue_tasks': 'Queued Tasks',
+    'asr_engine': 'ASR Engine',
+    'llm_engine': 'LLM Engine',
+    'connected': '🟢 Connected',
+    'online_mode': '☁️ Cloud API',
+    'offline': '🔴 Offline',
+    'my_podcast_lib': 'My Podcast Library',
+    'transcribe_asr': 'ASR',
+    'summary_llm': 'LLM',
+    'local': 'Local',
+    'online': 'Online',
+    'local_trans': 'Local ASR',
+    'online_trans': 'Online ASR',
+    'input_placeholder': 'Paste Xiaoyuzhou or Bilibili URL...',
+    'fetch_audio': 'Fetch Audio',
+    'upload_audio': 'Upload Audio',
+    'initiating': 'Initiating...',
+    'uploading': 'Uploading...',
+    'empty_lib': 'Your podcast library is empty',
+    'empty_lib_sub': 'Enter a podcast URL or click "Upload Audio" to start transcript, voiceprint and AI summary services.',
+    'local_asr_badge': 'Local ASR',
+    'online_asr_badge': 'Online ASR',
+    'failed': 'Failed',
+    'completed': 'Completed',
+    'warning_llm_off': '⚠️ Local LLM Offline: The local summary mode is selected, but local service (Ollama/LM Studio) is not running. Please launch Ollama or switch to Cloud API in Settings.',
+    'back': 'Back',
+    'script_dialogue': 'Dialogue Transcript',
+    'script_dialogue_sub': 'Click edit icon next to speakers to rename, click bubbles to jump in audio',
+    'script_loading': 'Processing audio on GPU...',
+    'script_loading_sub': 'Transcript will be displayed sequentially once processed.',
+    'script_empty': 'No script data found. Voiceprint fallback or transcription error occurred.',
+    'ai_report': 'AI Summary Report',
+    'shownotes_comments': 'Shownotes & Hot Comments',
+    'speaker_list': 'Speaker Voiceprints',
+    'regenerate_summary': 'Regenerate Report',
+    'sys_config_header': 'System Settings',
+    'tab_appearance': '🎨 Appearance & Lang',
+    'tab_asr': '🎙️ ASR Settings',
+    'tab_llm': '📝 LLM Settings',
+    'tab_notifications': '✉️ Notification (SMTP)',
+    'theme_appearance': '🎨 Theme Settings (Appearance)',
+    'theme_sub': 'Configure visual themes and color settings.',
+    'display_mode': 'Display Mode',
+    'display_mode_sub': 'Select Light, Dark, or System preference.',
+    'light_theme_title': '☀️ Light Theme Configuration',
+    'dark_theme_title': '🌙 Dark Theme Configuration',
+    'preset': 'Preset',
+    'bg_color': 'Background Color',
+    'fg_color': 'Foreground Color',
+    'accent_color': 'Accent Color',
+    'language_setting': '🌐 Language Setting',
+    'language_setting_sub': 'Select the interface language for the application.',
+    'select_lang': 'System Language',
+    'auto_save_chk': '💡 Auto-save settings',
+    'save_status_saving': '⏳ Auto-saving...',
+    'save_status_saved': '✅ Saved & applied',
+    'save_status_unsaved': '✍️ Typing, will auto-save...',
+    'save_status_unsaved_manual': '⚠️ Unsaved changes',
+    'save_status_error': '❌ Save failed',
+    'save_status_idle': '✨ Config loaded',
+    'save_btn': 'Save Settings',
+    'ffmpeg_exe_path': 'FFmpeg Executable Path (.exe)',
+    'ffmpeg_bin_dir': 'FFmpeg Bin Directory',
+    'whisper_path': 'Local Whisper Model Path',
+    'hf_token_lbl': 'Hugging Face Access Token (diarization requirement)',
+    'hf_token_placeholder': 'Paste HF token starting with hf_',
+    'hf_token_sub': '* Agreement for pyannote/speaker-diarization-3.1 must be accepted on Hugging Face.',
+    'mimo_key_lbl': 'OpenAI Compatible ASR API Key',
+    'mimo_key_placeholder': 'Paste your API Key',
+    'mimo_url_lbl': 'API Base URL',
+    'mimo_model_lbl': 'ASR Model ID',
+    'local_api_url': 'Local API URL (Ollama/LM Studio)',
+    'local_model_id': 'Local LLM Model ID',
+    'online_api_url': 'Online API Base URL',
+    'online_model_id': 'Online Model ID',
+    'online_api_key': 'Online API Key',
+    'smtp_server': 'SMTP Server (e.g. smtp.gmail.com)',
+    'smtp_port': 'SMTP Port',
+    'smtp_user': 'SMTP Username',
+    'smtp_pass': 'SMTP Password / Auth Key',
+    'smtp_sender': 'Sender Email Address',
+    'smtp_receiver': 'Notification Receiver Email',
+    'enable_win_notify': 'Enable Windows notification bubbles',
+    'summarizing': 'AI summary generation in progress...',
+    'summarizing_sub': 'This will occupy a small amount of VRAM and perform inference. Takes about 30-90 seconds.'
+  },
+  'ja-JP': {
+    'dashboard': 'ポッドキャストライブラリ',
+    'settings': 'システム設定',
+    'center_sub': 'ローカル音声ダイアリゼーション処理センター',
+    'cpu': 'CPU使用率',
+    'ram': 'システムメモリ (RAM)',
+    'gpu_name_lbl': 'グラフィックカード名',
+    'gpu_temp_lbl': 'コア温度',
+    'gpu_load': 'GPUコア負荷',
+    'vram': 'VRAM使用率',
+    'gpu_cpu': 'GPUステータス',
+    'gpu_cpu_off': '未有効化 (CPU)',
+    'disk': 'ストレージ空き容量',
+    'queue_tasks': 'キューにあるタスク',
+    'asr_engine': '文字起こし (ASR)',
+    'llm_engine': 'AI 要約 (LLM)',
+    'connected': '🟢 接続済み',
+    'online_mode': '☁️ クラウド API',
+    'offline': '🔴 未起動',
+    'my_podcast_lib': 'ポッドキャストライブラリ',
+    'transcribe_asr': 'ASR',
+    'summary_llm': 'LLM',
+    'local': 'ローカル',
+    'online': 'オンライン',
+    'local_trans': 'ローカル ASR',
+    'online_trans': 'オンライン ASR',
+    'input_placeholder': 'リンクを貼り付けてください...',
+    'fetch_audio': '取得開始',
+    'upload_audio': 'アップロード',
+    'initiating': '送信中...',
+    'uploading': '送信中...',
+    'empty_lib': 'ライブラリは空です',
+    'empty_lib_sub': 'URLを貼り付けるか、「アップロード」をクリックして自動処理を開始してください。',
+    'local_asr_badge': 'ローカル文字起こし',
+    'online_asr_badge': 'オンライン文字起こし',
+    'failed': '失敗',
+    'completed': '完了',
+    'warning_llm_off': '⚠️ ローカル大模型 (LLM) オフライン警告: ローカル要約モードが選択されていますが、ローカルポート (Ollama/LM Studio) が起動していません。Ollama を起動するか、クラウドAPIに切り替えてください。',
+    'back': '戻る',
+    'script_dialogue': '台本テキストストリーム',
+    'script_dialogue_sub': '話者のニックネームをクリックして編集、テキストをクリックして再生位置移動',
+    'script_loading': 'GPUで処理中...',
+    'script_loading_sub': '文字起こしが完了すると台本が表示されます。',
+    'script_empty': 'データがありません。音声認識エラーの可能性があります。',
+    'ai_report': 'AI 要約レポート',
+    'shownotes_comments': 'Shownotes & 人気コメント',
+    'speaker_list': '話者一覧',
+    'regenerate_summary': 'レポート再生成',
+    'sys_config_header': 'システム設定',
+    'tab_appearance': '🎨 外観と言語',
+    'tab_asr': '🎙️ 文字起こし (ASR)',
+    'tab_llm': '📝 AI 要約 (LLM)',
+    'tab_notifications': '✉️ メール通知 (SMTP)',
+    'theme_appearance': '🎨 テーマ外観設定',
+    'theme_sub': 'ビジュアルテーマとカラー設定を設定します。',
+    'display_mode': '表示モード',
+    'display_mode_sub': 'ライト、ダーク、またはシステム設定を選択してください。',
+    'light_theme_title': '☀️ ライトテーマ設定',
+    'dark_theme_title': '🌙 ダークテーマ設定',
+    'preset': 'プリセット',
+    'bg_color': '背景色',
+    'fg_color': '前景色',
+    'accent_color': 'アクセントカラー',
+    'language_setting': '🌐 言語設定 (Language)',
+    'language_setting_sub': 'システム画面の表示言語を設定します。',
+    'select_lang': 'システム言語',
+    'auto_save_chk': '💡 自動保存を有効化',
+    'save_status_saving': '⏳ 自動保存中...',
+    'save_status_saved': '✅ 設定保存完了',
+    'save_status_unsaved': '✍️ 入力中、自動保存されます...',
+    'save_status_unsaved_manual': '⚠️ 未保存の変更あり',
+    'save_status_error': '❌ 保存失敗、ネットワークを確認してください',
+    'save_status_idle': '✨ 設定ロード完了',
+    'save_btn': '設定を保存',
+    'ffmpeg_exe_path': 'FFmpeg 実行パス (.exe)',
+    'ffmpeg_bin_dir': 'FFmpeg Bin フォルダ',
+    'whisper_path': 'ローカル Whisper モデルパス',
+    'hf_token_lbl': 'Hugging Face Access Token (話者分離に必要)',
+    'hf_token_placeholder': 'hf_で始まるトークンを入力',
+    'hf_token_sub': '* Hugging Faceでpyannote/speaker-diarization-3.1のライセンス同意が必要です。',
+    'mimo_key_lbl': 'ASR APIキー',
+    'mimo_key_placeholder': 'APIキーを入力してください',
+    'mimo_url_lbl': 'API Base URL',
+    'mimo_model_lbl': 'ASR モデル代号',
+    'local_api_url': 'ローカル API URL (Ollama/LM Studio)',
+    'local_model_id': 'ローカル LLM モデルID',
+    'online_api_url': 'オンライン API Base URL',
+    'online_model_id': 'オンライン分析モデルID',
+    'online_api_key': 'オンライン APIキー',
+    'smtp_server': 'SMTP サーバー (smtp.gmail.com など)',
+    'smtp_port': 'SMTP ポート',
+    'smtp_user': 'SMTP ユーザー名',
+    'smtp_pass': 'SMTP パスワード / 認証キー',
+    'smtp_sender': '送信元メールアドレス',
+    'smtp_receiver': '通知受信用メールアドレス',
+    'enable_win_notify': 'Windowsトースト通知を有効にする',
+    'summarizing': 'ローカルAIモデルが要約を作成しています...',
+    'summarizing_sub': '推論処理を行うため、少量のVRAMを消費します。完了まで約30〜90秒かかります。'
+  }
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'detail', 'config'
+  
+  const t = (key) => {
+    const langDict = TRANSLATIONS[language] || TRANSLATIONS['zh-CN'];
+    return langDict[key] || key;
+  };
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
@@ -233,10 +637,35 @@ export default function App() {
 
   const [asrMode, setAsrMode] = useState('local'); // 'local' | 'online'
   
+  // 配置热保存/状态辅助变量
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'unsaved' | 'error'
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+    return localStorage.getItem('autoSaveSettings') !== 'false';
+  });
+  const isFetchingConfig = useRef(false);
+
+  const updateConfigField = (field, value) => {
+    if (isFetchingConfig.current) return;
+    setConfigData(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+    setSaveStatus('unsaved');
+  };
+
   // 播放器状态绑定
   const [currentTime, setCurrentTime] = useState(0);
   const audioPlayerRef = useRef(null);
   const activeBubbleRef = useRef(null);
+
+  // 配置页面二级分类及多语言状态
+  const [configSubTab, setConfigSubTab] = useState('general'); // 'general', 'asr', 'llm', 'notifications'
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('appLanguage') || 'zh-CN';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('appLanguage', language);
+  }, [language]);
 
   // 硬件性能监控数据
   const [perfData, setPerfData] = useState(null);
@@ -444,15 +873,65 @@ export default function App() {
   };
 
   const fetchConfig = async () => {
+    isFetchingConfig.current = true;
     try {
       const res = await fetch(`${BACKEND_URL}/api/config`);
       const data = await res.json();
       setConfigData(data);
+      if (data.theme_mode) {
+        setThemeMode(data.theme_mode);
+      }
+      if (data.light_theme) {
+        setLightTheme(data.light_theme);
+      }
+      if (data.dark_theme) {
+        setDarkTheme(data.dark_theme);
+      }
       if (data.asr_mode) {
         setAsrMode(data.asr_mode);
       }
+      setIsDirty(false);
+      setSaveStatus('idle');
     } catch (e) {
       console.error("无法加载系统配置:", e);
+    } finally {
+      // 延迟重置以防 React 状态异步更新未落盘
+      setTimeout(() => {
+        isFetchingConfig.current = false;
+      }, 100);
+    }
+  };
+
+  // 快捷切换 ASR 模式并保存到后端配置
+  const handleToggleAsrMode = async (mode) => {
+    setAsrMode(mode);
+    const updatedConfig = { ...configData, asr_mode: mode };
+    setConfigData(updatedConfig);
+    try {
+      await fetch(`${BACKEND_URL}/api/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedConfig)
+      });
+    } catch (e) {
+      console.error("快捷更新 ASR 模式失败:", e);
+    }
+  };
+
+  // 快捷切换 LLM 总结模式并保存到后端配置
+  const handleToggleSummaryMode = async (mode) => {
+    const updatedConfig = { ...configData, summary_mode: mode };
+    setConfigData(updatedConfig);
+    try {
+      await fetch(`${BACKEND_URL}/api/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedConfig)
+      });
+      // 立即刷新性能与大模型状态
+      fetchPerformance();
+    } catch (e) {
+      console.error("快捷更新 LLM 模式失败:", e);
     }
   };
 
@@ -626,8 +1105,9 @@ export default function App() {
   };
 
   // 保存系统配置
-  const handleSaveConfig = async (e) => {
-    e.preventDefault();
+  const handleSaveConfig = async (e, options = { silent: false }) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setSaveStatus('saving');
     try {
       const res = await fetch(`${BACKEND_URL}/api/config`, {
         method: 'POST',
@@ -635,13 +1115,37 @@ export default function App() {
         body: JSON.stringify(configData)
       });
       if (res.status === 200) {
-        alert("配置已成功更新，并实时应用！");
-        setActiveTab('dashboard');
+        setSaveStatus('saved');
+        setIsDirty(false);
+        if (!options.silent) {
+          alert("配置已成功更新，并实时应用！");
+          setActiveTab('dashboard');
+        }
+      } else {
+        setSaveStatus('error');
       }
     } catch (e) {
-      alert("保存失败");
+      setSaveStatus('error');
+      if (!options.silent) {
+        alert("保存失败");
+      }
     }
   };
+
+  // 监听并执行防抖自动保存
+  useEffect(() => {
+    localStorage.setItem('autoSaveSettings', autoSaveEnabled);
+  }, [autoSaveEnabled]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled || !isDirty || isFetchingConfig.current) return;
+    
+    const delayDebounceFn = setTimeout(() => {
+      handleSaveConfig(null, { silent: true });
+    }, 1200);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [configData, autoSaveEnabled, isDirty]);
 
   // 点击跳转到指定秒数播放
   const handleTimeJump = (seconds) => {
@@ -700,12 +1204,11 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
           {/* Logo 标题 */}
-          <div style={{ padding: '0 8px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '1px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src="/logo.svg" alt="logo" style={{ width: '28px', height: '28px' }} />
+          <div style={{ padding: '4px 8px' }}>
+            <h1 style={{ fontSize: '25px', fontWeight: '750', letterSpacing: '1px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
+              <img src="/logo.svg" alt="logo" style={{ width: '36px', height: '36px' }} />
               whisperMe
             </h1>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>本地播客声纹自动化处理中心</p>
           </div>
 
           {/* 导航按钮 */}
@@ -722,7 +1225,7 @@ export default function App() {
               }}
             >
               <Icons.Home />
-              控制面板
+              {t('dashboard')}
             </button>
             
             <button 
@@ -737,7 +1240,7 @@ export default function App() {
               }}
             >
               <Icons.Settings />
-              系统设置
+              {t('settings')}
             </button>
           </div>
         </div>
@@ -754,12 +1257,12 @@ export default function App() {
         }}>
           {/* CPU & RAM */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>CPU 占用率:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{t('cpu')}:</span>
             <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>系统内存 (RAM):</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{t('ram')}:</span>
             <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
               {perfData ? `${perfData.ram.used}G / ${perfData.ram.total}G` : '--'}
             </span>
@@ -778,13 +1281,13 @@ export default function App() {
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>GPU 核心负载:</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{t('gpu_load')}:</span>
                 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData.vram.gpu_util}%</span>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>显存占用 (VRAM):</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('vram')}:</span>
                   <span style={{ 
                     color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : 'var(--text-primary)'),
                     fontWeight: '600' 
@@ -803,8 +1306,8 @@ export default function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--error)' }}>
-              <span>GPU 运行状态:</span>
-              <span>未启用 (CPU)</span>
+              <span>{t('gpu_cpu')}:</span>
+              <span>{t('gpu_cpu_off')}</span>
             </div>
           )}
 
@@ -812,7 +1315,7 @@ export default function App() {
           {perfData?.disk && (
             <div style={{ marginTop: '2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>存储空间 (Disk):</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{t('disk')}:</span>
                 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
                   {perfData.disk.used}G / {perfData.disk.total}G
                 </span>
@@ -830,25 +1333,36 @@ export default function App() {
           {/* 队列状况 */}
           {perfData?.queue && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '2px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>排队中任务:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{t('queue_tasks')}:</span>
               <span style={{ 
                 color: perfData.queue.size > 0 ? 'var(--primary)' : 'var(--text-muted)', 
                 fontWeight: '700' 
               }}>
-                {perfData.queue.size} 个
+                {perfData.queue.size} {language.startsWith('zh') ? '个' : 'tasks'}
               </span>
             </div>
           )}
 
-          {/* 大模型服务状态 */}
+          {/* 语音转录 (ASR) 状态 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '4px' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>{t('asr_engine')}:</span>
+            <span style={{ 
+              color: asrMode === 'local' ? 'var(--primary)' : 'var(--accent)', 
+              fontWeight: '700' 
+            }}>
+              {asrMode === 'local' ? `💻 ${t('local_trans')}` : `🌐 ${t('online_trans')}`}
+            </span>
+          </div>
+
+          {/* AI 总结 (LLM) 状态 */}
           {perfData?.llm_status && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '4px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>大模型状态:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{t('llm_engine')}:</span>
               <span style={{ 
                 color: perfData.llm_status === 'connected' ? 'var(--success)' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)'), 
                 fontWeight: '700' 
               }}>
-                {perfData.llm_status === 'connected' ? '🟢 已联通' : (perfData.llm_status === 'online_mode' ? '☁️ 云端 API' : '🔴 本地未开启')}
+                {perfData.llm_status === 'connected' ? t('connected') : (perfData.llm_status === 'online_mode' ? t('online_mode') : t('offline'))}
               </span>
             </div>
           )}
@@ -857,7 +1371,7 @@ export default function App() {
 
       {/* ==================== 💻 右侧主内容区域 ==================== */}
       <div style={{ flex: '1', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        {/* 本地大模型未开启提示条 */}
+        {/* 本地 AI 总结大模型 (LLM) 未开启提示条 */}
         {perfData?.llm_status === 'offline' && (
           <div style={{ 
             background: 'rgba(239, 68, 68, 0.15)', 
@@ -871,7 +1385,7 @@ export default function App() {
             fontWeight: '600',
             zIndex: '5'
           }}>
-            <span>⚠️ 本地大模型未开启提示：检测到当前选择“本地模式”，但本地推理接口端口（Ollama/LM Studio）处于未启动状态，总结任务将无法进行。请启动对应本地端口，或在“系统设置”中切换为云端模式。</span>
+            <span>{t('warning_llm_off')}</span>
           </div>
         )}
         
@@ -882,7 +1396,7 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <button className="btn-ghost" style={{ padding: '8px 12px' }} onClick={() => { setActiveTab('dashboard'); setActiveTaskId(null); }}>
                   <Icons.ArrowLeft />
-                  返回
+                  {t('back')}
                 </button>
                 <div>
                   <h2 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{activeTask.title}</h2>
@@ -891,7 +1405,7 @@ export default function App() {
               </div>
             ) : (
               <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                {activeTab === 'dashboard' ? '我的播客库' : '系统参数配置'}
+                {activeTab === 'dashboard' ? t('my_podcast_lib') : t('sys_config_header')}
               </h2>
             )}
           </div>
@@ -899,7 +1413,8 @@ export default function App() {
           {/* 右侧快速任务新建栏 */}
           {activeTab === 'dashboard' && (
             <form onSubmit={handleCreateTask} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {/* 在线/本地模式切换按钮组 */}
+              {/* 转录 (ASR) 切换 */}
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>{t('transcribe_asr')}:</span>
               <div style={{ 
                 display: 'inline-flex', 
                 background: 'rgba(0, 0, 0, 0.25)', 
@@ -909,9 +1424,9 @@ export default function App() {
               }}>
                 <button
                   type="button"
-                  onClick={() => setAsrMode('local')}
+                  onClick={() => handleToggleAsrMode('local')}
                   style={{
-                    padding: '6px 12px',
+                    padding: '6px 10px',
                     fontSize: '12px',
                     fontWeight: asrMode === 'local' ? '600' : '400',
                     borderRadius: '6px',
@@ -924,22 +1439,15 @@ export default function App() {
                     alignItems: 'center',
                     gap: '4px'
                   }}
+                  title="使用本地 Faster-Whisper 进行语音转录与分轨"
                 >
-                  <span style={{ 
-                    display: 'inline-block', 
-                    width: '6px', 
-                    height: '6px', 
-                    borderRadius: '50%', 
-                    background: asrMode === 'local' ? 'var(--primary)' : 'transparent',
-                    border: asrMode === 'local' ? 'none' : '1px solid var(--text-muted)'
-                  }}></span>
-                  本地模式
+                  {t('local')}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAsrMode('online')}
+                  onClick={() => handleToggleAsrMode('online')}
                   style={{
-                    padding: '6px 12px',
+                    padding: '6px 10px',
                     fontSize: '12px',
                     fontWeight: asrMode === 'online' ? '600' : '400',
                     borderRadius: '6px',
@@ -952,22 +1460,68 @@ export default function App() {
                     alignItems: 'center',
                     gap: '4px'
                   }}
+                  title="使用在线 OpenASR 兼容接口转录"
                 >
-                  <span style={{ 
-                    display: 'inline-block', 
-                    width: '6px', 
-                    height: '6px', 
-                    borderRadius: '50%', 
-                    background: asrMode === 'online' ? 'var(--accent)' : 'transparent',
-                    border: asrMode === 'online' ? 'none' : '1px solid var(--text-muted)'
-                  }}></span>
-                  在线模式
+                  {t('online')}
+                </button>
+              </div>
+
+              {/* 总结 (LLM) 快捷切换 */}
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500', marginLeft: '6px' }}>{t('summary_llm')}:</span>
+              <div style={{ 
+                display: 'inline-flex', 
+                background: 'rgba(0, 0, 0, 0.25)', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '8px',
+                padding: '3px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSummaryMode('local')}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    fontWeight: configData.summary_mode === 'local' ? '600' : '400',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: configData.summary_mode === 'local' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title={perfData?.llm_status === 'connected' ? '本地大模型已联通 (Ollama/LM Studio)' : '本地大模型未开启，请检查本地 11434 端口'}
+                >
+                  {t('local')} {perfData?.llm_status === 'connected' ? '🟢' : '🔴'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSummaryMode('online')}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    fontWeight: configData.summary_mode === 'online' ? '600' : '400',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: configData.summary_mode === 'online' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    color: configData.summary_mode === 'online' ? 'var(--accent)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="使用云端 API (如 OpenAI/DeepSeek 兼容密钥) 总结"
+                >
+                  {t('online')} ☁️
                 </button>
               </div>
 
               <input 
                 type="text" 
-                placeholder="粘贴小宇宙或Bilibili链接..."
+                placeholder={t('input_placeholder')}
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 className="glass-input"
@@ -975,7 +1529,7 @@ export default function App() {
                 disabled={loading}
               />
               <button type="submit" className="btn-glow" disabled={loading}>
-                {loading && !uploading ? "发起中..." : <><Icons.Plus /> 抓取音频</>}
+                {loading && !uploading ? t('initiating') : <><Icons.Plus /> {t('fetch_audio')}</>}
               </button>
 
               <input 
@@ -995,7 +1549,7 @@ export default function App() {
                 onClick={handleUploadClick}
                 disabled={loading}
               >
-                {uploading ? "上传中..." : <><Icons.Upload /> 上传音频</>}
+                {uploading ? t('uploading') : <><Icons.Upload /> {t('upload_audio')}</>}
               </button>
             </form>
           )}
@@ -1011,8 +1565,8 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
                 {tasks.length === 0 ? (
                   <div className="glass-panel" style={{ gridColumn: '1/-1', padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <p style={{ fontSize: '16px', fontWeight: '500' }}>您的播客库空空如也</p>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>在右上方输入播客单集链接或点击“上传音频”，即可开始体验自动排队、声纹切分与 AI 总结服务</p>
+                    <p style={{ fontSize: '16px', fontWeight: '500' }}>{t('empty_lib')}</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>{t('empty_lib_sub')}</p>
                   </div>
                 ) : (
                   tasks.map((task) => (
@@ -1056,7 +1610,7 @@ export default function App() {
                               color: task.asr_mode === 'online' ? 'var(--accent)' : 'var(--primary)',
                               fontWeight: '600'
                             }}>
-                              {task.asr_mode === 'online' ? '在线' : '本地'}
+                              {task.asr_mode === 'online' ? t('online_asr_badge') : t('local_asr_badge')}
                             </span>
                             {(() => {
                               const srcInfo = getSourceLabel(task);
@@ -1129,8 +1683,8 @@ export default function App() {
               {/* 左侧：语音转文字剧本流动 (2指针联动) */}
               <div className="glass-panel" style={{ flex: '1.2', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>剧本对话流</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>点击说话人旁的编辑图标可修改昵称，点击对话行跳转音频</span>
+                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{t('script_dialogue')}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('script_dialogue_sub')}</span>
                 </div>
                 
                 {/* 剧本对话渲染区 */}
@@ -1196,11 +1750,11 @@ export default function App() {
                     <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       {activeTask.status !== 'completed' && activeTask.status !== 'failed' ? (
                         <div>
-                          <p style={{ fontSize: '14px' }}>正在为您进行 GPU 识别...</p>
-                          <p style={{ fontSize: '12px', marginTop: '6px' }}>转录完成后此处将按顺序显示剧本。</p>
+                          <p style={{ fontSize: '14px' }}>{t('script_loading')}</p>
+                          <p style={{ fontSize: '12px', marginTop: '6px' }}>{t('script_loading_sub')}</p>
                         </div>
                       ) : (
-                        <p>暂无剧本数据，可能是降级未包含声纹/识别出错</p>
+                        <p>{t('script_empty')}</p>
                       )}
                     </div>
                   )}
@@ -1224,7 +1778,7 @@ export default function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    AI 总结报告
+                    {t('ai_report')}
                   </button>
                   <button 
                     onClick={() => setDetailSubTab('shownotes')}
@@ -1239,7 +1793,7 @@ export default function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    Shownotes & 热门评论
+                    {t('shownotes_comments')}
                   </button>
                   <button 
                     onClick={() => setDetailSubTab('speakers')}
@@ -1254,7 +1808,7 @@ export default function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    发言人管理
+                    {t('speaker_list')}
                   </button>
                 </div>
 
@@ -1265,8 +1819,8 @@ export default function App() {
                     <div>
                       {activeTask.status === 'summarizing' && (
                         <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          <p style={{ fontWeight: '500' }}>🤖 本地大模型正在拼命为您总结中...</p>
-                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>这会占用少量显卡显存并执行推理，大约需要 30-90 秒。</p>
+                          <p style={{ fontWeight: '500' }}>🤖 {t('summarizing')}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>{t('summarizing_sub')}</p>
                         </div>
                       )}
                       
@@ -1275,7 +1829,7 @@ export default function App() {
                           {/* 刷新总结按钮 */}
                           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
                             <button className="btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={handleRegenerateSummary}>
-                              <Icons.Refresh /> 重新生成报告
+                              <Icons.Refresh /> {t('regenerate_summary')}
                             </button>
                           </div>
                           
@@ -1432,665 +1986,863 @@ export default function App() {
 
           {/* ==================== PANEL 3: CONFIG FORM ==================== */}
           {activeTab === 'config' && (
-            <div className="glass-panel" style={{ maxWidth: '780px', margin: '0 auto', padding: '30px' }}>
-              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="glass-panel" style={{ maxWidth: '780px', margin: '0 auto', padding: '30px', position: 'relative' }}>
+              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                {/* 0. 外观主题设置 (Appearance) */}
-                <div style={{ marginBottom: '10px' }}>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px' }}>🎨 主题外观设置 (Appearance)</h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>配置系统的视觉主题与色彩显示偏好。</p>
-                  
-                  {/* Mode Select */}
-                  <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px', background: 'rgba(0,0,0,0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>显示模式 (Appearance)</span>
-                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>选择浅色、深色，或跟随系统。</span>
+                {/* Configuration Sub-tabs Navigation */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '12px',
+                  marginBottom: '10px',
+                  overflowX: 'auto'
+                }}>
+                  {[
+                    { id: 'general', label: t('tab_appearance') },
+                    { id: 'asr', label: t('tab_asr') },
+                    { id: 'llm', label: t('tab_llm') },
+                    { id: 'notifications', label: t('tab_notifications') }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setConfigSubTab(tab.id)}
+                      className="btn-ghost"
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        background: configSubTab === tab.id ? 'var(--primary-glow)' : 'transparent',
+                        borderColor: configSubTab === tab.id ? 'var(--primary)' : 'transparent',
+                        color: configSubTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+                        fontWeight: configSubTab === tab.id ? '700' : '500',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 0. 外观与语言设置 (Appearance & Language Settings) */}
+                {configSubTab === 'general' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.015)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px', margin: 0 }}>
+                        {t('theme_appearance')}
+                      </h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', margin: 0 }}>
+                        {t('theme_sub')}
+                      </p>
+                      
+                      {/* Mode Select */}
+                      <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', marginBottom: '8px', background: 'rgba(0,0,0,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>{t('display_mode')}</span>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{t('display_mode_sub')}</span>
+                          </div>
+                          <select
+                            value={themeMode}
+                            onChange={(e) => setThemeMode(e.target.value)}
+                            className="glass-input"
+                            style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
+                          >
+                            <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
+                            <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
+                            <option value="system" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>System (跟随系统)</option>
+                          </select>
+                        </div>
                       </div>
-                      <select
-                        value={themeMode}
-                        onChange={(e) => setThemeMode(e.target.value)}
-                        className="glass-input"
-                        style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
-                        <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
-                        <option value="system" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>System (跟随系统)</option>
-                      </select>
+
+                      {/* Light & Dark Theme Editors side-by-side */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        
+                        {/* Light Theme Panel */}
+                        <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                          <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', margin: 0 }}>
+                            {t('light_theme_title')}
+                          </h4>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>{t('preset')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setLightTheme(PRESETS.light[lightPresetName]);
+                                }}
+                                title="重置为当前预设默认颜色"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  fontSize: '15px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'color 0.2s'
+                                }}
+                              >
+                                ↶
+                              </button>
+                              <select
+                                value={lightPresetName}
+                                onChange={(e) => {
+                                  const name = e.target.value;
+                                  setLightPresetName(name);
+                                  setLightTheme(PRESETS.light[name]);
+                                }}
+                                className="glass-input"
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
+                              >
+                                {Object.keys(PRESETS.light).map(k => (
+                                  <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Background Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('bg_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: lightTheme.background,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={lightTheme.background} 
+                                  onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={lightTheme.background} 
+                                onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Foreground Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('fg_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: lightTheme.foreground,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={lightTheme.foreground} 
+                                  onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={lightTheme.foreground} 
+                                onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Accent Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('accent_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: lightTheme.accent,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={lightTheme.accent} 
+                                  onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={lightTheme.accent} 
+                                onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Dark Theme Panel */}
+                        <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                          <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', margin: 0 }}>
+                            {t('dark_theme_title')}
+                          </h4>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>{t('preset')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setDarkTheme(PRESETS.dark[darkPresetName]);
+                                }}
+                                title="重置为当前预设默认颜色"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  fontSize: '15px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'color 0.2s'
+                                }}
+                              >
+                                ↶
+                              </button>
+                              <select
+                                value={darkPresetName}
+                                onChange={(e) => {
+                                  const name = e.target.value;
+                                  setDarkPresetName(name);
+                                  setDarkTheme(PRESETS.dark[name]);
+                                }}
+                                className="glass-input"
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
+                              >
+                                {Object.keys(PRESETS.dark).map(k => (
+                                  <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Background Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('bg_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: darkTheme.background,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={darkTheme.background} 
+                                  onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={darkTheme.background} 
+                                onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Foreground Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('fg_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: darkTheme.foreground,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={darkTheme.foreground} 
+                                  onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={darkTheme.foreground} 
+                                onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Accent Color */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('accent_color')}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                backgroundColor: darkTheme.accent,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <input 
+                                  type="color" 
+                                  value={darkTheme.accent} 
+                                  onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })} 
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-5px',
+                                    left: '-5px',
+                                    width: '34px',
+                                    height: '34px',
+                                    opacity: 0,
+                                    cursor: 'pointer'
+                                  }} 
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={darkTheme.accent} 
+                                onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })}
+                                className="glass-input" 
+                                style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
+                              />
+                            </div>
+                          </div>
+
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Language Settings Card */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.015)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px', margin: 0 }}>
+                        {t('language_setting')}
+                      </h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', margin: 0 }}>
+                        {t('language_setting_sub')}
+                      </p>
+                      
+                      <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>{t('select_lang')}</span>
+                          </div>
+                          <select
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="glass-input"
+                            style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
+                          >
+                            <option value="zh-CN" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>简体中文</option>
+                            <option value="zh-TW" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>繁體中文</option>
+                            <option value="en-US" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>English</option>
+                            <option value="ja-JP" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>日本語</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Light & Dark Theme Editors side-by-side */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                {/* 1. 🎙️ 语音转录与分轨配置 (ASR Engine) */}
+                {configSubTab === 'asr' && (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.015)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {t('tab_asr')}
+                    </h3>
                     
-                    {/* Light Theme Panel */}
-                    <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>
-                        ☀️ 浅色主题配置 (Light Theme)
-                      </h4>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>预设方案 (Preset)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setLightTheme(PRESETS.light[lightPresetName]);
-                            }}
-                            title="重置为当前预设默认颜色"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-secondary)',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              fontSize: '15px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'color 0.2s'
-                            }}
-                          >
-                            ↶
-                          </button>
-                          <select
-                            value={lightPresetName}
-                            onChange={(e) => {
-                              const name = e.target.value;
-                              setLightPresetName(name);
-                              setLightTheme(PRESETS.light[name]);
-                            }}
-                            className="glass-input"
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
-                          >
-                            {Object.keys(PRESETS.light).map(k => (
-                              <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Background Color */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>背景色 (Background)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: lightTheme.background,
-                            border: '1px solid rgba(255,255,255,0.15)',
+                    {/* ASR 模式选择 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>默认转录模式 (Default ASR Mode)</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          type="button"
+                          onClick={() => updateConfigField('asr_mode', 'local')}
+                          style={{
+                            flex: '1',
+                            padding: '10px',
+                            borderRadius: '8px',
+                            border: configData.asr_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: configData.asr_mode === 'local' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                            color: configData.asr_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
                             cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={lightTheme.background} 
-                              onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={lightTheme.background} 
-                            onChange={(e) => setLightTheme({ ...lightTheme, background: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
-                      </div>
-
-                      {/* Foreground Color */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>前景色 (Foreground)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: lightTheme.foreground,
-                            border: '1px solid rgba(255,255,255,0.15)',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          💻 {t('local_trans')}
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => updateConfigField('asr_mode', 'online')}
+                          style={{
+                            flex: '1',
+                            padding: '10px',
+                            borderRadius: '8px',
+                            border: configData.asr_mode === 'online' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: configData.asr_mode === 'online' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                            color: configData.asr_mode === 'online' ? 'var(--primary)' : 'var(--text-secondary)',
                             cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={lightTheme.foreground} 
-                              onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={lightTheme.foreground} 
-                            onChange={(e) => setLightTheme({ ...lightTheme, foreground: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          🌐 {t('online_trans')}
+                        </button>
                       </div>
+                    </div>
 
-                      {/* Accent Color */}
+                    {/* 基础核心依赖 (始终展示) */}
+                    <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '4px', margin: 0 }}>🛠️ 转录与声纹前置依赖 (Base dependencies)</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>强调色 (Accent)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: lightTheme.accent,
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={lightTheme.accent} 
-                              onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={lightTheme.accent} 
-                            onChange={(e) => setLightTheme({ ...lightTheme, accent: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Dark Theme Panel */}
-                    <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>
-                        🌙 深色主题配置 (Dark Theme)
-                      </h4>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>预设方案 (Preset)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setDarkTheme(PRESETS.dark[darkPresetName]);
-                            }}
-                            title="重置为当前预设默认颜色"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-secondary)',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              fontSize: '15px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'color 0.2s'
-                            }}
-                          >
-                            ↶
-                          </button>
-                          <select
-                            value={darkPresetName}
-                            onChange={(e) => {
-                              const name = e.target.value;
-                              setDarkPresetName(name);
-                              setDarkTheme(PRESETS.dark[name]);
-                            }}
-                            className="glass-input"
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
-                          >
-                            {Object.keys(PRESETS.dark).map(k => (
-                              <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Background Color */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>背景色 (Background)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: darkTheme.background,
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={darkTheme.background} 
-                              onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={darkTheme.background} 
-                            onChange={(e) => setDarkTheme({ ...darkTheme, background: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
-                      </div>
-
-                      {/* Foreground Color */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>前景色 (Foreground)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: darkTheme.foreground,
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={darkTheme.foreground} 
-                              onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={darkTheme.foreground} 
-                            onChange={(e) => setDarkTheme({ ...darkTheme, foreground: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
-                      </div>
-
-                      {/* Accent Color */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>强调色 (Accent)</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: darkTheme.accent,
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            <input 
-                              type="color" 
-                              value={darkTheme.accent} 
-                              onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })} 
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '-5px',
-                                width: '34px',
-                                height: '34px',
-                                opacity: 0,
-                                cursor: 'pointer'
-                              }} 
-                            />
-                          </div>
-                          <input 
-                            type="text" 
-                            value={darkTheme.accent} 
-                            onChange={(e) => setDarkTheme({ ...darkTheme, accent: e.target.value })}
-                            className="glass-input" 
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px' }} 
-                          />
-                        </div>
-                      </div>
-
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* 1. 本地程序物理路径 */}
-                <div>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🛠️ 本地核心组件路径</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>FFmpeg 物理主程序路径 (.exe)</label>
-                      <input 
-                        type="text" 
-                        value={configData.ffmpeg_path} 
-                        onChange={(e) => setConfigData({ ...configData, ffmpeg_path: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>FFmpeg Bin 二进制文件夹目录</label>
-                      <input 
-                        type="text" 
-                        value={configData.ffmpeg_bin_dir} 
-                        onChange={(e) => setConfigData({ ...configData, ffmpeg_bin_dir: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>本地 Whisper 大模型路径 (如 model_large_v3)</label>
-                      <input 
-                        type="text" 
-                        value={configData.local_whisper_model_path} 
-                        onChange={(e) => setConfigData({ ...configData, local_whisper_model_path: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Hugging Face 凭证 */}
-                <div>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🔑 Hugging Face 凭证（用于声纹识别）</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Hugging Face User Access Token (以 hf_ 开头)
-                    </label>
-                    <input 
-                      type="password" 
-                      placeholder="如果您需要声纹分角色功能，请在此粘贴 HF Token"
-                      value={configData.hf_token} 
-                      onChange={(e) => setConfigData({ ...configData, hf_token: e.target.value })}
-                      className="glass-input" 
-                    />
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      * 说明：请确保您在 Hugging Face 账号中已经接受了 `pyannote/speaker-diarization-3.1` 和 `pyannote/segmentation-3.0` 模型的共享协议。不填将直接熔断降级为单轨道转录，不崩盘。
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2.5 在线转录配置 */}
-                <div>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🌐 在线 ASR 转录配置 (例如 Xiaomi MiMo)</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线模式默认 ASR 引擎</label>
-                      <select
-                        value={configData.asr_mode}
-                        onChange={(e) => setConfigData({ ...configData, asr_mode: e.target.value })}
-                        className="glass-input"
-                        style={{ background: 'rgba(0, 0, 0, 0.25)', color: 'var(--text-primary)' }}
-                      >
-                        <option value="local" style={{ background: '#1c1c24' }}>本地转录模式 (Faster-Whisper)</option>
-                        <option value="online" style={{ background: '#1c1c24' }}>在线转录模式 (OpenAI 协议兼容 ASR)</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Mimo / OpenAI 兼容 API Key (密钥)</label>
-                      <input 
-                        type="password" 
-                        placeholder="在此粘贴您的 tp-xxxxxx 密钥"
-                        value={configData.online_api_key || ''} 
-                        onChange={(e) => setConfigData({ ...configData, online_api_key: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线 API Base URL (请求网关)</label>
-                      <input 
-                        type="text" 
-                        placeholder="默认: https://token-plan-sgp.xiaomimimo.com/v1"
-                        value={configData.online_base_url || ''} 
-                        onChange={(e) => setConfigData({ ...configData, online_base_url: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线 ASR 模型代号</label>
-                      <input 
-                        type="text" 
-                        placeholder="默认: mimo-v2.5-asr"
-                        value={configData.online_model || ''} 
-                        onChange={(e) => setConfigData({ ...configData, online_model: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. AI 总结引擎配置 */}
-                <div>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>📝 AI 总结与文本分析引擎</h3>
-                  
-                  {/* 模式选择 */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>总结推理模式</label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button 
-                        type="button"
-                        onClick={() => setConfigData({ ...configData, summary_mode: 'local' })}
-                        style={{
-                          flex: '1',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: configData.summary_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                          background: configData.summary_mode === 'local' ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                          color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        本地大模型 (Ollama / LM Studio)
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setConfigData({ ...configData, summary_mode: 'online' })}
-                        style={{
-                          flex: '1',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: configData.summary_mode === 'online' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                          background: configData.summary_mode === 'online' ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                          color: configData.summary_mode === 'online' ? 'var(--primary)' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        在线 OpenAI 兼容 API
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 输入字段切换 */}
-                  {configData.summary_mode === 'local' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>本地 API 地址 (Ollama/LM Studio)</label>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('ffmpeg_exe_path')}</label>
                         <input 
                           type="text" 
-                          value={configData.ollama_url} 
-                          onChange={(e) => setConfigData({ ...configData, ollama_url: e.target.value })}
+                          value={configData.ffmpeg_path} 
+                          onChange={(e) => updateConfigField('ffmpeg_path', e.target.value)}
                           className="glass-input" 
-                          placeholder="http://localhost:11434 或 http://localhost:1234"
                         />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>所选分析模型代号</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('ffmpeg_bin_dir')}</label>
                         <input 
                           type="text" 
-                          value={configData.ollama_model} 
-                          onChange={(e) => setConfigData({ ...configData, ollama_model: e.target.value })}
+                          value={configData.ffmpeg_bin_dir} 
+                          onChange={(e) => updateConfigField('ffmpeg_bin_dir', e.target.value)}
                           className="glass-input" 
-                          placeholder="qwen2.5:7b-instruct 等"
                         />
                       </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线 API 代理地址 (Base URL)</label>
-                          <input 
-                            type="text" 
-                            value={configData.online_summary_base_url} 
-                            onChange={(e) => setConfigData({ ...configData, online_summary_base_url: e.target.value })}
-                            className="glass-input" 
-                            placeholder="https://api.openai.com/v1"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线分析模型代号 (Model ID)</label>
-                          <input 
-                            type="text" 
-                            value={configData.online_summary_model} 
-                            onChange={(e) => setConfigData({ ...configData, online_summary_model: e.target.value })}
-                            className="glass-input" 
-                            placeholder="gpt-4o-mini 或 deepseek-chat 等"
-                          />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线 API 授权秘钥 (API Key)</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('hf_token_lbl')}</label>
                         <input 
                           type="password" 
-                          value={configData.online_summary_api_key} 
-                          onChange={(e) => setConfigData({ ...configData, online_summary_api_key: e.target.value })}
+                          placeholder={t('hf_token_placeholder')}
+                          value={configData.hf_token} 
+                          onChange={(e) => updateConfigField('hf_token', e.target.value)}
                           className="glass-input" 
-                          placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+                        />
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                          {t('hf_token_sub')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ASR 引擎详细参数 */}
+                    {configData.asr_mode === 'local' ? (
+                      <div style={{ background: 'rgba(122, 162, 247, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(122, 162, 247, 0.15)' }}>
+                        <h4 style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: '600', marginBottom: '10px', margin: 0 }}>💻 本地 Faster-Whisper 转录参数</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('whisper_path')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.local_whisper_model_path} 
+                            onChange={(e) => updateConfigField('local_whisper_model_path', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: 'rgba(157, 124, 216, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(157, 124, 216, 0.15)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <h4 style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', marginBottom: '2px', margin: 0 }}>🌐 在线 ASR API 兼容转录参数</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_key_lbl')}</label>
+                          <input 
+                            type="password" 
+                            placeholder={t('mimo_key_placeholder')}
+                            value={configData.online_api_key || ''} 
+                            onChange={(e) => updateConfigField('online_api_key', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_url_lbl')}</label>
+                          <input 
+                            type="text" 
+                            placeholder="默认: https://token-plan-sgp.xiaomimimo.com/v1"
+                            value={configData.online_base_url || ''} 
+                            onChange={(e) => updateConfigField('online_base_url', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_model_lbl')}</label>
+                          <input 
+                            type="text" 
+                            placeholder="默认: mimo-v2.5-asr"
+                            value={configData.online_model || ''} 
+                            onChange={(e) => updateConfigField('online_model', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. 📝 AI 总结与文本分析引擎 (LLM Engine) */}
+                {configSubTab === 'llm' && (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.015)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {t('tab_llm')}
+                    </h3>
+                    
+                    {/* 模式选择 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>总结推理模式 (Summary Mode)</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          type="button"
+                          onClick={() => updateConfigField('summary_mode', 'local')}
+                          style={{
+                            flex: '1',
+                            padding: '10px',
+                            borderRadius: '8px',
+                            border: configData.summary_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: configData.summary_mode === 'local' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                            color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          💻 {t('local')}
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => updateConfigField('summary_mode', 'online')}
+                          style={{
+                            flex: '1',
+                            padding: '10px',
+                            borderRadius: '8px',
+                            border: configData.summary_mode === 'online' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: configData.summary_mode === 'online' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                            color: configData.summary_mode === 'online' ? 'var(--primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ☁️ {t('online')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 输入字段切换 */}
+                    {configData.summary_mode === 'local' ? (
+                      <div style={{ background: 'rgba(122, 162, 247, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(122, 162, 247, 0.15)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('local_api_url')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.ollama_url} 
+                            onChange={(e) => updateConfigField('ollama_url', e.target.value)}
+                            className="glass-input" 
+                            placeholder="http://localhost:11434 或 http://localhost:1234"
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('local_model_id')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.ollama_model} 
+                            onChange={(e) => updateConfigField('ollama_model', e.target.value)}
+                            className="glass-input" 
+                            placeholder="qwen2.5:7b-instruct 等"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: 'rgba(157, 124, 216, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(157, 124, 216, 0.15)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_api_url')}</label>
+                            <input 
+                              type="text" 
+                              value={configData.online_summary_base_url} 
+                              onChange={(e) => updateConfigField('online_summary_base_url', e.target.value)}
+                              className="glass-input" 
+                              placeholder="https://api.openai.com/v1"
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_model_id')}</label>
+                            <input 
+                              type="text" 
+                              value={configData.online_summary_model} 
+                              onChange={(e) => updateConfigField('online_summary_model', e.target.value)}
+                              className="glass-input" 
+                              placeholder="gpt-4o-mini 或 deepseek-chat 等"
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_api_key')}</label>
+                          <input 
+                            type="password" 
+                            value={configData.online_summary_api_key} 
+                            onChange={(e) => updateConfigField('online_summary_api_key', e.target.value)}
+                            className="glass-input" 
+                            placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. ✉️ 邮件与通知配置 (Notifications) */}
+                {configSubTab === 'notifications' && (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.015)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}>
+                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {t('tab_notifications')}
+                    </h3>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_server')}</label>
+                        <input 
+                          type="text" 
+                          value={configData.smtp_server} 
+                          onChange={(e) => updateConfigField('smtp_server', e.target.value)}
+                          className="glass-input" 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_port')}</label>
+                        <input 
+                          type="number" 
+                          value={configData.smtp_port} 
+                          onChange={(e) => updateConfigField('smtp_port', parseInt(e.target.value) || 465)}
+                          className="glass-input" 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_user')}</label>
+                        <input 
+                          type="text" 
+                          placeholder="如 QQ 邮箱号"
+                          value={configData.smtp_username} 
+                          onChange={(e) => updateConfigField('smtp_username', e.target.value)}
+                          className="glass-input" 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_pass')}</label>
+                        <input 
+                          type="password" 
+                          placeholder="在邮箱设置中开启 SMTP 服务获得密钥"
+                          value={configData.smtp_password} 
+                          onChange={(e) => updateConfigField('smtp_password', e.target.value)}
+                          className="glass-input" 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_sender')}</label>
+                        <input 
+                          type="text" 
+                          value={configData.smtp_sender} 
+                          onChange={(e) => updateConfigField('smtp_sender', e.target.value)}
+                          className="glass-input" 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_receiver')}</label>
+                        <input 
+                          type="text" 
+                          placeholder="转录成功后向此邮箱发送总结提醒"
+                          value={configData.notification_email} 
+                          onChange={(e) => updateConfigField('notification_email', e.target.value)}
+                          className="glass-input" 
                         />
                       </div>
                     </div>
-                  )}
-                </div>
+                    
+                    {/* 是否开启桌面通知 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', borderTop: '1px dashed var(--border-color)', paddingTop: '16px' }}>
+                      <input 
+                        type="checkbox" 
+                        id="enable-win" 
+                        checked={configData.enable_win_notification}
+                        onChange={(e) => updateConfigField('enable_win_notification', e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <label htmlFor="enable-win" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                        {t('enable_win_notify')}
+                      </label>
+                    </div>
+                  </div>
+                )}
 
-                {/* 4. 邮件与桌面通知提醒 */}
-                <div>
-                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>✉️ 邮件提醒配置（SMTP）</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>SMTP 服务器（如 smtp.qq.com）</label>
+                {/* 粘性悬浮保存底栏 */}
+                <div style={{
+                  position: 'sticky',
+                  bottom: '-30px',
+                  margin: '30px -30px -30px -30px',
+                  padding: '16px 30px',
+                  background: 'rgba(20, 20, 25, 0.88)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  borderTop: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  zIndex: 100,
+                  borderBottomLeftRadius: '14px',
+                  borderBottomRightRadius: '14px',
+                  boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.35)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <input 
-                        type="text" 
-                        value={configData.smtp_server} 
-                        onChange={(e) => setConfigData({ ...configData, smtp_server: e.target.value })}
-                        className="glass-input" 
+                        type="checkbox" 
+                        checked={autoSaveEnabled}
+                        onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                        style={{ cursor: 'pointer', width: '15px', height: '15px' }}
                       />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>SMTP 端口</label>
-                      <input 
-                        type="number" 
-                        value={configData.smtp_port} 
-                        onChange={(e) => setConfigData({ ...configData, smtp_port: parseInt(e.target.value) || 465 })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>邮箱登录用户名</label>
-                      <input 
-                        type="text" 
-                        placeholder="如 QQ 邮箱号"
-                        value={configData.smtp_username} 
-                        onChange={(e) => setConfigData({ ...configData, smtp_username: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>邮箱 SMTP 授权码/授权密钥</label>
-                      <input 
-                        type="password" 
-                        placeholder="在邮箱设置中开启 SMTP 服务获得密钥"
-                        value={configData.smtp_password} 
-                        onChange={(e) => setConfigData({ ...configData, smtp_password: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>发送人签名邮箱</label>
-                      <input 
-                        type="text" 
-                        value={configData.smtp_sender} 
-                        onChange={(e) => setConfigData({ ...configData, smtp_sender: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>提醒接收人目标邮箱</label>
-                      <input 
-                        type="text" 
-                        placeholder="转录成功后向此邮箱发送总结提醒"
-                        value={configData.notification_email} 
-                        onChange={(e) => setConfigData({ ...configData, notification_email: e.target.value })}
-                        className="glass-input" 
-                      />
-                    </div>
+                      <span>{t('auto_save_chk')}</span>
+                    </label>
+                    <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                      {saveStatus === 'saving' && t('save_status_saving')}
+                      {saveStatus === 'saved' && t('save_status_saved')}
+                      {saveStatus === 'unsaved' && (autoSaveEnabled ? t('save_status_unsaved') : t('save_status_unsaved_manual'))}
+                      {saveStatus === 'error' && t('save_status_error')}
+                      {saveStatus === 'idle' && t('save_status_idle')}
+                    </span>
                   </div>
                   
-                  {/* 是否开启桌面通知 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px' }}>
-                    <input 
-                      type="checkbox" 
-                      id="enable-win" 
-                      checked={configData.enable_win_notification}
-                      onChange={(e) => setConfigData({ ...configData, enable_win_notification: e.target.checked })}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                    />
-                    <label htmlFor="enable-win" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                      开启 Windows 右下角桌面气泡推送提醒
-                    </label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {!autoSaveEnabled && (
+                      <button type="submit" className="btn-glow" style={{ padding: '10px 24px', fontSize: '13px' }}>
+                        <Icons.Check /> {t('save_btn')}
+                      </button>
+                    )}
                   </div>
-                </div>
-
-                {/* 保存按钮 */}
-                <div style={{ marginTop: '10px', textAlign: 'right' }}>
-                  <button type="submit" className="btn-glow" style={{ padding: '12px 32px' }}>
-                    <Icons.Check /> 保存参数配置
-                  </button>
                 </div>
 
               </form>

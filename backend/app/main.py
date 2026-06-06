@@ -416,6 +416,27 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not task:
             print(f"⚠️ [LOG] 检测到任务 {task_id} 已被删除，队列自动抛弃执行。")
             return
+
+        # Step 0.5: 检测本地大模型服务是否可用（若配置为本地大模型总结模式）
+        from app.config import config
+        summary_mode = config.get("summary_mode", "local")
+        if summary_mode == "local":
+            import socket
+            import urllib.parse
+            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+            try:
+                parsed = urllib.parse.urlparse(ollama_url)
+                host = parsed.hostname or "localhost"
+                port = parsed.port or 11434
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(1.0)
+                s.connect((host, port))
+                s.close()
+            except Exception:
+                raise Exception(
+                    f"本地大模型未开启：当前系统配置的是【本地大模型总结模式】，但未检测到正在运行的本地推理服务（地址: {ollama_url}）。"
+                    "请先启动您的 LM Studio 或 Ollama 服务，或者在【系统设置】中将 AI 总结引擎切换为【在线 OpenAI 兼容 API】。"
+                )
             
         # Step 1: 下载音频与获取元数据
         db.update_task(task_id, status="downloading", progress=10.0)
