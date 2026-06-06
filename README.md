@@ -42,14 +42,6 @@ graph TD
     style D fill:#7C3AED,stroke:#5B21B6,stroke-width:2px,color:#fff
     style E fill:#DB2777,stroke:#9D174D,stroke-width:2px,color:#fff
 ```
-
-#### 🖥️ Web 交互界面
-
-提供了一个高度精美、动效丝滑的本地工作台，方便您直观查看和微调转录详情。
-
-> 📸 **[这里插入产品主界面截图或运行动图，帮助用户直观理解]**
-> `![Product Demo](./docs/images/demo.gif)`
-
 ---
 
 ### 3. 快速上手指南 (Quick Start)
