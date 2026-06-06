@@ -27,7 +27,7 @@ function parseInlineMarkdown(text) {
   while ((match = boldRegex.exec(text)) !== null) {
     const textBefore = text.substring(lastIndex, match.index);
     if (textBefore) parts.push(textBefore);
-    parts.push(<strong key={match.index} style={{ color: '#fff', fontWeight: '700' }}>{match[1]}</strong>);
+    parts.push(<strong key={match.index} style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{match[1]}</strong>);
     lastIndex = boldRegex.lastIndex;
   }
   
@@ -87,7 +87,7 @@ function MarkdownRenderer({ text }) {
         <h2 key={i} style={{ 
           fontSize: '16.5px', 
           fontWeight: '700', 
-          color: '#fff', 
+          color: 'var(--text-primary)', 
           marginTop: '24px', 
           marginBottom: '12px',
           borderBottom: '1px solid var(--border-color)',
@@ -115,7 +115,7 @@ function MarkdownRenderer({ text }) {
     // 解析 Header 1
     else if (line.startsWith('# ')) {
       renderedElements.push(
-        <h1 key={i} style={{ fontSize: '19px', fontWeight: '700', color: '#fff', marginBottom: '16px' }}>
+        <h1 key={i} style={{ fontSize: '19px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '16px' }}>
           {parseInlineMarkdown(line.substring(2))}
         </h1>
       );
@@ -155,15 +155,31 @@ function MarkdownRenderer({ text }) {
 
 const PRESETS = {
   light: {
-    'Default Light': { background: '#FDF6E3', foreground: '#586E75', accent: '#CB4B16' },
-    'Pure White': { background: '#FFFFFF', foreground: '#111827', accent: '#4F46E5' },
-    'Soft Green': { background: '#F0F9FF', foreground: '#1E293B', accent: '#0D9488' }
+    'Default Light': { background: '#FDF6E3', foreground: '#586E75', primary: '#268BD2', accent: '#CB4B16' },
+    'Pure White': { background: '#FFFFFF', foreground: '#111827', primary: '#3B82F6', accent: '#8B5CF6' },
+    'Soft Green': { background: '#F0F9FF', foreground: '#1E293B', primary: '#0D9488', accent: '#D97706' }
   },
   dark: {
-    'Default Dark': { background: '#272822', foreground: '#F8F8F2', accent: '#F92672' },
-    'Antigravity Slate': { background: '#0F172A', foreground: '#F8FAFC', accent: '#38BDF8' },
-    'Midnight Obsidian': { background: '#0B0F19', foreground: '#E2E8F0', accent: '#8B5CF6' }
+    'Default Dark': { background: '#272822', foreground: '#F8F8F2', primary: '#66D9EF', accent: '#F92672' },
+    'Antigravity Slate': { background: '#0F172A', foreground: '#F8FAFC', primary: '#38BDF8', accent: '#EC4899' },
+    'Midnight Obsidian': { background: '#0B0F19', foreground: '#E2E8F0', primary: '#8B5CF6', accent: '#D946EF' }
   }
+};
+
+const getSourceLabel = (task) => {
+  const url = task.url || '';
+  const metadata = task.metadata || {};
+  const source = metadata.source || '';
+  
+  if (source.includes('bilibili')) return { text: 'Bilibili', color: '#ff6699', bg: 'rgba(255, 102, 153, 0.12)' };
+  if (source.includes('xiaoyuzhou')) return { text: '小宇宙', color: '#ff8800', bg: 'rgba(255, 136, 0, 0.12)' };
+  if (url.includes('uploaded_') || source === 'upload' || source === 'local') return { text: '本地上传', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' };
+  
+  // Fallback detection from URL
+  if (url.includes('bilibili.com') || url.includes('b23.tv')) return { text: 'Bilibili', color: '#ff6699', bg: 'rgba(255, 102, 153, 0.12)' };
+  if (url.includes('xiaoyuzhoufm.com')) return { text: '小宇宙', color: '#ff8800', bg: 'rgba(255, 136, 0, 0.12)' };
+  
+  return { text: '其他来源', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)' };
 };
 
 const BACKEND_URL = "http://127.0.0.1:8000";
@@ -283,30 +299,60 @@ export default function App() {
       const colors = activeMode === 'dark' ? darkTheme : lightTheme;
       const root = document.documentElement;
       
-      root.style.setProperty('--bg-base', colors.background);
-      root.style.setProperty('--text-primary', colors.foreground);
-      root.style.setProperty('--primary', colors.accent);
-      root.style.setProperty('--accent', colors.accent);
-      
-      const fgRgb = hexToRgb(colors.foreground);
-      const accRgb = hexToRgb(colors.accent);
-      
-      root.style.setProperty('--text-secondary', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, 0.65)`);
-      root.style.setProperty('--text-muted', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, 0.4)`);
-      root.style.setProperty('--primary-glow', `rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.15)`);
-      root.style.setProperty('--accent-glow', `rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.15)`);
+      let bgBase = colors.background;
+      let bgSurface = 'rgba(255, 255, 255, 0.03)';
+      let bgSurfaceHover = 'rgba(255, 255, 255, 0.06)';
+      let borderColor = 'rgba(255, 255, 255, 0.06)';
+      let borderHover = 'rgba(255, 255, 255, 0.12)';
       
       if (activeMode === 'dark') {
-        root.style.setProperty('--bg-surface', 'rgba(255, 255, 255, 0.03)');
-        root.style.setProperty('--bg-surface-hover', 'rgba(255, 255, 255, 0.06)');
-        root.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.06)');
-        root.style.setProperty('--border-hover', 'rgba(255, 255, 255, 0.12)');
+        bgSurface = 'rgba(255, 255, 255, 0.03)';
+        bgSurfaceHover = 'rgba(255, 255, 255, 0.06)';
+        borderColor = 'rgba(255, 255, 255, 0.06)';
+        borderHover = 'rgba(255, 255, 255, 0.12)';
       } else {
-        root.style.setProperty('--bg-surface', 'rgba(255, 255, 255, 0.55)');
-        root.style.setProperty('--bg-surface-hover', 'rgba(255, 255, 255, 0.8)');
-        root.style.setProperty('--border-color', 'rgba(0, 0, 0, 0.06)');
-        root.style.setProperty('--border-hover', 'rgba(0, 0, 0, 0.12)');
+        const bgLower = colors.background.toLowerCase();
+        if (bgLower === '#ffffff') {
+          bgBase = '#f1f5f9';
+          bgSurface = '#ffffff';
+          bgSurfaceHover = '#f8fafc';
+        } else if (bgLower === '#fdf6e3') {
+          bgSurface = '#eee8d5';
+          bgSurfaceHover = '#e4ddca';
+        } else {
+          bgBase = '#f1f7fc';
+          bgSurface = '#ffffff';
+          bgSurfaceHover = '#f8fafc';
+        }
+        borderColor = 'rgba(0, 0, 0, 0.08)';
+        borderHover = 'rgba(0, 0, 0, 0.15)';
       }
+      
+      root.style.setProperty('--bg-base', bgBase);
+      root.style.setProperty('--bg-surface', bgSurface);
+      root.style.setProperty('--bg-surface-hover', bgSurfaceHover);
+      root.style.setProperty('--border-color', borderColor);
+      root.style.setProperty('--border-hover', borderHover);
+      
+      root.style.setProperty('--text-primary', colors.foreground);
+      
+      const primaryColor = colors.primary || colors.accent;
+      const accentColor = colors.accent;
+      
+      root.style.setProperty('--primary', primaryColor);
+      root.style.setProperty('--accent', accentColor);
+      
+      const fgRgb = hexToRgb(colors.foreground);
+      const priRgb = hexToRgb(primaryColor);
+      const accRgb = hexToRgb(accentColor);
+      
+      const secOpacity = activeMode === 'light' ? 0.88 : 0.65;
+      const mutOpacity = activeMode === 'light' ? 0.62 : 0.4;
+      
+      root.style.setProperty('--text-secondary', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, ${secOpacity})`);
+      root.style.setProperty('--text-muted', `rgba(${fgRgb.r}, ${fgRgb.g}, ${fgRgb.b}, ${mutOpacity})`);
+      root.style.setProperty('--primary-glow', `rgba(${priRgb.r}, ${priRgb.g}, ${priRgb.b}, 0.12)`);
+      root.style.setProperty('--accent-glow', `rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.12)`);
     };
 
     applyColors();
@@ -651,7 +697,7 @@ export default function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
           {/* Logo 标题 */}
           <div style={{ padding: '0 8px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '1px', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '1px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <img src="/logo.svg" alt="logo" style={{ width: '28px', height: '28px' }} />
               whisperMe
             </h1>
@@ -703,12 +749,12 @@ export default function App() {
           {/* CPU & RAM */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)' }}>CPU 占用率:</span>
-            <span style={{ color: '#fff', fontWeight: '600' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)' }}>系统内存 (RAM):</span>
-            <span style={{ color: '#fff', fontWeight: '600' }}>
+            <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
               {perfData ? `${perfData.ram.used}G / ${perfData.ram.total}G` : '--'}
             </span>
           </div>
@@ -727,7 +773,7 @@ export default function App() {
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>GPU 核心负载:</span>
-                <span style={{ color: '#fff', fontWeight: '600' }}>{perfData.vram.gpu_util}%</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData.vram.gpu_util}%</span>
               </div>
 
               <div>
@@ -761,7 +807,7 @@ export default function App() {
             <div style={{ marginTop: '2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>存储空间 (Disk):</span>
-                <span style={{ color: '#fff', fontWeight: '600' }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
                   {perfData.disk.used}G / {perfData.disk.total}G
                 </span>
               </div>
@@ -803,12 +849,12 @@ export default function App() {
                   返回
                 </button>
                 <div>
-                  <h2 style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>{activeTask.title}</h2>
+                  <h2 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{activeTask.title}</h2>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{activeTask.podcast_name}</p>
                 </div>
               </div>
             ) : (
-              <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#fff' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>
                 {activeTab === 'dashboard' ? '我的播客库' : '系统参数配置'}
               </h2>
             )}
@@ -947,7 +993,8 @@ export default function App() {
                         display: 'flex', 
                         flexDirection: 'column', 
                         justifyContent: 'space-between',
-                        minHeight: '180px'
+                        minHeight: '180px',
+                        borderLeft: task.asr_mode === 'online' ? '4px solid var(--accent)' : '4px solid var(--primary)'
                       }}
                     >
                       <div>
@@ -958,7 +1005,7 @@ export default function App() {
                               fontSize: '11px', 
                               padding: '3px 8px', 
                               borderRadius: '12px', 
-                              background: task.status === 'completed' ? 'rgba(115, 218, 202, 0.12)' : 'rgba(255,255,255,0.05)',
+                              background: task.status === 'completed' ? 'var(--success-glow)' : 'rgba(255,255,255,0.05)',
                               border: task.status === 'completed' ? '1px solid rgba(115, 218, 202, 0.2)' : '1px solid var(--border-color)',
                               color: task.status === 'completed' ? 'var(--success)' : 'var(--text-secondary)'
                             }}>
@@ -968,13 +1015,29 @@ export default function App() {
                               fontSize: '10px', 
                               padding: '2px 6px', 
                               borderRadius: '10px', 
-                              background: task.asr_mode === 'online' ? 'rgba(157, 124, 216, 0.12)' : 'rgba(122, 162, 247, 0.12)',
-                              border: task.asr_mode === 'online' ? '1px solid rgba(157, 124, 216, 0.2)' : '1px solid rgba(122, 162, 247, 0.2)',
+                              background: task.asr_mode === 'online' ? 'var(--accent-glow)' : 'var(--primary-glow)',
+                              border: task.asr_mode === 'online' ? '1px solid var(--accent)' : '1px solid var(--primary)',
                               color: task.asr_mode === 'online' ? 'var(--accent)' : 'var(--primary)',
                               fontWeight: '600'
                             }}>
                               {task.asr_mode === 'online' ? '在线' : '本地'}
                             </span>
+                            {(() => {
+                              const srcInfo = getSourceLabel(task);
+                              return (
+                                <span style={{ 
+                                  fontSize: '10px', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '10px', 
+                                  background: srcInfo.bg,
+                                  border: `1px solid ${srcInfo.color}40`,
+                                  color: srcInfo.color,
+                                  fontWeight: '600'
+                                }}>
+                                  {srcInfo.text}
+                                </span>
+                              );
+                            })()}
                           </div>
                           
                           <button 
@@ -987,7 +1050,7 @@ export default function App() {
                         </div>
 
                         {/* 标题 */}
-                        <h3 style={{ fontSize: '14.5px', fontWeight: '700', color: '#fff', lineBreak: 'anywhere', lineHeight: '1.4', marginBottom: '6px' }}>
+                        <h3 style={{ fontSize: '14.5px', fontWeight: '700', color: 'var(--text-primary)', lineBreak: 'anywhere', lineHeight: '1.4', marginBottom: '6px' }}>
                           {task.title}
                         </h3>
                         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>{task.podcast_name}</p>
@@ -1030,7 +1093,7 @@ export default function App() {
               {/* 左侧：语音转文字剧本流动 (2指针联动) */}
               <div className="glass-panel" style={{ flex: '1.2', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>剧本对话流</h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>剧本对话流</h3>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>点击说话人旁的编辑图标可修改昵称，点击对话行跳转音频</span>
                 </div>
                 
@@ -1191,7 +1254,7 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                       {/* Shownotes */}
                       <div>
-                        <h3 style={{ fontSize: '14px', color: '#fff', fontWeight: '700', marginBottom: '8px' }}>节目简介 (Shownotes)</h3>
+                        <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '8px' }}>节目简介 (Shownotes)</h3>
                         <div style={{ 
                           background: 'rgba(255,255,255,0.02)', 
                           border: '1px solid var(--border-color)', 
@@ -1210,7 +1273,7 @@ export default function App() {
 
                       {/* 热门评论 */}
                       <div>
-                        <h3 style={{ fontSize: '14px', color: '#fff', fontWeight: '700', marginBottom: '10px' }}>听友热评 (第一页共 {activeTask.metadata?.comments?.length || 0} 条)</h3>
+                        <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '10px' }}>听友热评 (第一页共 {activeTask.metadata?.comments?.length || 0} 条)</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {activeTask.metadata?.comments && activeTask.metadata.comments.length > 0 ? (
                             activeTask.metadata.comments.map((comment, cIdx) => (
@@ -1238,7 +1301,7 @@ export default function App() {
                   {/* SUBTAB 3: Speaker Management */}
                   {detailSubTab === 'speakers' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      <h3 style={{ fontSize: '14px', color: '#fff', fontWeight: '700', marginBottom: '8px' }}>发言人昵称管理</h3>
+                      <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '8px' }}>发言人昵称管理</h3>
                       <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                         在此统一修改节目中识别出的声纹角色昵称。修改后，左侧剧本对话流中的角色名字会实时更新，系统也将自动采用新昵称。
                       </p>
@@ -1264,7 +1327,7 @@ export default function App() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>系统内部 ID: {spId}</span>
                                   {!isEditing ? (
-                                    <span style={{ fontSize: '14.5px', color: '#fff', fontWeight: '600' }}>{currentName}</span>
+                                    <span style={{ fontSize: '14.5px', color: 'var(--text-primary)', fontWeight: '600' }}>{currentName}</span>
                                   ) : (
                                     <input 
                                       type="text" 
@@ -1338,21 +1401,21 @@ export default function App() {
                 
                 {/* 0. 外观主题设置 (Appearance) */}
                 <div style={{ marginBottom: '10px' }}>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px' }}>🎨 主题外观设置 (Appearance)</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px' }}>🎨 主题外观设置 (Appearance)</h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>配置系统的视觉主题与色彩显示偏好。</p>
                   
                   {/* Mode Select */}
                   <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px', background: 'rgba(0,0,0,0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '13.5px', color: '#fff', fontWeight: '500' }}>显示模式 (Appearance)</span>
+                        <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>显示模式 (Appearance)</span>
                         <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>选择浅色、深色，或跟随系统。</span>
                       </div>
                       <select
                         value={themeMode}
                         onChange={(e) => setThemeMode(e.target.value)}
                         className="glass-input"
-                        style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: '#fff' }}
+                        style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
                       >
                         <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
                         <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
@@ -1366,7 +1429,7 @@ export default function App() {
                     
                     {/* Light Theme Panel */}
                     <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                      <h4 style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>
                         ☀️ 浅色主题配置 (Light Theme)
                       </h4>
                       
@@ -1402,7 +1465,7 @@ export default function App() {
                               setLightTheme(PRESETS.light[name]);
                             }}
                             className="glass-input"
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
                           >
                             {Object.keys(PRESETS.light).map(k => (
                               <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
@@ -1532,7 +1595,7 @@ export default function App() {
 
                     {/* Dark Theme Panel */}
                     <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                      <h4 style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>
                         🌙 深色主题配置 (Dark Theme)
                       </h4>
                       
@@ -1568,7 +1631,7 @@ export default function App() {
                               setDarkTheme(PRESETS.dark[name]);
                             }}
                             className="glass-input"
-                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                            style={{ flex: 1, padding: '6px 10px', fontSize: '12.5px', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)' }}
                           >
                             {Object.keys(PRESETS.dark).map(k => (
                               <option key={k} value={k} style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>{k}</option>
@@ -1701,7 +1764,7 @@ export default function App() {
 
                 {/* 1. 本地程序物理路径 */}
                 <div>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🛠️ 本地核心组件路径</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🛠️ 本地核心组件路径</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>FFmpeg 物理主程序路径 (.exe)</label>
@@ -1735,7 +1798,7 @@ export default function App() {
 
                 {/* 2. Hugging Face 凭证 */}
                 <div>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🔑 Hugging Face 凭证（用于声纹识别）</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🔑 Hugging Face 凭证（用于声纹识别）</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                       Hugging Face User Access Token (以 hf_ 开头)
@@ -1755,7 +1818,7 @@ export default function App() {
 
                 {/* 2.5 在线转录配置 */}
                 <div>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🌐 在线 ASR 转录配置 (例如 Xiaomi MiMo)</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>🌐 在线 ASR 转录配置 (例如 Xiaomi MiMo)</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>在线模式默认 ASR 引擎</label>
@@ -1804,7 +1867,7 @@ export default function App() {
 
                 {/* 3. AI 总结引擎配置 */}
                 <div>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>📝 AI 总结与文本分析引擎</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>📝 AI 总结与文本分析引擎</h3>
                   
                   {/* 模式选择 */}
                   <div style={{ marginBottom: '16px' }}>
@@ -1911,7 +1974,7 @@ export default function App() {
 
                 {/* 4. 邮件与桌面通知提醒 */}
                 <div>
-                  <h3 style={{ fontSize: '14.5px', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>✉️ 邮件提醒配置（SMTP）</h3>
+                  <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>✉️ 邮件提醒配置（SMTP）</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>SMTP 服务器（如 smtp.qq.com）</label>

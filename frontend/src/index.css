@@ -250,7 +250,7 @@ body {
   font-size: 18px;
   font-weight: 700;
   margin: 24px 0 12px 0;
-  color: #fff;
+  color: var(--text-primary);
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 6px;
   display: flex;

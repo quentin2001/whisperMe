@@ -70,7 +70,6 @@ class PodcastNotifier:
             # 格式化议题卡片
             topics_txt = extract_section(summary_md, ['核心观点与议题提炼', '核心观点与议题', '核心观点', '议题提炼'], next_kws)
             topics_html = format_markdown_to_html_cards(topics_txt)
-
             # 确定评级标签颜色
             rating_color = "#f7768e" # 红色/粉色表示 A/A+
             if "B" in score:
@@ -85,19 +84,19 @@ class PodcastNotifier:
 
             html_content = f"""
             <html>
-            <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d10; color: #e4e4e7; padding: 20px; margin: 0;">
-                <div style="max-width: 600px; margin: 0 auto; background-color: #141416; border: 1px solid #232329; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.65);">
+            <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #e2e8f0; padding: 20px; margin: 0;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: #121218; border: 1px solid #1f1f2e; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.7);">
                     
-                    <!-- 渐变头部卡片 -->
-                    <div style="background: linear-gradient(135deg, #3d5afe, #8c24e3); padding: 30px 24px; text-align: left; position: relative;">
-                        <div style="font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                    <!-- 渐变头部卡片 (使用 whisperMe 主题配色) -->
+                    <div style="background: linear-gradient(135deg, #7aa2f7, #9d7cd8); padding: 30px 24px; text-align: left; position: relative;">
+                        <div style="font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.85); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
                             🎙️ {podcast_name} • AI 播客浓缩卡片
                         </div>
                         <h2 style="color: #ffffff; margin: 0 0 10px 0; font-size: 20px; font-weight: bold; line-height: 1.4;">
                             {podcast_title}
                         </h2>
-                        <div style="font-size: 13px; color: rgba(255, 255, 255, 0.9);">
-                            主持：<span style="font-weight: bold; color: #ffeb3b;">{host}</span> &nbsp;&nbsp;|&nbsp;&nbsp; 嘉宾：<span style="font-weight: bold; color: #76ff03;">{guest}</span>
+                        <div style="font-size: 13px; color: rgba(255, 255, 255, 0.95);">
+                            主持：<span style="font-weight: bold; color: #73daca;">{host}</span> &nbsp;&nbsp;|&nbsp;&nbsp; 嘉宾：<span style="font-weight: bold; color: #ff9e64;">{guest}</span>
                         </div>
                     </div>
                     
@@ -105,23 +104,23 @@ class PodcastNotifier:
                         <!-- 头部评分卡片与收听建议 -->
                         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
                             <tr>
-                                <td style="width: 100px; text-align: center; vertical-align: middle; background-color: #1c1c21; border: 1px solid #2d2d35; border-radius: 10px 0 0 10px; padding: 15px;">
+                                <td style="width: 100px; text-align: center; vertical-align: middle; background-color: #181820; border: 1px solid #262630; border-radius: 10px 0 0 10px; padding: 15px;">
                                     <div style="font-size: 10px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">含金量评级</div>
                                     <div style="font-size: 36px; font-weight: 900; color: {rating_color}; line-height: 1;">{score}</div>
                                 </td>
-                                <td style="background-color: #1e1e24; border: 1px solid #2d2d35; border-left: none; border-radius: 0 10px 10px 0; padding: 15px; vertical-align: top;">
+                                <td style="background-color: #1a1a24; border: 1px solid #262630; border-left: none; border-radius: 0 10px 10px 0; padding: 15px; vertical-align: top;">
                                     <div style="font-size: 11px; color: #bb9af2; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">🎯 核心收听建议</div>
-                                    <div style="font-size: 13px; color: #e4e4e7; font-weight: bold; line-height: 1.4;">{recommend}</div>
+                                    <div style="font-size: 13px; color: #e2e8f0; font-weight: bold; line-height: 1.4;">{recommend}</div>
                                     <div style="font-size: 12px; color: #a1a1aa; margin-top: 4px; line-height: 1.4;"><strong>适合人群：</strong>{audience}</div>
                                 </td>
                             </tr>
                         </table>
 
                         <!-- 核心主旨卡片 -->
-                        <div style="background-color: #1c1c21; border: 1px solid #2d2d35; border-radius: 10px; padding: 18px; margin-bottom: 24px;">
+                        <div style="background-color: #181820; border: 1px solid #262630; border-radius: 10px; padding: 18px; margin-bottom: 24px;">
                             <div style="font-size: 13px; font-weight: bold; color: #7aa2f7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">📖 播客核心速览</div>
                             <div style="font-size: 13px; line-height: 1.6; color: #d4d4d8;">{theme}</div>
-                            {f'<div style="font-size: 12px; line-height: 1.5; color: #a1a1aa; margin-top: 10px; border-top: 1px solid #2d2d35; padding-top: 8px;"><strong>评级理由：</strong>{rating_desc_clean}</div>' if rating_desc_clean else ''}
+                            {f'<div style="font-size: 12px; line-height: 1.5; color: #a1a1aa; margin-top: 10px; border-top: 1px solid #262630; padding-top: 8px;"><strong>评级理由：</strong>{rating_desc_clean}</div>' if rating_desc_clean else ''}
                         </div>
 
                         <!-- 观点/议题卡片列表 -->
@@ -131,14 +130,14 @@ class PodcastNotifier:
                         </div>
 
                         <!-- 社交互动热度 -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #1c1c21; border-radius: 8px; padding: 10px 15px; font-size: 12px; color: #a1a1aa; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #181820; border-radius: 8px; padding: 10px 15px; font-size: 12px; color: #a1a1aa; margin-bottom: 24px;">
                             <span>🔥 本集互动数据：👍 {like_count} 点赞 &nbsp;&nbsp;|&nbsp;&nbsp; 💬 {comment_count} 评论</span>
-                            <span style="color: #73daca;">数据源：小宇宙 FM</span>
+                            <span style="color: #73daca;">数据源：Bilibili / 小宇宙 FM</span>
                         </div>
 
                         <!-- 打开工作台按钮 -->
                         <div style="text-align: center; margin: 30px 0 10px 0;">
-                            <a href="http://localhost:5173/task/{task_id}" style="display: inline-block; background: linear-gradient(90deg, #3d5afe, #8c24e3); color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 35px; border-radius: 30px; box-shadow: 0 4px 10px rgba(61, 90, 254, 0.45); letter-spacing: 0.5px;">
+                            <a href="http://localhost:5173/task/{task_id}" style="display: inline-block; background: linear-gradient(90deg, #7aa2f7, #9d7cd8); color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 35px; border-radius: 30px; box-shadow: 0 4px 15px rgba(122, 162, 247, 0.45); letter-spacing: 0.5px;">
                                 💻 打开工作台查看详情
                             </a>
                         </div>
@@ -146,7 +145,7 @@ class PodcastNotifier:
                     </div>
                     
                     <!-- 页脚 -->
-                    <div style="background-color: #0d0d10; padding: 20px; text-align: center; font-size: 11px; color: #52525b; border-top: 1px solid #1c1c21;">
+                    <div style="background-color: #0b0f19; padding: 20px; text-align: center; font-size: 11px; color: #52525b; border-top: 1px solid #181820;">
                         本邮件由 whisperMe 播客 AI 助手自动发送。请确保您的本地 Uvicorn 服务和 Vite 前端处于正常运行状态。
                     </div>
 
