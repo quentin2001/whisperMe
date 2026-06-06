@@ -52,9 +52,15 @@ graph TD
 
 让您在 3 分钟内本地跑通 whisperMe 的全链路转录流程。
 
-#### 💻 环境要求
-* **后端 (Backend)**: Python >= 3.10, FFmpeg (已配置系统环境变量)
-* **前端 (Frontend)**: Node.js >= 18, npm
+#### 💻 环境要求 与 平台兼容性 (Platform Compatibility)
+
+* **🖥️ 操作系统支持**:
+  * **Windows 10/11**: 完美支持。完整启用 NVIDIA CUDA GPU 硬件加速，支持独创的“1.5 GB 显存安全熔断与降级机制”以防显存溢出 (OOM)。
+  * **macOS (Intel / Apple Silicon M系列芯片)**: 完美支持。后端自动规避短路径转换，并在显卡检测上做安全降级适配（声纹分割与 Whisper 均平稳运行在多线程 CPU 模式或 MPS 模式下，完美适配 M 芯片的统一内存架构）。
+* **🔌 基础依赖**:
+  * **后端 (Backend)**: Python >= 3.10
+  * **音频预处理**: FFmpeg (Windows 请在 `config.json` 指定 `.exe` 物理绝对路径；macOS 建议通过 `brew install ffmpeg` 安装并将 `ffmpeg_path` 设为 `"ffmpeg"`)
+  * **前端 (Frontend)**: Node.js >= 18, npm
 
 #### 📥 克隆与安装
 
