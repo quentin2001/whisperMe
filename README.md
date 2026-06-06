@@ -114,28 +114,28 @@ npm install
 
 ```mermaid
 graph TD
-    A[用户输入播客 URL] --> B[FastAPI 接口层 /api/tasks]
-    B --> C[任务序列化写入 tasks_db.json]
-    C --> D[TaskQueueManager 后台排队线程]
-    D -->|串行取出| E[Downloader 抓取模块]
-    E -->|1. curl 绕过获取元数据和高赞评论| F[音频及元数据下载完成]
-    F -->|2. FFmpeg 启动预处理| G[16kHz 单声道 WAV]
-    G --> H[Transcriber 转录模块]
-    H -->|3. 监控 VRAM 显存| I{剩余 VRAM < 1.5GB?}
-    I -->|是| J[自动熔断: 降级到 CPU 运行]
-    I -->|否| K[运行 CUDA 加速声纹分割]
-    J --> L[PyAnnote 声纹角色切分]
+    A["用户输入播客 URL"] --> B["FastAPI 接口层 /api/tasks"]
+    B --> C["任务序列化写入 tasks_db.json"]
+    C --> D["TaskQueueManager 后台排队线程"]
+    D -->|"串行取出"| E["Downloader 抓取模块"]
+    E -->|"1. curl 抓取与下载"| F["音频及元数据下载完成"]
+    F -->|"2. FFmpeg 预处理"| G["16kHz 单声道 WAV"]
+    G --> H["Transcriber 转录模块"]
+    H -->|"3. 监控 VRAM"| I{"剩余 VRAM < 1.5GB?"}
+    I -->|"是"| J["自动熔断: 降级到 CPU 运行"]
+    I -->|"否"| K["运行 CUDA 加速声纹分割"]
+    J --> L["PyAnnote 声纹角色切分"]
     K --> L
-    L --> M{ASR 识别模式?}
-    M -->|local| N[本地 Whisper 引擎识别]
-    M -->|online| O[压缩音频分片并发送 Mimo ASR API]
-    N --> P[交叉合并文本时间轴与声纹角色]
+    L --> M{"ASR 识别模式"}
+    M -->|"local"| N["本地 Whisper 引擎识别"]
+    M -->|"online"| O["压缩分片并发送 Mimo ASR API"]
+    N --> P["交叉合并文本时间轴与声纹角色"]
     O --> P
-    P -->|过滤无意义短词| Q[自动标记语气词发言人]
-    Q --> R[Summarizer 总结模块]
-    R -->|调用本地/在线大模型事实总结| S[生成 Grounded 总结报告]
-    S --> T[Notifier 提醒模块]
-    T -->|发送桌面气泡通知| U[任务完成状态变更并持久化]
-    T -->|通过 SMTP 发送 HTML 渐变卡片邮件| U
-    U --> V[前端 React 工作台渲染展示]
+    P -->|"过滤无意义短词"| Q["自动标记语气词发言人"]
+    Q --> R["Summarizer 总结模块"]
+    R -->|"大模型事实总结"| S["生成 Grounded 总结报告"]
+    S --> T["Notifier 提醒模块"]
+    T -->|"发送桌面通知"| U["任务完成状态变更并持久化"]
+    T -->|"SMTP 发送 HTML 邮件"| U
+    U --> V["前端 React 工作台渲染展示"]
 ```
