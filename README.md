@@ -1,4 +1,4 @@
-# # 🎙️ **whisperMe**
+# <img src="./logo.svg" width="32" height="32" align="center" /> **whisperMe**
 
 **whisperMe** 是一款专为播客爱好者与知识整理控量身打造的**本地化、私密化播客转录与 AI 知识提炼工作台**。它支持一键抓取主流播客平台（如小宇宙 FM、Bilibili、本地音频等），智能提取声纹角色，将长语音精准识别为时间轴剧本，并调用大模型（本地 LLM / 在线 API）生成深度 Grounded 的暗黑卡片风格总结，最终自动通过邮件推送至您的收件箱。
 

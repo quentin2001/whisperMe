@@ -540,13 +540,7 @@ export default function App() {
           {/* Logo 标题 */}
           <div style={{ padding: '0 8px' }}>
             <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '1px', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ 
-                background: 'linear-gradient(135deg, var(--primary), var(--accent))', 
-                padding: '6px 10px', 
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '800'
-              }}>wM</span>
+              <img src="/logo.svg" alt="logo" style={{ width: '28px', height: '28px' }} />
               whisperMe
             </h1>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>本地播客声纹自动化处理中心</p>
