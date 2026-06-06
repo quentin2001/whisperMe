@@ -1,7 +1,8 @@
 import os
 import uuid
 import traceback
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+import shutil
+from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -550,6 +551,48 @@ def create_task(req: CreateTaskRequest):
     
     # 放入全局单例队列管理器进行排队串行处理，不再直接塞给 background_tasks 并行跑
     queue_manager.add_task(task_id, req.url)
+    return {"task_id": task_id, "status": "pending"}
+
+@app.post("/api/upload")
+def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
+    # 1. 验证文件后缀
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"]:
+        raise HTTPException(status_code=400, detail="不支持的音频格式。仅支持 mp3, wav, m4a, aac, flac, ogg 等格式。")
+    
+    # 2. 生成唯一的任务 ID 和文件名
+    task_id = str(uuid.uuid4())
+    safe_filename = f"uploaded_{task_id}{ext}"
+    local_path = os.path.join(SHORT_DOWNLOADS_DIR, safe_filename)
+    
+    # 3. 保存上传文件到 downloads 目录
+    try:
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存上传音频文件失败: {str(e)}")
+        
+    # 4. 创建任务并以本地导入的元数据初始化
+    db.add_task(task_id, local_path, asr_mode=asr_mode)
+    
+    name_without_ext = os.path.splitext(file.filename)[0]
+    db.update_task(
+        task_id,
+        title=name_without_ext,
+        podcast_name="本地导入",
+        metadata={
+            "title": name_without_ext,
+            "podcast_name": "本地导入",
+            "shownotes": "用户上传的本地音频文件，完全离线处理。",
+            "like_count": 0,
+            "comment_count": 0,
+            "comments": [],
+            "source": "local"
+        }
+    )
+    
+    # 5. 放入全局单例队列管理器进行排队串行处理
+    queue_manager.add_task(task_id, local_path)
     return {"task_id": task_id, "status": "pending"}
 
 @app.get("/api/performance")

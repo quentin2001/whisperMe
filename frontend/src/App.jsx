@@ -13,7 +13,8 @@ const Icons = {
   Play: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>,
   Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
   Home: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>,
-  Edit: () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+  Edit: () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
+  Upload: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
 };
 
 // ==================== 📝 自研高性能 Markdown 渲染器 ====================
@@ -162,6 +163,8 @@ export default function App() {
   const [newUrl, setNewUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   
   // 详情页内部子标签卡：'summary' | 'shownotes'
   const [detailSubTab, setDetailSubTab] = useState('summary');
@@ -324,6 +327,48 @@ export default function App() {
     } catch (e) {
       alert("发起任务失败，请检查后端服务是否启动！");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // 触发本地音频文件选择
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // 处理文件上传与任务创建
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024 * 1024) {
+      alert("音频文件过大，请控制在 500MB 以内！");
+      return;
+    }
+
+    setUploading(true);
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('asr_mode', asrMode);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.status === 200) {
+        fetchTasks();
+        e.target.value = null; // 重置以允许重复上传相同文件
+      } else {
+        const err = await res.json();
+        alert(`上传音频失败: ${err.detail || "未知错误"}`);
+      }
+    } catch (err) {
+      alert("上传文件请求失败，请检查网络与后端服务！");
+    } finally {
+      setUploading(false);
       setLoading(false);
     }
   };
@@ -692,7 +737,27 @@ export default function App() {
                 disabled={loading}
               />
               <button type="submit" className="btn-glow" disabled={loading}>
-                {loading ? "发起中..." : <><Icons.Plus /> 抓取音频</>}
+                {loading && !uploading ? "发起中..." : <><Icons.Plus /> 抓取音频</>}
+              </button>
+
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".mp3,.wav,.m4a,.aac,.flac,.ogg"
+                style={{ display: 'none' }}
+              />
+              <button 
+                type="button" 
+                className="btn-glow" 
+                style={{ 
+                  background: 'linear-gradient(135deg, var(--accent) 0%, #a855f7 100%)',
+                  boxShadow: '0 0 15px rgba(168, 85, 247, 0.4)'
+                }}
+                onClick={handleUploadClick}
+                disabled={loading}
+              >
+                {uploading ? "上传中..." : <><Icons.Upload /> 上传音频</>}
               </button>
             </form>
           )}
@@ -709,7 +774,7 @@ export default function App() {
                 {tasks.length === 0 ? (
                   <div className="glass-panel" style={{ gridColumn: '1/-1', padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <p style={{ fontSize: '16px', fontWeight: '500' }}>您的播客库空空如也</p>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>在右上方输入小宇宙播客单集链接，点击“抓取音频”开始体验纯本地转录分析</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>在右上方输入播客单集链接或点击“上传音频”，即可开始体验自动排队、声纹切分与 AI 总结服务</p>
                   </div>
                 ) : (
                   tasks.map((task) => (
