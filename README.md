@@ -25,6 +25,26 @@
 
 ### 2. 视觉直观展示 (Showcase / Quick Demo)
 
+#### 🧭 极简用户使用流程 (How It Works)
+
+无需理解复杂的底层显存调度与声纹算法，您只需体验以下简单的一键式处理旅程：
+
+```mermaid
+graph TD
+    A["📥 1. 输入链接 (小宇宙/B站/本地音频)"] -->|"后台串行排队防卡死"| B["⚙️ 2. 音频下载与格式标准化"]
+    B -->|"智能显存安全熔断"| C["👤 3. 声纹分段与发言人自动识别"]
+    C -->|"去粗取精/自动过滤语气助词"| D["🧠 4. AI 事实一致性提炼总结"]
+    D -->|"任务完成自动发信"| E["📬 5. 收件箱即时接收卡片式报告"]
+
+    style A fill:#4F46E5,stroke:#312E81,stroke-width:2px,color:#fff
+    style B fill:#0D9488,stroke:#115E59,stroke-width:2px,color:#fff
+    style C fill:#0284C7,stroke:#075985,stroke-width:2px,color:#fff
+    style D fill:#7C3AED,stroke:#5B21B6,stroke-width:2px,color:#fff
+    style E fill:#DB2777,stroke:#9D174D,stroke-width:2px,color:#fff
+```
+
+#### 🖥️ Web 交互界面
+
 提供了一个高度精美、动效丝滑的本地工作台，方便您直观查看和微调转录详情。
 
 > 📸 **[这里插入产品主界面截图或运行动图，帮助用户直观理解]**
