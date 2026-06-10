@@ -2074,7 +2074,16 @@ export default function App() {
                               <div className="progress-bar-animated" style={{ width: `${task.progress}%`, height: '100%' }}></div>
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px', gap: '8px' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              flexWrap: 'wrap',
+                              fontSize: '11px',
+                              borderTop: '1px solid var(--border-color)',
+                              paddingTop: '8px',
+                              marginTop: '4px'
+                            }}>
                               <span style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -2093,7 +2102,7 @@ export default function App() {
                                   : (task.created_at ? task.created_at.substring(0, 10) : '')}
                               </span>
                               {task.status === 'completed' && (
-                                <div style={{ display: 'flex', gap: '6px' }}>
+                                <>
                                   <span style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2120,9 +2129,10 @@ export default function App() {
                                   }}>
                                     <Icons.MessageCircle /> {task.comment_count}
                                   </span>
-                                </div>
+                                </>
                               )}
                             </div>
+
                           )}
                           {task.status === 'failed' && (
                             <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px', lineBreak: 'anywhere' }}>
@@ -3739,11 +3749,11 @@ export default function App() {
                   }}
                 >
                   <option value="0.75" style={{ color: 'var(--text-primary)' }}>0.75x</option>
-                  <option value="1.0" style={{ color: 'var(--text-primary)' }}>1.0x</option>
+                  <option value="1" style={{ color: 'var(--text-primary)' }}>1.0x</option>
                   <option value="1.25" style={{ color: 'var(--text-primary)' }}>1.25x</option>
                   <option value="1.5" style={{ color: 'var(--text-primary)' }}>1.5x</option>
                   <option value="1.75" style={{ color: 'var(--text-primary)' }}>1.75x</option>
-                  <option value="2.0" style={{ color: 'var(--text-primary)' }}>2.0x</option>
+                  <option value="2" style={{ color: 'var(--text-primary)' }}>2.0x</option>
                 </select>
               </div>
 
