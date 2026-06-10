@@ -406,6 +406,7 @@ class PodcastTranscriber:
                 
                 # Convert embedding numpy array to list of floats
                 if isinstance(emb, np.ndarray):
+                    emb = np.nan_to_num(emb)
                     # Normalize vector
                     norm = np.linalg.norm(emb)
                     if norm > 0:

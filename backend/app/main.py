@@ -131,6 +131,7 @@ class UpdateConfigRequest(BaseModel):
     smtp_sender: str
     notification_email: str
     enable_win_notification: bool
+    enable_email_notification: bool = False
     asr_mode: str = "local"
     online_api_key: str = ""
     online_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
@@ -208,7 +209,7 @@ def match_speakers_with_voiceprints(speaker_embeddings: dict) -> dict:
         print(f"⚠️ [LOG] 声纹特征库匹配失败: {e}")
         return {}
 
-def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict) -> dict:
+def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict, summary_mode: str = None) -> dict:
     """
     Use local Ollama or Online Standard API to match unmatched speakers using shownotes and first 5 minutes of transcript
     """
@@ -259,8 +260,9 @@ def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers
 3. 如果根据文本无法推断出某些 ID 对应的人名，请对应返回 null，例如：{{"SPEAKER_00": null}}。
 """
 
-        # Dynamic engine selection based on config
-        summary_mode = config.get("summary_mode", "local")
+        # Dynamic engine selection based on task or config
+        if not summary_mode:
+            summary_mode = config.get("summary_mode", "local")
         headers = {"Content-Type": "application/json"}
         
         if summary_mode == "online":
@@ -333,7 +335,12 @@ def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker
     if not transcript or not speaker_embeddings:
         return
         
-    print(f"🚀 [LOG] 正在对任务 {task_id} 启动智能声纹库与大模型改名流水线...")
+    task = db.get_task(task_id)
+    if not task:
+        return
+        
+    summary_mode = task.get("summary_mode", "local")
+    print(f"🚀 [LOG] 正在对任务 {task_id} 启动智能声纹库与大模型改名流水线... (总结模式: {summary_mode})")
     
     # 1. First Pass: Voiceprint embedding match
     voiceprint_mappings = match_speakers_with_voiceprints(speaker_embeddings)
@@ -346,20 +353,17 @@ def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker
     # 3. Second Pass: LLM shownotes deduction for unmatched speakers
     llm_mappings = {}
     if unmatched_speakers:
-        llm_mappings = match_speakers_with_llm(metadata, transcript, unmatched_speakers, voiceprint_mappings)
+        llm_mappings = match_speakers_with_llm(metadata, transcript, unmatched_speakers, voiceprint_mappings, summary_mode=summary_mode)
         
     # 4. Merge mappings
     final_mappings = {**voiceprint_mappings, **llm_mappings}
     
     if final_mappings:
-        # Load existing task mappings if any
-        task = db.get_task(task_id)
-        if task:
-            existing_mappings = task.get("speaker_mappings", {})
-            # Merge (prioritizing existing manually renamed ones, then new matched ones)
-            merged = {**final_mappings, **existing_mappings}
-            db.update_task(task_id, speaker_mappings=merged)
-            print(f"🎉 [LOG] 智能改名流水线完成！已自动应用以下角色命名: {merged}")
+        # Merge (prioritizing existing manually renamed ones, then new matched ones)
+        existing_mappings = task.get("speaker_mappings", {})
+        merged = {**final_mappings, **existing_mappings}
+        db.update_task(task_id, speaker_mappings=merged)
+        print(f"🎉 [LOG] 智能改名流水线完成！已自动应用以下角色命名: {merged}")
 
 def apply_interjection_labels(task_id: str, transcript: list):
     """
@@ -418,8 +422,7 @@ def run_podcast_pipeline(task_id: str, url: str):
             return
 
         # Step 0.5: 检测本地大模型服务是否可用（若配置为本地大模型总结模式）
-        from app.config import config
-        summary_mode = config.get("summary_mode", "local")
+        summary_mode = task.get("summary_mode", "local")
         if summary_mode == "local":
             import socket
             import urllib.parse
@@ -460,6 +463,7 @@ def run_podcast_pipeline(task_id: str, url: str):
             task_id, 
             title=metadata["title"], 
             podcast_name=metadata["podcast_name"],
+            image_url=metadata.get("image_url", ""),
             metadata=metadata,
             progress=30.0
         )
@@ -535,7 +539,8 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not db.get_task(task_id):
             raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="summarizing", progress=80.0)
-        summary_report = summarizer.summarize(metadata, merged_transcript)
+        task_summary_mode = task.get("summary_mode", "local")
+        summary_report = summarizer.summarize(metadata, merged_transcript, summary_mode=task_summary_mode)
         db.update_task(task_id, summary=summary_report, progress=95.0)
 
         # 标志任务已彻底成功
@@ -549,14 +554,16 @@ def run_podcast_pipeline(task_id: str, url: str):
             title="播客 AI 转录完成！",
             message=f"《{metadata['title']}》已转录成功，点击进入工作台查看。"
         )
-        notifier.send_email_notification(
-            podcast_title=metadata["title"],
-            podcast_name=metadata["podcast_name"],
-            task_id=task_id,
-            summary_md=summary_report,
-            like_count=metadata["like_count"],
-            comment_count=metadata["comment_count"]
-        )
+        if config.get("enable_email_notification", False):
+            notifier.send_email_notification(
+                podcast_title=metadata["title"],
+                podcast_name=metadata["podcast_name"],
+                task_id=task_id,
+                summary_md=summary_report,
+                like_count=metadata["like_count"],
+                comment_count=metadata["comment_count"],
+                image_url=metadata.get("image_url", "")
+            )
 
     except Exception as e:
         # 如果任务在中途已经被物理删除，静默跳过其余数据库和通知逻辑，物理销毁所有临时生成的音频，释放资源
@@ -611,6 +618,18 @@ def list_tasks():
             t["queue_position"] = pos
     return tasks
 
+import math
+
+def sanitize_floats(obj):
+    if isinstance(obj, dict):
+        return {k: sanitize_floats(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_floats(x) for x in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0
+    return obj
+
 @app.get("/api/tasks/{task_id}")
 def get_task_details(task_id: str):
     task = db.get_task(task_id)
@@ -620,12 +639,13 @@ def get_task_details(task_id: str):
     if task.get("status") == "pending":
         pos = queue_manager.get_queue_position(task.get("id"))
         task["queue_position"] = pos
-    return task
+    return sanitize_floats(task)
 
 @app.post("/api/tasks")
 def create_task(req: CreateTaskRequest):
     task_id = str(uuid.uuid4())
-    db.add_task(task_id, req.url, asr_mode=req.asr_mode)
+    curr_summary_mode = config.get("summary_mode", "local")
+    db.add_task(task_id, req.url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
     
     # 放入全局单例队列管理器进行排队串行处理，不再直接塞给 background_tasks 并行跑
     queue_manager.add_task(task_id, req.url)
@@ -651,7 +671,8 @@ def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
         raise HTTPException(status_code=500, detail=f"保存上传音频文件失败: {str(e)}")
         
     # 4. 创建任务并以本地导入的元数据初始化
-    db.add_task(task_id, local_path, asr_mode=asr_mode)
+    curr_summary_mode = config.get("summary_mode", "local")
+    db.add_task(task_id, local_path, asr_mode=asr_mode, summary_mode=curr_summary_mode)
     
     name_without_ext = os.path.splitext(file.filename)[0]
     db.update_task(
@@ -885,7 +906,8 @@ def regenerate_summary(task_id: str, background_tasks: BackgroundTasks):
             summary_report = summarizer.summarize(
                 task["metadata"], 
                 task["transcript"], 
-                speaker_mappings=task.get("speaker_mappings")
+                speaker_mappings=task.get("speaker_mappings"),
+                summary_mode=task.get("summary_mode", "local")
             )
             db.update_task(task_id, status="completed", summary=summary_report, progress=100.0)
         except Exception as ex:
@@ -893,6 +915,62 @@ def regenerate_summary(task_id: str, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(run_re_summarize)
     return {"status": "summarizing"}
+
+@app.post("/api/tasks/{task_id}/metadata/refresh")
+def refresh_metadata(task_id: str):
+    """
+    重新抓取播客的最新点赞数、评论数、简介/Shownotes等，实时同步到本地库中
+    """
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到任务")
+    
+    url = task.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="本地上传任务没有源链接，无法刷新元数据")
+        
+    try:
+        new_metadata = downloader.parse_metadata(url)
+        
+        # 合并最新的元数据
+        old_meta = task.get("metadata", {}) or {}
+        for k, v in new_metadata.items():
+            if v is not None:
+                old_meta[k] = v
+                
+        # 更新数据库
+        updated_t = db.update_task(
+            task_id,
+            metadata=old_meta,
+            title=new_metadata.get("title", task.get("title")),
+            podcast_name=new_metadata.get("podcast_name", task.get("podcast_name")),
+            image_url=new_metadata.get("image_url", task.get("image_url"))
+        )
+        return {
+            "success": True, 
+            "task": {
+                "id": updated_t.get("id"),
+                "url": updated_t.get("url"),
+                "asr_mode": updated_t.get("asr_mode", "local"),
+                "summary_mode": updated_t.get("summary_mode", "local"),
+                "title": updated_t.get("title", "未命名任务"),
+                "podcast_name": updated_t.get("podcast_name", "未知播客"),
+                "status": updated_t.get("status", "pending"),
+                "progress": updated_t.get("progress", 0),
+                "created_at": updated_t.get("created_at"),
+                "error_message": updated_t.get("error_message"),
+                "like_count": updated_t.get("metadata", {}).get("like_count", 0),
+                "comment_count": updated_t.get("metadata", {}).get("comment_count", 0),
+                "obsidian_synced": updated_t.get("obsidian_synced", False),
+                "image_url": updated_t.get("image_url", ""),
+                "metadata": {
+                    "pub_date": updated_t.get("metadata", {}).get("pub_date", ""),
+                    "source": updated_t.get("metadata", {}).get("source", "")
+                }
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"刷新元数据失败: {str(e)}")
 
 @app.get("/api/config")
 def get_global_config():

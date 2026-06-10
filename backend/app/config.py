@@ -56,6 +56,7 @@ def load_config():
         "smtp_sender": "",
         "notification_email": "",
         "enable_win_notification": True,
+        "enable_email_notification": False,
         "asr_mode": "local",
         "online_api_key": "",
         "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",

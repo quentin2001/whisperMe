@@ -34,7 +34,7 @@ class PodcastNotifier:
         except Exception as e:
             print(f"⚠️ [LOG 异常] 无法发送 Windows 桌面通知: {e}")
 
-    def send_email_notification(self, podcast_title: str, podcast_name: str, task_id: str, summary_md: str, like_count: int, comment_count: int):
+    def send_email_notification(self, podcast_title: str, podcast_name: str, task_id: str, summary_md: str, like_count: int, comment_count: int, image_url: str = ""):
         """
         发送格式精美的卡片式 HTML 邮件通知
         """
@@ -77,6 +77,14 @@ class PodcastNotifier:
             elif "C" in score or "D" in score:
                 rating_color = "#73daca" # 蓝色/绿色表示 C/D
 
+            image_cell = ""
+            if image_url:
+                image_cell = f"""
+                <td style="width: 80px; padding-right: 16px; vertical-align: middle;">
+                    <img src="{image_url}" alt="{podcast_title}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.2);" />
+                </td>
+                """
+
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"🎙️ 播客总结卡片：【{podcast_title}】"
             msg["From"] = self.smtp_sender or self.smtp_username
@@ -88,16 +96,23 @@ class PodcastNotifier:
                 <div style="max-width: 600px; margin: 0 auto; background-color: #121218; border: 1px solid #1f1f2e; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.7);">
                     
                     <!-- 渐变头部卡片 (使用 whisperMe 主题配色) -->
-                    <div style="background: linear-gradient(135deg, #7aa2f7, #9d7cd8); padding: 30px 24px; text-align: left; position: relative;">
-                        <div style="font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.85); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
-                            🎙️ {podcast_name} • AI 播客浓缩卡片
-                        </div>
-                        <h2 style="color: #ffffff; margin: 0 0 10px 0; font-size: 20px; font-weight: bold; line-height: 1.4;">
-                            {podcast_title}
-                        </h2>
-                        <div style="font-size: 13px; color: rgba(255, 255, 255, 0.95);">
-                            主持：<span style="font-weight: bold; color: #73daca;">{host}</span> &nbsp;&nbsp;|&nbsp;&nbsp; 嘉宾：<span style="font-weight: bold; color: #ff9e64;">{guest}</span>
-                        </div>
+                    <div style="background: linear-gradient(135deg, #7aa2f7, #9d7cd8); padding: 24px; text-align: left;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                {image_cell}
+                                <td style="vertical-align: middle;">
+                                    <div style="font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.85); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                                        🎙️ {podcast_name} • AI 播客浓缩卡片
+                                    </div>
+                                    <h2 style="color: #ffffff; margin: 0 0 10px 0; font-size: 20px; font-weight: bold; line-height: 1.4;">
+                                        {podcast_title}
+                                    </h2>
+                                    <div style="font-size: 13px; color: rgba(255, 255, 255, 0.95);">
+                                        主持：<span style="font-weight: bold; color: #73daca;">{host}</span> &nbsp;&nbsp;|&nbsp;&nbsp; 嘉宾：<span style="font-weight: bold; color: #ff9e64;">{guest}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div style="padding: 24px;">
@@ -129,17 +144,9 @@ class PodcastNotifier:
                             {topics_html}
                         </div>
 
-                        <!-- 社交互动热度 -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #181820; border-radius: 8px; padding: 10px 15px; font-size: 12px; color: #a1a1aa; margin-bottom: 24px;">
+                        <!-- 社交互动热度 (居中且去除了数据源) -->
+                        <div style="background-color: #181820; border-radius: 8px; padding: 10px 15px; font-size: 12px; color: #a1a1aa; margin-bottom: 24px; text-align: center;">
                             <span>🔥 本集互动数据：👍 {like_count} 点赞 &nbsp;&nbsp;|&nbsp;&nbsp; 💬 {comment_count} 评论</span>
-                            <span style="color: #73daca;">数据源：Bilibili / 小宇宙 FM</span>
-                        </div>
-
-                        <!-- 打开工作台按钮 -->
-                        <div style="text-align: center; margin: 30px 0 10px 0;">
-                            <a href="http://localhost:5173/task/{task_id}" style="display: inline-block; background: linear-gradient(90deg, #7aa2f7, #9d7cd8); color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 35px; border-radius: 30px; box-shadow: 0 4px 15px rgba(122, 162, 247, 0.45); letter-spacing: 0.5px;">
-                                💻 打开工作台查看详情
-                            </a>
                         </div>
 
                     </div>
@@ -197,18 +204,79 @@ def extract_section(text, keywords, next_keywords, default_val=''):
             return val
     return default_val
 
+def format_markdown_body_to_html(body_text):
+    import re
+    if not body_text:
+        return ""
+    
+    lines = body_text.split("\n")
+    html_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+            
+        indent = len(line) - len(line.lstrip())
+        list_match = re.match(r'^[\-\*\+]\s+(.*)', stripped)
+        if list_match:
+            content = list_match.group(1).strip()
+            bold_match = re.match(r'^\*\*([^*]+)\*\*([：:\-\s]*)(.*)', content)
+            if bold_match:
+                label = bold_match.group(1).strip()
+                val = bold_match.group(3).strip()
+                val = re.sub(r'^[:：\-\s]+', '', val).strip()
+                margin_left = "20px" if indent >= 2 else "10px"
+                line_html = f'<div style="margin: 8px 0 8px {margin_left}; line-height: 1.5; color: #a1a1aa;">• <strong style="color: #bb9af2;">{label}：</strong>{convert_markdown_inline(val)}</div>'
+            else:
+                margin_left = "20px" if indent >= 2 else "10px"
+                line_html = f'<div style="margin: 8px 0 8px {margin_left}; line-height: 1.5; color: #d4d4d8;">• {convert_markdown_inline(content)}</div>'
+        else:
+            bold_match = re.match(r'^\*\*([^*]+)\*\*([：:\-\s]*)(.*)', stripped)
+            if bold_match:
+                label = bold_match.group(1).strip()
+                val = bold_match.group(3).strip()
+                val = re.sub(r'^[:：\-\s]+', '', val).strip()
+                line_html = f'<div style="margin: 6px 0; line-height: 1.5;"><strong style="color: #bb9af2;">{label}：</strong>{convert_markdown_inline(val)}</div>'
+            else:
+                line_html = f'<div style="margin: 6px 0; line-height: 1.5; color: #d4d4d8;">{convert_markdown_inline(stripped)}</div>'
+                
+        html_lines.append(line_html)
+        
+    return "".join(html_lines)
+
+
 def format_markdown_to_html_cards(markdown_text):
     import re
+    if not markdown_text:
+        return ""
+        
     html = markdown_text.strip()
     html = html.replace("<", "&lt;").replace(">", "&gt;")
     
-    parts = re.split(r'\n###\s+', "\n" + html)
+    # Normalize headers: convert list item headers like "- **议题..." into "### 议题..."
+    lines = html.split("\n")
+    normalized_lines = []
+    for line in lines:
+        line_str = line.strip()
+        if line_str.startswith("###"):
+            normalized_lines.append(line)
+        elif (line_str.startswith("- **议题") or line_str.startswith("* **议题") or line_str.startswith("**议题")) and "**" in line_str:
+            header_content = re.sub(r'^[\-\*\s]+', '', line_str).strip()
+            header_content = re.sub(r'^\*\*|\*\*[：:]*$', '', header_content).strip()
+            header_content = header_content.rstrip("：:*")
+            normalized_lines.append(f"### {header_content}")
+        else:
+            normalized_lines.append(line)
+            
+    html_normalized = "\n".join(normalized_lines)
+    parts = re.split(r'\n###\s+', "\n" + html_normalized)
     card_htmls = []
     
     intro = parts[0].strip()
     if intro and not intro.startswith("##"):
-        intro_clean = convert_markdown_inline(intro)
-        card_htmls.append(f"<p style='color: #d4d4d8; font-size: 14px; margin-bottom: 15px;'>{intro_clean}</p>")
+        intro_clean = format_markdown_body_to_html(intro)
+        card_htmls.append(f"<div style='color: #d4d4d8; font-size: 13px; line-height: 1.6; margin-bottom: 20px;'>{intro_clean}</div>")
         
     for part in parts[1:]:
         if not part.strip():
@@ -217,16 +285,12 @@ def format_markdown_to_html_cards(markdown_text):
         title = convert_markdown_inline(lines[0].strip())
         body = "\n".join(lines[1:]).strip()
         
-        body_html = body
-        body_html = re.sub(r'^\s*[\-\*]\s*\*\*([^*]+)\*\*[：:]*(.*)', r'<p style="margin: 6px 0; font-size: 13px; line-height: 1.5; color: #a1a1aa;"><strong style="color: #bb9af2;">\1：</strong>\2</p>', body_html, flags=re.MULTILINE)
-        body_html = re.sub(r'^\s*[\-\*]\s*(.+)', r'<p style="margin: 6px 0; font-size: 13px; line-height: 1.5; color: #d4d4d8;">• \1</p>', body_html, flags=re.MULTILINE)
-        body_html = convert_markdown_inline(body_html)
-        body_html = body_html.replace("\n", "<br>")
+        body_html = format_markdown_body_to_html(body)
         
         card = f"""
-        <div style="background-color: #1e1e24; border: 1px solid #2d2d34; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #9d7cd8;">
-            <h4 style="color: #7aa2f7; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">{title}</h4>
-            <div style="color: #d4d4d8;">{body_html}</div>
+        <div style="background-color: #1a1a24; border: 1px solid #262630; border-radius: 10px; padding: 18px; margin-bottom: 20px; border-left: 4px solid #9d7cd8; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <h4 style="color: #7aa2f7; margin: 0 0 12px 0; font-size: 14px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">{title}</h4>
+            <div style="color: #e2e8f0; font-size: 13px; line-height: 1.6;">{body_html}</div>
         </div>
         """
         card_htmls.append(card)

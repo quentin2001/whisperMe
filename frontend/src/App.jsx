@@ -14,7 +14,13 @@ const Icons = {
   Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
   Home: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>,
   Edit: () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
-  Upload: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+  Upload: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>,
+  Rewind15: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline><text x="12" y="15.5" fontSize="8" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="bold" fill="currentColor" stroke="none" textAnchor="middle">15</text></svg>,
+  Forward30: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><polyline points="21 3 21 8 16 8"></polyline><text x="12" y="15.5" fontSize="8" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="bold" fill="currentColor" stroke="none" textAnchor="middle">30</text></svg>,
+  PlayPlayer: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '2px' }}><polygon points="6 3 21 12 6 21"></polygon></svg>,
+  PausePlayer: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"></rect><rect x="15" y="4" width="4" height="16" rx="1"></rect></svg>,
+  Volume: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>,
+  Mute: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>
 };
 
 // ==================== 📝 自研高性能 Markdown 渲染器 ====================
@@ -35,6 +41,19 @@ function parseInlineMarkdown(text) {
   if (remaining) parts.push(remaining);
   
   return parts.length > 0 ? parts : text;
+}
+
+function formatSpeakerName(speakerId, mappings) {
+  if (mappings && mappings[speakerId]) {
+    return mappings[speakerId];
+  }
+  if (speakerId && speakerId.startsWith('SPEAKER_')) {
+    const num = parseInt(speakerId.replace('SPEAKER_', ''), 10);
+    if (!isNaN(num)) {
+      return `声音 ${num + 1}`;
+    }
+  }
+  return speakerId || '未知声音';
 }
 
 function MarkdownRenderer({ text }) {
@@ -151,6 +170,230 @@ function MarkdownRenderer({ text }) {
   }
 
   return <div className="markdown-body">{renderedElements}</div>;
+}
+
+// ==================== 🎙️ 节目简介结构化与时点跳转渲染器 ====================
+function parseTimestampToSeconds(timestampStr) {
+  const cleanStr = timestampStr.replace(/[\[\]\(\)]/g, '').trim();
+  const parts = cleanStr.split(':').map(Number);
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  return 0;
+}
+
+function parseShownotesToBlocks(text) {
+  if (!text) return [];
+  const rawLines = text.split(/\r?\n/);
+  const tempItems = [];
+  const timeRegex = /(?:\[|\()?\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b(?:\]|\))?/;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line) {
+      tempItems.push({ type: 'empty' });
+      continue;
+    }
+
+    const timeMatch = line.match(timeRegex);
+    if (timeMatch) {
+      const fullMatch = timeMatch[0]; // e.g., "03:28" or "[03:28]"
+      const rawTime = fullMatch.replace(/[\[\]\(\)]/g, '').trim();
+      const seconds = parseTimestampToSeconds(rawTime);
+      let rest = line.replace(fullMatch, '').trim();
+      rest = rest.replace(/^[:：\-—\s]+/, '').trim(); // clean leading dashes/colons
+
+      // If the rest of the line is empty, see if we can steal the next line as the text!
+      if (rest === '' && i + 1 < rawLines.length) {
+        const nextLine = rawLines[i + 1].trim();
+        if (nextLine && !nextLine.match(timeRegex)) {
+          rest = nextLine;
+          i++; // skip next line in loop
+        }
+      }
+
+      tempItems.push({
+        type: 'timestamp',
+        timestamp: rawTime,
+        seconds: seconds,
+        text: rest
+      });
+    } else {
+      tempItems.push({
+        type: 'text',
+        text: line
+      });
+    }
+  }
+
+  // Group consecutive timestamps into timeline blocks
+  const blocks = [];
+  let currentTimeline = [];
+
+  const flushTimeline = () => {
+    if (currentTimeline.length > 0) {
+      blocks.push({
+        type: 'timeline',
+        items: [...currentTimeline]
+      });
+      currentTimeline = [];
+    }
+  };
+
+  for (const item of tempItems) {
+    if (item.type === 'timestamp') {
+      currentTimeline.push(item);
+    } else if (item.type === 'empty') {
+      flushTimeline();
+      blocks.push({ type: 'space' });
+    } else {
+      flushTimeline();
+      blocks.push(item);
+    }
+  }
+  flushTimeline();
+
+  return blocks;
+}
+
+function ShownotesRenderer({ text, onTimeJump }) {
+  if (!text) return <p style={{ color: 'var(--text-secondary)' }}>本集暂无节目简介。</p>;
+
+  const blocks = parseShownotesToBlocks(text);
+  const headerRegex = /^(?:#+\s+|[一二三四五六七八九十]+[、.]|[0-9]+\.|part\s*\d|【|🎙️|⏳|📅|💡|📌|「|『)/i;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {blocks.map((block, index) => {
+        if (block.type === 'space') {
+          return <div key={index} style={{ height: '8px' }} />;
+        }
+
+        if (block.type === 'timeline') {
+          return (
+            <div key={index} style={{
+              position: 'relative',
+              paddingLeft: '20px',
+              borderLeft: '2px solid var(--border-color)',
+              marginLeft: '8px',
+              marginTop: '12px',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              {block.items.map((item, idx) => (
+                <div key={idx} style={{ position: 'relative' }}>
+                  {/* Timeline bullet dot */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '-26px',
+                    top: '12px',
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: 'var(--bg-surface)',
+                    border: '2px solid var(--primary)',
+                    boxShadow: '0 0 6px var(--primary-glow)',
+                    zIndex: 2
+                  }} />
+                  
+                  {/* Card representing this timeline segment */}
+                  <div 
+                    className="timeline-card"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTimeJump(item.seconds);
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="shownotes-timestamp-link" style={{ margin: 0, fontSize: '13px' }}>
+                        ⏱️ {item.timestamp}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.8 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style={{ verticalAlign: 'middle' }}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        点击跳转播放
+                      </span>
+                    </div>
+                    {item.text && (
+                      <div style={{ 
+                        fontSize: '13.5px', 
+                        color: 'var(--text-secondary)',
+                        lineHeight: '1.6',
+                        fontWeight: '500',
+                        marginTop: '2px'
+                      }}>
+                        {parseInlineMarkdown(item.text)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        // normal text blocks
+        const isHeader = headerRegex.test(block.text);
+        const isListItem = block.text.startsWith('- ') || block.text.startsWith('* ');
+
+        if (isHeader) {
+          return (
+            <div key={index} style={{
+              fontSize: '15.5px',
+              fontWeight: '700',
+              color: 'var(--text-primary)',
+              marginTop: '14px',
+              marginBottom: '6px',
+              paddingLeft: block.text.includes('【') ? '8px' : '2px',
+              borderLeft: block.text.includes('【') ? '3px solid var(--primary)' : 'none',
+            }}>
+              {parseInlineMarkdown(block.text)}
+            </div>
+          );
+        }
+
+        if (isListItem) {
+          const content = block.text.replace(/^[-*]\s+/, '');
+          return (
+            <div key={index} style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              paddingLeft: '12px',
+              marginBottom: '6px',
+              color: 'var(--text-secondary)',
+              fontSize: '14px',
+              lineHeight: '1.7'
+            }}>
+              <span style={{ color: 'var(--primary)', marginTop: '6px', fontSize: '6px' }}>●</span>
+              <span style={{ flex: 1 }}>{parseInlineMarkdown(content)}</span>
+            </div>
+          );
+        }
+
+        return (
+          <p key={index} style={{
+            margin: '0 0 8px 0',
+            color: 'var(--text-secondary)',
+            lineHeight: '1.75',
+            fontSize: '14px',
+            textIndent: '0em',
+            letterSpacing: '0.1px'
+          }}>
+            {parseInlineMarkdown(block.text)}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 const PRESETS = {
@@ -281,6 +524,7 @@ const TRANSLATIONS = {
     'smtp_sender': '发送人签名邮箱',
     'smtp_receiver': '提醒接收人目标邮箱',
     'enable_win_notify': '开启 Windows 右下角桌面气泡推送提醒',
+    'enable_email_notify': '开启邮件通知（当转录/总结完成后发送邮件提醒）',
     'summarizing': '本地大模型正在拼命为您总结中...',
     'summarizing_sub': '这会占用少量显卡显存并执行推理，大约需要 30-90 秒。'
   },
@@ -380,6 +624,7 @@ const TRANSLATIONS = {
     'smtp_sender': '發送人簽名郵箱',
     'smtp_receiver': '提醒接收人目標郵箱',
     'enable_win_notify': '開啟 Windows 右下角桌面氣泡推送提醒',
+    'enable_email_notify': '開啟郵件通知（當轉錄/總結完成後發送郵件提醒）',
     'summarizing': '在地大模型正在拼命為您總結中...',
     'summarizing_sub': '這會佔用少量顯卡顯存並執行推理，大約需要 30-90 秒。'
   },
@@ -479,6 +724,7 @@ const TRANSLATIONS = {
     'smtp_sender': 'Sender Email Address',
     'smtp_receiver': 'Notification Receiver Email',
     'enable_win_notify': 'Enable Windows notification bubbles',
+    'enable_email_notify': 'Enable email notifications upon completion',
     'summarizing': 'AI summary generation in progress...',
     'summarizing_sub': 'This will occupy a small amount of VRAM and perform inference. Takes about 30-90 seconds.'
   },
@@ -578,6 +824,7 @@ const TRANSLATIONS = {
     'smtp_sender': '送信元メールアドレス',
     'smtp_receiver': '通知受信用メールアドレス',
     'enable_win_notify': 'Windowsトースト通知を有効にする',
+    'enable_email_notify': '完了時にメール通知を送信する',
     'summarizing': 'ローカルAIモデルが要約を作成しています...',
     'summarizing_sub': '推論処理を行うため、少量のVRAMを消費します。完了まで約30〜90秒かかります。'
   }
@@ -596,6 +843,7 @@ export default function App() {
   const [newUrl, setNewUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -625,6 +873,7 @@ export default function App() {
     smtp_sender: '',
     notification_email: '',
     enable_win_notification: true,
+    enable_email_notification: false,
     asr_mode: 'local',
     online_api_key: '',
     online_base_url: 'https://token-plan-sgp.xiaomimimo.com/v1',
@@ -654,8 +903,91 @@ export default function App() {
 
   // 播放器状态绑定
   const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [volume, setVolume] = useState(0.8);
+  const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const audioPlayerRef = useRef(null);
   const activeBubbleRef = useRef(null);
+
+  // 可拖拽的分栏布局状态
+  const [leftWidth, setLeftWidth] = useState(55); // 初始左侧占比百分比
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+      // 限制拖拽占比在 25% ~ 75% 之间
+      if (newWidth >= 25 && newWidth <= 75) {
+        setLeftWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  const togglePlay = () => {
+    if (!audioPlayerRef.current) return;
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+    } else {
+      audioPlayerRef.current.play().catch(err => console.log("播放失败:", err));
+    }
+  };
+
+  const skipTime = (amount) => {
+    if (!audioPlayerRef.current) return;
+    let newTime = audioPlayerRef.current.currentTime + amount;
+    if (newTime < 0) newTime = 0;
+    if (newTime > duration) newTime = duration;
+    audioPlayerRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const changePlaybackRate = (rate) => {
+    if (!audioPlayerRef.current) return;
+    audioPlayerRef.current.playbackRate = rate;
+    setPlaybackRate(rate);
+  };
+
+  const handleSeek = (e) => {
+    if (!audioPlayerRef.current) return;
+    const time = parseFloat(e.target.value);
+    audioPlayerRef.current.currentTime = time;
+    setCurrentTime(time);
+  };
+
+  const formatTime = (seconds) => {
+    if (isNaN(seconds)) return '00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const pad = (num) => num.toString().padStart(2, '0');
+    if (h > 0) {
+      return `${h}:${pad(m)}:${pad(s)}`;
+    }
+    return `${pad(m)}:${pad(s)}`;
+  };
 
   // 配置页面二级分类及多语言状态
   const [configSubTab, setConfigSubTab] = useState('general'); // 'general', 'asr', 'llm', 'notifications'
@@ -766,6 +1098,10 @@ export default function App() {
       root.style.setProperty('--bg-surface-hover', bgSurfaceHover);
       root.style.setProperty('--border-color', borderColor);
       root.style.setProperty('--border-hover', borderHover);
+      
+      // 动态音频播放器面板背景色（跟随主题模式自动改变，保障亮色/暗色一致性）
+      const playerBg = activeMode === 'dark' ? 'rgba(10, 10, 12, 0.92)' : 'rgba(255, 255, 255, 0.95)';
+      root.style.setProperty('--player-bg', playerBg);
       
       root.style.setProperty('--text-primary', colors.foreground);
       
@@ -1101,6 +1437,34 @@ export default function App() {
       }
     } catch (e) {
       alert("请求总结失败");
+    }
+  };
+
+  // 刷新节目元数据 (实时获取点赞、评论等)
+  const handleRefreshMetadata = async () => {
+    if (!activeTaskId || isRefreshingMetadata) return;
+    setIsRefreshingMetadata(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tasks/${activeTaskId}/metadata/refresh`, {
+        method: 'POST'
+      });
+      if (res.status === 200) {
+        const result = await res.json();
+        if (result.success) {
+          // 重新获取详情和任务列表以更新主界面
+          await fetchTaskDetail(activeTaskId, true);
+          await fetchTasks();
+        } else {
+          alert("刷新数据失败：" + (result.detail || "未知错误"));
+        }
+      } else {
+        const errorData = await res.json();
+        alert("刷新数据失败：" + (errorData.detail || "服务器内部错误"));
+      }
+    } catch (e) {
+      alert("网络请求失败，请检查后端服务");
+    } finally {
+      setIsRefreshingMetadata(false);
     }
   };
 
@@ -1556,7 +1920,15 @@ export default function App() {
         </div>
 
         {/* 主展示区 */}
-        <div style={{ flex: '1', overflowY: 'auto', padding: '32px', position: 'relative' }}>
+        <div style={{ 
+          flex: '1', 
+          overflowY: activeTab === 'detail' ? 'hidden' : 'auto', 
+          padding: activeTab === 'detail' ? '24px 32px 0 32px' : '32px', 
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0
+        }}>
           
           {/* ==================== PANEL 1: DASHBOARD ==================== */}
           {activeTab === 'dashboard' && (
@@ -1578,23 +1950,87 @@ export default function App() {
                         setActiveTab('detail');
                       }}
                       style={{ 
-                        padding: '20px', 
+                        padding: '16px', 
                         cursor: 'pointer', 
                         display: 'flex', 
-                        flexDirection: 'column', 
-                        justifyContent: 'space-between',
-                        minHeight: '180px',
-                        borderLeft: task.asr_mode === 'online' ? '4px solid var(--accent)' : '4px solid var(--primary)'
+                        flexDirection: 'row', 
+                        gap: '16px',
+                        borderLeft: task.asr_mode === 'online' ? '4px solid var(--accent)' : '4px solid var(--primary)',
+                        position: 'relative',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        alignItems: 'flex-start'
                       }}
                     >
-                      <div>
-                        {/* 状态指示 */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {/* Trash button positioned absolutely at top right */}
+                      <button 
+                        className="btn-ghost" 
+                        style={{ 
+                          position: 'absolute', 
+                          top: '12px', 
+                          right: '12px', 
+                          border: 'none', 
+                          background: 'transparent', 
+                          padding: '6px', 
+                          borderRadius: '50%', 
+                          color: 'var(--text-muted)',
+                          opacity: 0.6,
+                          transition: 'opacity 0.2s',
+                          zIndex: 5
+                        }}
+                        onClick={(e) => handleDeleteTask(task.id, e)}
+                      >
+                        <Icons.Trash />
+                      </button>
+
+                      {/* Left side: Cover image wrapper (centered vertically in stretched flex card) */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        alignSelf: 'stretch',
+                        flexShrink: 0
+                      }}>
+                        {/* Cover image or gradient placeholder */}
+                        <div style={{ 
+                          width: '96px', 
+                          height: '96px', 
+                          borderRadius: '8px', 
+                          overflow: 'hidden', 
+                          background: 'var(--bg-base)',
+                          border: '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                        }}>
+                          {task.image_url ? (
+                            <img 
+                              src={task.image_url} 
+                              alt={task.title} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.target.style.display = 'none'; }} 
+                            />
+                          ) : (
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.2 }}><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right side: stats & title info */}
+                      <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '24px' }}>
+                        <div>
+                          {/* Title & Podcast Name */}
+                          <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', lineBreak: 'anywhere', lineHeight: '1.4', marginBottom: '4px', paddingRight: '8px' }}>
+                            {task.title}
+                          </h3>
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{task.podcast_name}</p>
+                          
+                          {/* Badges row */}
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
                             <span style={{ 
-                              fontSize: '11px', 
-                              padding: '3px 8px', 
-                              borderRadius: '12px', 
+                              fontSize: '10px', 
+                              padding: '2px 6px', 
+                              borderRadius: '10px', 
                               background: task.status === 'completed' ? 'var(--success-glow)' : 'rgba(255,255,255,0.05)',
                               border: task.status === 'completed' ? '1px solid rgba(115, 218, 202, 0.2)' : '1px solid var(--border-color)',
                               color: task.status === 'completed' ? 'var(--success)' : 'var(--text-secondary)'
@@ -1629,45 +2065,71 @@ export default function App() {
                               );
                             })()}
                           </div>
-                          
-                          <button 
-                            className="btn-ghost" 
-                            style={{ border: 'none', background: 'transparent', padding: '4px', borderRadius: '50%', color: 'var(--text-muted)' }}
-                            onClick={(e) => handleDeleteTask(task.id, e)}
-                          >
-                            <Icons.Trash />
-                          </button>
                         </div>
 
-                        {/* 标题 */}
-                        <h3 style={{ fontSize: '14.5px', fontWeight: '700', color: 'var(--text-primary)', lineBreak: 'anywhere', lineHeight: '1.4', marginBottom: '6px' }}>
-                          {task.title}
-                        </h3>
-                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>{task.podcast_name}</p>
-                      </div>
-
-                      {/* 统计指标 / 进度条 */}
-                      <div>
-                        {task.status !== 'completed' && task.status !== 'failed' ? (
-                          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div className="progress-bar-animated" style={{ width: `${task.progress}%`, height: '100%' }}></div>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icons.Clock /> {task.created_at ? task.created_at.substring(0, 10) : ''}</span>
-                            {task.status === 'completed' && (
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Icons.ThumbsUp /> {task.like_count}</span>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Icons.MessageCircle /> {task.comment_count}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {task.status === 'failed' && (
-                          <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px', lineBreak: 'anywhere' }}>
-                            ❌ {task.error_message || "未知报错，请检查终端日志"}
-                          </div>
-                        )}
+                        {/* Bottom stats / progress */}
+                        <div style={{ marginTop: 'auto' }}>
+                          {task.status !== 'completed' && task.status !== 'failed' ? (
+                            <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div className="progress-bar-animated" style={{ width: `${task.progress}%`, height: '100%' }}></div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px', gap: '8px' }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                whiteSpace: 'nowrap',
+                                padding: '2px 8px',
+                                borderRadius: '20px',
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                border: '1px solid var(--border-color)',
+                                fontSize: '10px',
+                                color: 'var(--text-secondary)'
+                              }}>
+                                <Icons.Clock /> 
+                                {task.metadata?.pub_date 
+                                  ? task.metadata.pub_date.substring(0, 10) 
+                                  : (task.created_at ? task.created_at.substring(0, 10) : '')}
+                              </span>
+                              {task.status === 'completed' && (
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 8px',
+                                    borderRadius: '20px',
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    border: '1px solid var(--border-color)',
+                                    fontSize: '10px',
+                                    color: 'var(--text-secondary)'
+                                  }}>
+                                    <Icons.ThumbsUp /> {task.like_count}
+                                  </span>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 8px',
+                                    borderRadius: '20px',
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    border: '1px solid var(--border-color)',
+                                    fontSize: '10px',
+                                    color: 'var(--text-secondary)'
+                                  }}>
+                                    <Icons.MessageCircle /> {task.comment_count}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {task.status === 'failed' && (
+                            <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px', lineBreak: 'anywhere' }}>
+                              ❌ {task.error_message || "未知报错，请检查终端日志"}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1678,14 +2140,170 @@ export default function App() {
 
           {/* ==================== PANEL 2: DETAIL WORKSPACE ==================== */}
           {activeTab === 'detail' && activeTask && (
-            <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
+            <div ref={containerRef} style={{ display: 'flex', flex: '1', height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative', gap: '0' }}>
+              {isDragging && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  cursor: 'col-resize',
+                  zIndex: 9999,
+                  background: 'transparent'
+                }} />
+              )}
               
               {/* 左侧：语音转文字剧本流动 (2指针联动) */}
-              <div className="glass-panel" style={{ flex: '1.2', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{t('script_dialogue')}</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('script_dialogue_sub')}</span>
+              <div className="glass-panel" style={{ 
+                width: `${leftWidth}%`, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%', 
+                overflow: 'hidden', 
+                flexShrink: 0,
+                position: 'relative',
+                transition: isDragging ? 'none' : 'var(--transition-smooth)'
+              }}>
+                <div style={{
+                  padding: '12px 20px',
+                  borderBottom: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  height: '56px',
+                  flexShrink: 0,
+                  borderTopLeftRadius: 'var(--radius-md)',
+                  borderTopRightRadius: 'var(--radius-md)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{t('script_dialogue')}</h3>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(点击对话行跳转播放)</span>
+                  </div>
+                  <button 
+                    className="btn-ghost" 
+                    style={{ padding: '6px 12px', fontSize: '12px', height: '32px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => setShowSpeakerModal(true)}
+                  >
+                    🗣️ 发言人管理
+                  </button>
                 </div>
+
+                {/* 发言人昵称管理悬浮卡片 (非全屏阻挡，局部绝对定位) */}
+                {showSpeakerModal && (
+                  <div className="glass-panel" style={{
+                    position: 'absolute',
+                    top: '56px',
+                    right: '16px',
+                    width: '340px',
+                    maxHeight: 'calc(100% - 72px)',
+                    background: 'var(--bg-surface)',
+                    backdropFilter: 'blur(30px)',
+                    WebkitBackdropFilter: 'blur(30px)',
+                    border: '1px solid var(--border-hover)',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+                    zIndex: 100,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '16px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                      <h3 style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        🗣️ 发言人昵称管理
+                      </h3>
+                      <button 
+                        className="btn-ghost" 
+                        style={{ padding: '2px 6px', fontSize: '11px', border: 'none', background: 'transparent' }}
+                        onClick={() => setShowSpeakerModal(false)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '12px' }}>
+                      修改节目中识别出的发言人昵称。修改后将实时更新。
+                    </p>
+                    
+                    <div style={{ flex: '1', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '2px' }}>
+                      {getUniqueSpeakers().length === 0 ? (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0' }}>暂无发言人数据</p>
+                      ) : (
+                        getUniqueSpeakers().map((spId) => {
+                          const currentName = formatSpeakerName(spId, activeTask.speaker_mappings);
+                          const isEditing = panelRenamingSpeakerId === spId;
+                          
+                          return (
+                            <div key={spId} style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between',
+                              background: 'rgba(255,255,255,0.01)', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '8px', 
+                              padding: '8px 10px' 
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: '1', marginRight: '8px' }}>
+                                <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>系统标识: {spId.startsWith('SPEAKER_') ? `声音 ${parseInt(spId.replace('SPEAKER_', ''), 10) + 1}` : spId}</span>
+                                {!isEditing ? (
+                                  <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{currentName}</span>
+                                ) : (
+                                  <input 
+                                    type="text" 
+                                    value={panelRenameValue}
+                                    onChange={(e) => setPanelRenameValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleRenameSpeakerPanel(spId);
+                                      if (e.key === 'Escape') setPanelRenamingSpeakerId(null);
+                                    }}
+                                    className="glass-input"
+                                    style={{ padding: '2px 8px', fontSize: '12px', width: '100%' }}
+                                    autoFocus
+                                  />
+                                )}
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                {!isEditing ? (
+                                  <button 
+                                    className="btn-ghost" 
+                                    style={{ padding: '4px 8px', fontSize: '11px' }}
+                                    onClick={() => {
+                                      setPanelRenamingSpeakerId(spId);
+                                      setPanelRenameValue(currentName);
+                                    }}
+                                  >
+                                    编辑
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button 
+                                      className="btn-glow" 
+                                      style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--success)' }}
+                                      onClick={() => handleRenameSpeakerPanel(spId)}
+                                    >
+                                      保存
+                                    </button>
+                                    <button 
+                                      className="btn-ghost" 
+                                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                                      onClick={() => {
+                                        setPanelRenamingSpeakerId(null);
+                                        setPanelRenameValue('');
+                                      }}
+                                    >
+                                      取消
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
                 
                 {/* 剧本对话渲染区 */}
                 <div style={{ flex: '1', overflowY: 'auto', padding: '20px' }}>
@@ -1693,7 +2311,7 @@ export default function App() {
                     <div className="dialogue-container">
                       {activeTask.transcript.map((seg, idx) => {
                         const isPlayingLine = currentTime >= seg.start && currentTime <= seg.end;
-                        const speakerName = activeTask.speaker_mappings[seg.speaker] || seg.speaker;
+                        const speakerName = formatSpeakerName(seg.speaker, activeTask.speaker_mappings);
                         
                         return (
                           <div 
@@ -1703,42 +2321,11 @@ export default function App() {
                             className={`dialogue-bubble ${isPlayingLine ? 'active-playing' : ''}`}
                           >
                             <div className="dialogue-meta">
-                              {renamingSpeakerId === seg.speaker ? (
-                                <input 
-                                  type="text" 
-                                  value={renameValue}
-                                  onChange={(e) => setRenameValue(e.target.value)}
-                                  onBlur={() => handleRenameSpeaker(seg.speaker)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleRenameSpeaker(seg.speaker);
-                                    if (e.key === 'Escape') {
-                                      cancelRenameRef.current = true;
-                                      setRenamingSpeakerId(null);
-                                    }
-                                  }}
-                                  className="glass-input"
-                                  style={{ padding: '2px 8px', fontSize: '11px', width: '120px' }}
-                                  autoFocus
-                                  onClick={(e) => e.stopPropagation()} // 阻止触发时间跳转
-                                />
-                              ) : (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  <span className="speaker-badge">
-                                    {speakerName}
-                                  </span>
-                                  <button 
-                                    className="edit-speaker-btn"
-                                    onClick={(e) => {
-                                      e.stopPropagation(); // 阻止播放跳转
-                                      setRenamingSpeakerId(seg.speaker);
-                                      setRenameValue(speakerName);
-                                    }}
-                                    title="修改说话人名称"
-                                  >
-                                    <Icons.Edit />
-                                  </button>
-                                </div>
-                              )}
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="speaker-badge">
+                                  {speakerName}
+                                </span>
+                              </div>
                               <span className="time-stamp">{seg.timestamp_str}</span>
                             </div>
                             <div className="dialogue-text">{seg.text}</div>
@@ -1761,10 +2348,49 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 右侧：总结报告与元数据评论 (两栏切换) */}
-              <div className="glass-panel" style={{ flex: '1', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              {/* 可拖拽的分隔条 */}
+              <div 
+                onMouseDown={handleMouseDown}
+                style={{
+                  width: '16px',
+                  cursor: 'col-resize',
+                  alignSelf: 'stretch',
+                  position: 'relative',
+                  zIndex: '10',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  userSelect: 'none',
+                  flexShrink: 0
+                }}
+              >
+                <div style={{
+                  width: '2px',
+                  height: '40px',
+                  borderRadius: '1px',
+                  background: isDragging ? 'var(--primary)' : 'var(--border-color)',
+                  transition: 'background 0.2s'
+                }} />
+              </div>
+
+              {/* 右侧：总结报告与元数据评论 (三栏切换) */}
+              <div className="glass-panel" style={{ 
+                flex: 1, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%', 
+                overflow: 'hidden',
+                transition: isDragging ? 'none' : 'var(--transition-smooth)'
+              }}>
                 {/* 选项卡栏 */}
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{
+                  display: 'flex',
+                  borderBottom: '1px solid var(--border-color)',
+                  flexShrink: 0,
+                  borderTopLeftRadius: 'var(--radius-md)',
+                  borderTopRightRadius: 'var(--radius-md)',
+                  overflow: 'hidden'
+                }}>
                   <button 
                     onClick={() => setDetailSubTab('summary')}
                     style={{ 
@@ -1793,22 +2419,22 @@ export default function App() {
                       cursor: 'pointer'
                     }}
                   >
-                    {t('shownotes_comments')}
+                    节目简介
                   </button>
                   <button 
-                    onClick={() => setDetailSubTab('speakers')}
+                    onClick={() => setDetailSubTab('comments')}
                     style={{ 
                       flex: '1', 
                       background: 'transparent', 
                       border: 'none', 
                       padding: '16px', 
-                      color: detailSubTab === 'speakers' ? 'var(--primary)' : 'var(--text-secondary)',
-                      fontWeight: detailSubTab === 'speakers' ? '700' : '500',
-                      borderBottom: detailSubTab === 'speakers' ? '2px solid var(--primary)' : 'none',
+                      color: detailSubTab === 'comments' ? 'var(--primary)' : 'var(--text-secondary)',
+                      fontWeight: detailSubTab === 'comments' ? '700' : '500',
+                      borderBottom: detailSubTab === 'comments' ? '2px solid var(--primary)' : 'none',
                       cursor: 'pointer'
                     }}
                   >
-                    {t('speaker_list')}
+                    听友热评 ({activeTask.metadata?.comments?.length || 0})
                   </button>
                 </div>
 
@@ -1839,140 +2465,119 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* SUBTAB 2: Shownotes and Top Comments */}
+                  {/* SUBTAB 2: Shownotes */}
                   {detailSubTab === 'shownotes' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                      {/* Shownotes */}
-                      <div>
-                        <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '8px' }}>节目简介 (Shownotes)</h3>
-                        <div style={{ 
-                          background: 'rgba(255,255,255,0.02)', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '8px', 
-                          padding: '16px', 
-                          fontSize: '13px', 
-                          color: 'var(--text-secondary)',
-                          lineHeight: '1.6',
-                          whiteSpace: 'pre-wrap',
-                          maxHeight: '220px',
-                          overflowY: 'auto'
-                        }}>
-                          {activeTask.metadata?.shownotes || "无节目简介"}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '18px' }}>🎙️</span>
+                          <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '700' }}>单集节目简介</h3>
                         </div>
+                        {activeTask.url && (
+                          <button 
+                            className="btn-ghost" 
+                            style={{ fontSize: '12px', padding: '6px 12px' }} 
+                            onClick={handleRefreshMetadata}
+                            disabled={isRefreshingMetadata}
+                          >
+                            <Icons.Refresh className={isRefreshingMetadata ? "spin-animation" : ""} /> {isRefreshingMetadata ? "正在刷新..." : "刷新数据"}
+                          </button>
+                        )}
                       </div>
-
-                      {/* 热门评论 */}
-                      <div>
-                        <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '10px' }}>听友热评 (第一页共 {activeTask.metadata?.comments?.length || 0} 条)</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {activeTask.metadata?.comments && activeTask.metadata.comments.length > 0 ? (
-                            activeTask.metadata.comments.map((comment, cIdx) => (
-                              <div key={cIdx} style={{ 
-                                background: 'rgba(255,255,255,0.01)', 
-                                border: '1px solid rgba(255,255,255,0.02)', 
-                                borderRadius: '8px', 
-                                padding: '12px 14px' 
-                              }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
-                                  <span style={{ color: 'var(--primary)', fontWeight: '600' }}>{comment.author}</span>
-                                  <span style={{ color: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Icons.ThumbsUp /> {comment.likes}</span>
-                                </div>
-                                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{comment.content}</p>
-                              </div>
-                            ))
-                          ) : (
-                            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>暂无评论数据（可能非小宇宙链接）</p>
-                          )}
-                        </div>
+                      <div style={{ 
+                        background: 'rgba(255,255,255,0.01)', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '12px', 
+                        padding: '24px', 
+                        fontSize: '14px', 
+                        color: 'var(--text-secondary)',
+                        lineHeight: '1.8',
+                        letterSpacing: '0.2px'
+                      }}>
+                        <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={handleTimeJump} />
                       </div>
                     </div>
                   )}
 
-                  {/* SUBTAB 3: Speaker Management */}
-                  {detailSubTab === 'speakers' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      <h3 style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '8px' }}>发言人昵称管理</h3>
-                      <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        在此统一修改节目中识别出的声纹角色昵称。修改后，左侧剧本对话流中的角色名字会实时更新，系统也将自动采用新昵称。
-                      </p>
+                  {/* SUBTAB 3: Comments */}
+                  {detailSubTab === 'comments' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '18px' }}>💬</span>
+                          <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '700' }}>听友热门评论</h3>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>共计 {activeTask.metadata?.comments?.length || 0} 条精彩留言</span>
+                          {activeTask.url && (
+                            <button 
+                              className="btn-ghost" 
+                              style={{ fontSize: '12px', padding: '6px 12px' }} 
+                              onClick={handleRefreshMetadata}
+                              disabled={isRefreshingMetadata}
+                            >
+                              <Icons.Refresh className={isRefreshingMetadata ? "spin-animation" : ""} /> {isRefreshingMetadata ? "正在刷新..." : "刷新数据"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                       
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                        {getUniqueSpeakers().length === 0 ? (
-                          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>暂无发言人数据（请确保已启用声纹识别并且任务已分析出角色）</p>
-                        ) : (
-                          getUniqueSpeakers().map((spId) => {
-                            const currentName = activeTask.speaker_mappings[spId] || spId;
-                            const isEditing = panelRenamingSpeakerId === spId;
-                            
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {activeTask.metadata?.comments && activeTask.metadata.comments.length > 0 ? (
+                          activeTask.metadata.comments.map((comment, cIdx) => {
+                            const hasManyLikes = comment.likes >= 20;
                             return (
-                              <div key={spId} style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between',
-                                background: 'rgba(255,255,255,0.01)', 
-                                border: '1px solid var(--border-color)', 
-                                borderRadius: '8px', 
-                                padding: '12px 16px' 
-                              }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>系统内部 ID: {spId}</span>
-                                  {!isEditing ? (
-                                    <span style={{ fontSize: '14.5px', color: 'var(--text-primary)', fontWeight: '600' }}>{currentName}</span>
-                                  ) : (
-                                    <input 
-                                      type="text" 
-                                      value={panelRenameValue}
-                                      onChange={(e) => setPanelRenameValue(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleRenameSpeakerPanel(spId);
-                                        if (e.key === 'Escape') {
-                                          setPanelRenamingSpeakerId(null);
-                                        }
-                                      }}
-                                      className="glass-input"
-                                      style={{ padding: '4px 10px', fontSize: '13px', width: '180px' }}
-                                      autoFocus
-                                    />
-                                  )}
-                                </div>
-                                
-                                <div>
-                                  {!isEditing ? (
-                                    <button 
-                                      className="btn-glow" 
-                                      style={{ padding: '6px 14px', fontSize: '12px' }}
-                                      onClick={() => {
-                                        setPanelRenamingSpeakerId(spId);
-                                        setPanelRenameValue(currentName);
-                                      }}
-                                    >
-                                      编辑昵称
-                                    </button>
-                                  ) : (
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                      <button 
-                                        className="btn-glow" 
-                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'var(--success)' }}
-                                        onClick={() => handleRenameSpeakerPanel(spId)}
-                                      >
-                                        保存
-                                      </button>
-                                      <button 
-                                        className="btn-ghost" 
-                                        style={{ padding: '6px 14px', fontSize: '12px' }}
-                                        onClick={() => {
-                                          setPanelRenamingSpeakerId(null);
-                                          setPanelRenameValue('');
-                                        }}
-                                      >
-                                        取消
-                                      </button>
+                              <div 
+                                key={cIdx} 
+                                className="glass-panel" 
+                                style={{ 
+                                  padding: '16px 20px',
+                                  borderRadius: '12px',
+                                  border: hasManyLikes ? '1px solid rgba(224, 175, 104, 0.25)' : '1px solid var(--border-color)',
+                                  background: hasManyLikes ? 'rgba(224, 175, 104, 0.02)' : 'rgba(255, 255, 255, 0.01)',
+                                  boxShadow: 'none',
+                                  transition: 'transform 0.2s, border-color 0.2s'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '50%',
+                                      background: hasManyLikes ? 'linear-gradient(135deg, var(--warning), var(--accent))' : 'linear-gradient(135deg, var(--primary), var(--accent))',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      color: '#fff'
+                                    }}>
+                                      {comment.author ? comment.author.charAt(0).toUpperCase() : 'U'}
                                     </div>
-                                  )}
+                                    <span style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '13px' }}>{comment.author}</span>
+                                  </div>
+                                  <span style={{ 
+                                    color: hasManyLikes ? 'var(--warning)' : 'var(--text-secondary)', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500'
+                                  }}>
+                                    <Icons.ThumbsUp /> {comment.likes}
+                                  </span>
                                 </div>
+                                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', paddingLeft: '32px' }}>
+                                  {comment.content}
+                                </p>
                               </div>
                             );
                           })
+                        ) : (
+                          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            <p style={{ fontSize: '13.5px' }}>暂无评论数据（可能非小宇宙链接）</p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1980,6 +2585,8 @@ export default function App() {
 
                 </div>
               </div>
+
+
 
             </div>
           )}
@@ -2031,48 +2638,45 @@ export default function App() {
 
                 {/* 0. 外观与语言设置 (Appearance & Language Settings) */}
                 {configSubTab === 'general' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{
-                      background: 'rgba(255, 255, 255, 0.015)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px'
-                    }}>
-                      <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px', margin: 0 }}>
-                        {t('theme_appearance')}
-                      </h3>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', margin: 0 }}>
-                        {t('theme_sub')}
-                      </p>
-                      
-                      {/* Mode Select */}
-                      <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', marginBottom: '8px', background: 'rgba(0,0,0,0.1)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>{t('display_mode')}</span>
-                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{t('display_mode_sub')}</span>
-                          </div>
-                          <select
-                            value={themeMode}
-                            onChange={(e) => setThemeMode(e.target.value)}
-                            className="glass-input"
-                            style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
-                          >
-                            <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
-                            <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
-                            <option value="system" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>System (跟随系统)</option>
-                          </select>
-                        </div>
+                  <div className="settings-container">
+                    
+                    {/* Theme Preference Settings Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">{t('theme_appearance')}</h3>
+                        <p className="settings-card-subtitle">{t('theme_sub')}</p>
                       </div>
 
-                      {/* Light & Dark Theme Editors side-by-side */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                        
-                        {/* Light Theme Panel */}
-                        <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                      {/* Display Mode Settings Row */}
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">{t('display_mode')}</span>
+                          <span className="settings-row-desc">{t('display_mode_sub')}</span>
+                        </div>
+                        <select
+                          value={themeMode}
+                          onChange={(e) => setThemeMode(e.target.value)}
+                          className="glass-input"
+                          style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="light" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Light (浅色)</option>
+                          <option value="dark" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>Dark (深色)</option>
+                          <option value="system" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>System (跟随系统)</option>
+                        </select>
+                      </div>
+
+                      {/* Light & Dark Theme Presets Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '10px' }}>
+                        {/* Light Theme Sub-card */}
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.015)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
                           <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', margin: 0 }}>
                             {t('light_theme_title')}
                           </h4>
@@ -2082,9 +2686,7 @@ export default function App() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button 
                                 type="button"
-                                onClick={() => {
-                                  setLightTheme(PRESETS.light[lightPresetName]);
-                                }}
+                                onClick={() => setLightTheme(PRESETS.light[lightPresetName])}
                                 title="重置为当前预设默认颜色"
                                 style={{
                                   background: 'transparent',
@@ -2118,7 +2720,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Background Color */}
+                          {/* Light Background Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('bg_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2157,7 +2759,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Foreground Color */}
+                          {/* Light Foreground Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('fg_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2196,7 +2798,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Accent Color */}
+                          {/* Light Accent Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('accent_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2234,11 +2836,18 @@ export default function App() {
                               />
                             </div>
                           </div>
-
                         </div>
 
-                        {/* Dark Theme Panel */}
-                        <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                        {/* Dark Theme Sub-card */}
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.015)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
                           <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', margin: 0 }}>
                             {t('dark_theme_title')}
                           </h4>
@@ -2248,9 +2857,7 @@ export default function App() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button 
                                 type="button"
-                                onClick={() => {
-                                  setDarkTheme(PRESETS.dark[darkPresetName]);
-                                }}
+                                onClick={() => setDarkTheme(PRESETS.dark[darkPresetName])}
                                 title="重置为当前预设默认颜色"
                                 style={{
                                   background: 'transparent',
@@ -2284,7 +2891,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Background Color */}
+                          {/* Dark Background Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('bg_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2323,7 +2930,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Foreground Color */}
+                          {/* Dark Foreground Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('fg_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2362,7 +2969,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Accent Color */}
+                          {/* Dark Accent Color */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('accent_color')}</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2400,130 +3007,124 @@ export default function App() {
                               />
                             </div>
                           </div>
-
                         </div>
-
                       </div>
                     </div>
 
                     {/* Language Settings Card */}
-                    <div style={{
-                      background: 'rgba(255, 255, 255, 0.015)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px'
-                    }}>
-                      <h3 style={{ fontSize: '14.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '4px', margin: 0 }}>
-                        {t('language_setting')}
-                      </h3>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', margin: 0 }}>
-                        {t('language_setting_sub')}
-                      </p>
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">{t('language_setting')}</h3>
+                        <p className="settings-card-subtitle">{t('language_setting_sub')}</p>
+                      </div>
                       
-                      <div className="glass-panel" style={{ padding: '16px', borderRadius: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>{t('select_lang')}</span>
-                          </div>
-                          <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                            className="glass-input"
-                            style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
-                          >
-                            <option value="zh-CN" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>简体中文</option>
-                            <option value="zh-TW" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>繁體中文</option>
-                            <option value="en-US" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>English</option>
-                            <option value="ja-JP" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>日本語</option>
-                          </select>
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">{t('select_lang')}</span>
                         </div>
+                        <select
+                          value={language}
+                          onChange={(e) => setLanguage(e.target.value)}
+                          className="glass-input"
+                          style={{ width: '160px', padding: '8px 12px', background: 'rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="zh-CN" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>简体中文</option>
+                          <option value="zh-TW" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>繁體中文</option>
+                          <option value="en-US" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>English</option>
+                          <option value="ja-JP" style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}>日本語</option>
+                        </select>
                       </div>
                     </div>
+
                   </div>
                 )}
 
                 {/* 1. 🎙️ 语音转录与分轨配置 (ASR Engine) */}
                 {configSubTab === 'asr' && (
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.015)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                  }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {t('tab_asr')}
-                    </h3>
+                  <div className="settings-container">
                     
-                    {/* ASR 模式选择 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>默认转录模式 (Default ASR Mode)</label>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          type="button"
-                          onClick={() => updateConfigField('asr_mode', 'local')}
-                          style={{
-                            flex: '1',
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: configData.asr_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            background: configData.asr_mode === 'local' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                            color: configData.asr_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          💻 {t('local_trans')}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => updateConfigField('asr_mode', 'online')}
-                          style={{
-                            flex: '1',
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: configData.asr_mode === 'online' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            background: configData.asr_mode === 'online' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                            color: configData.asr_mode === 'online' ? 'var(--primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          🌐 {t('online_trans')}
-                        </button>
+                    {/* ASR Mode Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">{t('tab_asr')}</h3>
+                        <p className="settings-card-subtitle">配置您默认使用的转录模式与前置依赖路径</p>
+                      </div>
+                      
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">默认转录模式 (Default ASR Mode)</span>
+                          <span className="settings-row-desc">可选择本地离线大模型或第三方高精兼容在线接口</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => updateConfigField('asr_mode', 'local')}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              border: configData.asr_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                              background: configData.asr_mode === 'local' ? 'var(--primary-glow)' : 'rgba(0,0,0,0.25)',
+                              color: configData.asr_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              fontSize: '12.5px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            💻 {t('local_trans')}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => updateConfigField('asr_mode', 'online')}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              border: configData.asr_mode === 'online' ? '1px solid var(--accent)' : '1px solid var(--border-color)',
+                              background: configData.asr_mode === 'online' ? 'var(--accent-glow)' : 'rgba(0,0,0,0.25)',
+                              color: configData.asr_mode === 'online' ? 'var(--accent)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              fontSize: '12.5px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            🌐 {t('online_trans')}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* 基础核心依赖 (始终展示) */}
-                    <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '4px', margin: 0 }}>🛠️ 转录与声纹前置依赖 (Base dependencies)</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('ffmpeg_exe_path')}</label>
-                        <input 
-                          type="text" 
-                          value={configData.ffmpeg_path} 
-                          onChange={(e) => updateConfigField('ffmpeg_path', e.target.value)}
-                          className="glass-input" 
-                        />
+                    {/* Pre-dependencies Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">🛠️ 转录与声纹前置依赖 (Base dependencies)</h3>
+                        <p className="settings-card-subtitle">系统运行必须的底层依赖工具及 HuggingFace 授权令牌</p>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('ffmpeg_bin_dir')}</label>
-                        <input 
-                          type="text" 
-                          value={configData.ffmpeg_bin_dir} 
-                          onChange={(e) => updateConfigField('ffmpeg_bin_dir', e.target.value)}
-                          className="glass-input" 
-                        />
+
+                      <div className="settings-grid">
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('ffmpeg_exe_path')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.ffmpeg_path} 
+                            onChange={(e) => updateConfigField('ffmpeg_path', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
+                        
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('ffmpeg_bin_dir')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.ffmpeg_bin_dir} 
+                            onChange={(e) => updateConfigField('ffmpeg_bin_dir', e.target.value)}
+                            className="glass-input" 
+                          />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('hf_token_lbl')}</label>
+
+                      <div className="settings-field" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '16px' }}>
+                        <label className="settings-field-label">{t('hf_token_lbl')}</label>
                         <input 
                           type="password" 
                           placeholder={t('hf_token_placeholder')}
@@ -2531,18 +3132,22 @@ export default function App() {
                           onChange={(e) => updateConfigField('hf_token', e.target.value)}
                           className="glass-input" 
                         />
-                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                          {t('hf_token_sub')}
-                        </p>
+                        <p className="settings-field-desc">{t('hf_token_sub')}</p>
                       </div>
                     </div>
 
-                    {/* ASR 引擎详细参数 */}
-                    {configData.asr_mode === 'local' ? (
-                      <div style={{ background: 'rgba(122, 162, 247, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(122, 162, 247, 0.15)' }}>
-                        <h4 style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: '600', marginBottom: '10px', margin: 0 }}>💻 本地 Faster-Whisper 转录参数</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('whisper_path')}</label>
+                    {/* ASR Parameters Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">🔌 ASR 引擎详细参数</h3>
+                        <p className="settings-card-subtitle">
+                          {configData.asr_mode === 'local' ? '配置本地 Faster-Whisper 转录参数' : '配置在线 ASR API 兼容转录参数'}
+                        </p>
+                      </div>
+
+                      {configData.asr_mode === 'local' ? (
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('whisper_path')}</label>
                           <input 
                             type="text" 
                             value={configData.local_whisper_model_path} 
@@ -2550,130 +3155,139 @@ export default function App() {
                             className="glass-input" 
                           />
                         </div>
-                      </div>
-                    ) : (
-                      <div style={{ background: 'rgba(157, 124, 216, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(157, 124, 216, 0.15)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <h4 style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', marginBottom: '2px', margin: 0 }}>🌐 在线 ASR API 兼容转录参数</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_key_lbl')}</label>
-                          <input 
-                            type="password" 
-                            placeholder={t('mimo_key_placeholder')}
-                            value={configData.online_api_key || ''} 
-                            onChange={(e) => updateConfigField('online_api_key', e.target.value)}
-                            className="glass-input" 
-                          />
+                      ) : (
+                        <div className="settings-grid">
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('mimo_key_lbl')}</label>
+                            <input 
+                              type="password" 
+                              placeholder={t('mimo_key_placeholder')}
+                              value={configData.online_api_key || ''} 
+                              onChange={(e) => updateConfigField('online_api_key', e.target.value)}
+                              className="glass-input" 
+                            />
+                          </div>
+                          
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('mimo_url_lbl')}</label>
+                            <input 
+                              type="text" 
+                              placeholder="默认: https://token-plan-sgp.xiaomimimo.com/v1"
+                              value={configData.online_base_url || ''} 
+                              onChange={(e) => updateConfigField('online_base_url', e.target.value)}
+                              className="glass-input" 
+                            />
+                          </div>
+
+                          <div className="settings-field" style={{ gridColumn: 'span 2' }}>
+                            <label className="settings-field-label">{t('mimo_model_lbl')}</label>
+                            <input 
+                              type="text" 
+                              placeholder="默认: mimo-v2.5-asr"
+                              value={configData.online_model || ''} 
+                              onChange={(e) => updateConfigField('online_model', e.target.value)}
+                              className="glass-input" 
+                            />
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_url_lbl')}</label>
-                          <input 
-                            type="text" 
-                            placeholder="默认: https://token-plan-sgp.xiaomimimo.com/v1"
-                            value={configData.online_base_url || ''} 
-                            onChange={(e) => updateConfigField('online_base_url', e.target.value)}
-                            className="glass-input" 
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('mimo_model_lbl')}</label>
-                          <input 
-                            type="text" 
-                            placeholder="默认: mimo-v2.5-asr"
-                            value={configData.online_model || ''} 
-                            onChange={(e) => updateConfigField('online_model', e.target.value)}
-                            className="glass-input" 
-                          />
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
                   </div>
                 )}
 
                 {/* 2. 📝 AI 总结与文本分析引擎 (LLM Engine) */}
                 {configSubTab === 'llm' && (
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.015)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                  }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {t('tab_llm')}
-                    </h3>
+                  <div className="settings-container">
                     
-                    {/* 模式选择 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>总结推理模式 (Summary Mode)</label>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          type="button"
-                          onClick={() => updateConfigField('summary_mode', 'local')}
-                          style={{
-                            flex: '1',
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: configData.summary_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            background: configData.summary_mode === 'local' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                            color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          💻 {t('local')}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => updateConfigField('summary_mode', 'online')}
-                          style={{
-                            flex: '1',
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: configData.summary_mode === 'online' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            background: configData.summary_mode === 'online' ? 'rgba(122, 162, 247, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                            color: configData.summary_mode === 'online' ? 'var(--primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          ☁️ {t('online')}
-                        </button>
+                    {/* Summary Engine Mode Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">{t('tab_llm')}</h3>
+                        <p className="settings-card-subtitle">选择并配置总结生成使用的 AI 大模型</p>
+                      </div>
+
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">总结推理模式 (Summary Mode)</span>
+                          <span className="settings-row-desc">选择本地离线运行的大模型，或云端商业在线 API</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => updateConfigField('summary_mode', 'local')}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              border: configData.summary_mode === 'local' ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                              background: configData.summary_mode === 'local' ? 'var(--primary-glow)' : 'rgba(0,0,0,0.25)',
+                              color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              fontSize: '12.5px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            💻 {t('local')}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => updateConfigField('summary_mode', 'online')}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              border: configData.summary_mode === 'online' ? '1px solid var(--accent)' : '1px solid var(--border-color)',
+                              background: configData.summary_mode === 'online' ? 'var(--accent-glow)' : 'rgba(0,0,0,0.25)',
+                              color: configData.summary_mode === 'online' ? 'var(--accent)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              fontSize: '12.5px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            ☁️ {t('online')}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* 输入字段切换 */}
-                    {configData.summary_mode === 'local' ? (
-                      <div style={{ background: 'rgba(122, 162, 247, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(122, 162, 247, 0.15)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('local_api_url')}</label>
-                          <input 
-                            type="text" 
-                            value={configData.ollama_url} 
-                            onChange={(e) => updateConfigField('ollama_url', e.target.value)}
-                            className="glass-input" 
-                            placeholder="http://localhost:11434 或 http://localhost:1234"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('local_model_id')}</label>
-                          <input 
-                            type="text" 
-                            value={configData.ollama_model} 
-                            onChange={(e) => updateConfigField('ollama_model', e.target.value)}
-                            className="glass-input" 
-                            placeholder="qwen2.5:7b-instruct 等"
-                          />
-                        </div>
+                    {/* LLM parameters Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">🔌 LLM 引擎参数配置</h3>
+                        <p className="settings-card-subtitle">
+                          {configData.summary_mode === 'local' ? '配置本地大语言模型连接参数' : '配置云端大语言模型连接参数'}
+                        </p>
                       </div>
-                    ) : (
-                      <div style={{ background: 'rgba(157, 124, 216, 0.05)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(157, 124, 216, 0.15)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_api_url')}</label>
+
+                      {configData.summary_mode === 'local' ? (
+                        <div className="settings-grid">
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('local_api_url')}</label>
+                            <input 
+                              type="text" 
+                              value={configData.ollama_url} 
+                              onChange={(e) => updateConfigField('ollama_url', e.target.value)}
+                              className="glass-input" 
+                              placeholder="http://localhost:11434 或 http://localhost:1234"
+                            />
+                          </div>
+                          
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('local_model_id')}</label>
+                            <input 
+                              type="text" 
+                              value={configData.ollama_model} 
+                              onChange={(e) => updateConfigField('ollama_model', e.target.value)}
+                              className="glass-input" 
+                              placeholder="qwen2.5:7b-instruct 等"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="settings-grid">
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('online_api_url')}</label>
                             <input 
                               type="text" 
                               value={configData.online_summary_base_url} 
@@ -2682,8 +3296,9 @@ export default function App() {
                               placeholder="https://api.openai.com/v1"
                             />
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_model_id')}</label>
+                          
+                          <div className="settings-field">
+                            <label className="settings-field-label">{t('online_model_id')}</label>
                             <input 
                               type="text" 
                               value={configData.online_summary_model} 
@@ -2692,110 +3307,145 @@ export default function App() {
                               placeholder="gpt-4o-mini 或 deepseek-chat 等"
                             />
                           </div>
+
+                          <div className="settings-field" style={{ gridColumn: 'span 2' }}>
+                            <label className="settings-field-label">{t('online_api_key')}</label>
+                            <input 
+                              type="password" 
+                              value={configData.online_summary_api_key} 
+                              onChange={(e) => updateConfigField('online_summary_api_key', e.target.value)}
+                              className="glass-input" 
+                              placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+                            />
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('online_api_key')}</label>
-                          <input 
-                            type="password" 
-                            value={configData.online_summary_api_key} 
-                            onChange={(e) => updateConfigField('online_summary_api_key', e.target.value)}
-                            className="glass-input" 
-                            placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                          />
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
                   </div>
                 )}
 
                 {/* 3. ✉️ 邮件与通知配置 (Notifications) */}
                 {configSubTab === 'notifications' && (
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.015)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                  }}>
-                    <h3 style={{ fontSize: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {t('tab_notifications')}
-                    </h3>
+                  <div className="settings-container">
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_server')}</label>
+                    {/* Notification Switches Card */}
+                    <div className="settings-card">
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">{t('tab_notifications')}</h3>
+                        <p className="settings-card-subtitle">开启后当任务成功或异常时会通过特定形式通知您</p>
+                      </div>
+
+                      {/* Desktop notifications row */}
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">{t('enable_win_notify')}</span>
+                          <span className="settings-row-desc">转录/总结完成后，在系统右下角弹出 Windows 原生推送通知气泡</span>
+                        </div>
                         <input 
-                          type="text" 
-                          value={configData.smtp_server} 
-                          onChange={(e) => updateConfigField('smtp_server', e.target.value)}
-                          className="glass-input" 
+                          type="checkbox" 
+                          id="enable-win" 
+                          checked={configData.enable_win_notification}
+                          onChange={(e) => updateConfigField('enable_win_notification', e.target.checked)}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
                         />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_port')}</label>
+
+                      {/* Email notifications row */}
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-title">{t('enable_email_notify')}</span>
+                          <span className="settings-row-desc">转录/总结完成后，自动将内容总结以精美格式投递到目标邮箱</span>
+                        </div>
                         <input 
-                          type="number" 
-                          value={configData.smtp_port} 
-                          onChange={(e) => updateConfigField('smtp_port', parseInt(e.target.value) || 465)}
-                          className="glass-input" 
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_user')}</label>
-                        <input 
-                          type="text" 
-                          placeholder="如 QQ 邮箱号"
-                          value={configData.smtp_username} 
-                          onChange={(e) => updateConfigField('smtp_username', e.target.value)}
-                          className="glass-input" 
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_pass')}</label>
-                        <input 
-                          type="password" 
-                          placeholder="在邮箱设置中开启 SMTP 服务获得密钥"
-                          value={configData.smtp_password} 
-                          onChange={(e) => updateConfigField('smtp_password', e.target.value)}
-                          className="glass-input" 
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_sender')}</label>
-                        <input 
-                          type="text" 
-                          value={configData.smtp_sender} 
-                          onChange={(e) => updateConfigField('smtp_sender', e.target.value)}
-                          className="glass-input" 
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('smtp_receiver')}</label>
-                        <input 
-                          type="text" 
-                          placeholder="转录成功后向此邮箱发送总结提醒"
-                          value={configData.notification_email} 
-                          onChange={(e) => updateConfigField('notification_email', e.target.value)}
-                          className="glass-input" 
+                          type="checkbox" 
+                          id="enable-email" 
+                          checked={configData.enable_email_notification}
+                          onChange={(e) => updateConfigField('enable_email_notification', e.target.checked)}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
                         />
                       </div>
                     </div>
-                    
-                    {/* 是否开启桌面通知 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', borderTop: '1px dashed var(--border-color)', paddingTop: '16px' }}>
-                      <input 
-                        type="checkbox" 
-                        id="enable-win" 
-                        checked={configData.enable_win_notification}
-                        onChange={(e) => updateConfigField('enable_win_notification', e.target.checked)}
-                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                      />
-                      <label htmlFor="enable-win" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                        {t('enable_win_notify')}
-                      </label>
+
+                    {/* SMTP Mail Server Settings Card */}
+                    <div className="settings-card" style={{ opacity: configData.enable_email_notification ? 1 : 0.6, transition: 'all 0.3s ease' }}>
+                      <div className="settings-row-info">
+                        <h3 className="settings-card-title">✉️ SMTP 邮件推送服务设置</h3>
+                        <p className="settings-card-subtitle">用于自动推送服务的邮箱发件服务器配置</p>
+                      </div>
+
+                      <div className="settings-grid">
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_server')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.smtp_server} 
+                            onChange={(e) => updateConfigField('smtp_server', e.target.value)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+                        
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_port')}</label>
+                          <input 
+                            type="number" 
+                            value={configData.smtp_port} 
+                            onChange={(e) => updateConfigField('smtp_port', parseInt(e.target.value) || 465)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_user')}</label>
+                          <input 
+                            type="text" 
+                            placeholder="如 QQ 邮箱号"
+                            value={configData.smtp_username} 
+                            onChange={(e) => updateConfigField('smtp_username', e.target.value)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_pass')}</label>
+                          <input 
+                            type="password" 
+                            placeholder="在邮箱设置中开启 SMTP 服务获得密钥"
+                            value={configData.smtp_password} 
+                            onChange={(e) => updateConfigField('smtp_password', e.target.value)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_sender')}</label>
+                          <input 
+                            type="text" 
+                            value={configData.smtp_sender} 
+                            onChange={(e) => updateConfigField('smtp_sender', e.target.value)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+
+                        <div className="settings-field">
+                          <label className="settings-field-label">{t('smtp_receiver')}</label>
+                          <input 
+                            type="text" 
+                            placeholder="转录成功后向此邮箱发送总结提醒"
+                            value={configData.notification_email} 
+                            onChange={(e) => updateConfigField('notification_email', e.target.value)}
+                            disabled={!configData.enable_email_notification}
+                            className="glass-input" 
+                          />
+                        </div>
+                      </div>
                     </div>
+
                   </div>
                 )}
 
@@ -2854,24 +3504,289 @@ export default function App() {
         {/* ==================== 🎧 粘性底部音频播放器 ==================== */}
         {activeTab === 'detail' && activeTask && activeTask.audio_url && (
           <div className="glass-panel" style={{ 
-            height: '80px', 
+            height: '92px', 
             borderRadius: '0', 
             borderLeft: 'none', 
             borderRight: 'none', 
             borderBottom: 'none',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             padding: '0 32px',
-            zIndex: '15',
-            background: 'rgba(15, 15, 20, 0.85)'
+            zIndex: '100',
+            background: 'var(--player-bg)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            borderTop: '1px solid var(--border-color)',
+            boxShadow: '0 -10px 40px -10px rgba(0, 0, 0, 0.3)'
           }}>
+            {/* 隐藏的 HTML5 播放器，利用 React state 和 ref 控制 */}
             <audio 
               ref={audioPlayerRef}
               src={`${BACKEND_URL}${activeTask.audio_url}`}
-              controls
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
               onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-              style={{ width: '100%', outline: 'none' }}
+              onDurationChange={(e) => setDuration(e.target.duration)}
+              onCanPlay={(e) => { e.target.playbackRate = playbackRate; }}
+              style={{ display: 'none' }}
             />
+
+            {/* 左侧：节目封面与基本信息 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '28%', minWidth: '180px' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '8px', 
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, var(--primary-glow), var(--accent-glow))',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                {activeTask.image_url || activeTask.metadata?.image_url ? (
+                  <img 
+                    src={activeTask.image_url || activeTask.metadata?.image_url} 
+                    alt="cover" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '18px' }}>🎧</span>
+                )}
+              </div>
+              <div style={{ overflow: 'hidden' }}>
+                <h4 style={{ 
+                  fontSize: '13.5px', 
+                  fontWeight: '600', 
+                  color: 'var(--text-primary)',
+                  margin: 0,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  lineHeight: '1.4'
+                }} title={activeTask.title}>
+                  {activeTask.title}
+                </h4>
+                <p style={{ 
+                  fontSize: '11px', 
+                  color: 'var(--text-secondary)',
+                  margin: '2px 0 0 0',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {activeTask.podcast_name}
+                </p>
+              </div>
+            </div>
+
+            {/* 中间：播放进度与核心按钮 */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              width: '44%', 
+              gap: '6px'
+            }}>
+              {/* 控制按钮列 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                {/* 后退 15 秒 */}
+                <button 
+                  onClick={() => skipTime(-15)}
+                  className="btn-ghost"
+                  style={{ 
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%', 
+                    border: '1px solid var(--border-color)', 
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s, border-color 0.2s, background 0.2s, transform 0.1s',
+                    padding: 0
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                  onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  title="快退15秒"
+                >
+                  <Icons.Rewind15 />
+                </button>
+
+                {/* 播放/暂停大圆钮 */}
+                <button 
+                  onClick={togglePlay}
+                  style={{ 
+                    width: '50px', 
+                    height: '50px', 
+                    borderRadius: '50%', 
+                    border: '1px solid var(--primary)',
+                    background: 'var(--primary-glow)',
+                    color: 'var(--primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 15px var(--primary-glow)',
+                    transition: 'transform 0.15s, background 0.15s, box-shadow 0.15s'
+                  }}
+                  onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'scale(1.08)'; 
+                    e.currentTarget.style.background = 'rgba(122, 162, 247, 0.25)'; 
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(122, 162, 247, 0.5)';
+                  }}
+                  onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'scale(1)'; 
+                    e.currentTarget.style.background = 'var(--primary-glow)'; 
+                    e.currentTarget.style.boxShadow = '0 0 15px var(--primary-glow)';
+                  }}
+                  title={isPlaying ? "暂停" : "播放"}
+                >
+                  {isPlaying ? <Icons.PausePlayer /> : <Icons.PlayPlayer />}
+                </button>
+
+                {/* 快进 30 秒 */}
+                <button 
+                  onClick={() => skipTime(30)}
+                  className="btn-ghost"
+                  style={{ 
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%', 
+                    border: '1px solid var(--border-color)', 
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s, border-color 0.2s, background 0.2s, transform 0.1s',
+                    padding: 0
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                  onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  title="快进30秒"
+                >
+                  <Icons.Forward30 />
+                </button>
+              </div>
+
+              {/* 进度条与时间指示 */}
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '12px' }}>
+                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)', width: '45px', textAlign: 'right' }}>
+                  {formatTime(currentTime)}
+                </span>
+                
+                {/* 自定义进度条输入 */}
+                <input 
+                  type="range"
+                  min="0"
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  style={{ 
+                    flex: '1', 
+                    height: '4px', 
+                    borderRadius: '2px', 
+                    background: 'rgba(255,255,255,0.1)',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    accentColor: 'var(--primary)',
+                    WebkitAppearance: 'none'
+                  }}
+                />
+
+                <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)', width: '45px', textAlign: 'left' }}>
+                  {formatTime(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* 右侧：播放速度与音量 */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'flex-end',
+              width: '28%', 
+              gap: '16px'
+            }}>
+              {/* 倍速选择器 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>倍速:</span>
+                <select 
+                  value={playbackRate}
+                  onChange={(e) => changePlaybackRate(parseFloat(e.target.value))}
+                  className="glass-input"
+                  style={{ 
+                    padding: '4px 8px', 
+                    fontSize: '12px', 
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="0.75" style={{ color: 'var(--text-primary)' }}>0.75x</option>
+                  <option value="1.0" style={{ color: 'var(--text-primary)' }}>1.0x</option>
+                  <option value="1.25" style={{ color: 'var(--text-primary)' }}>1.25x</option>
+                  <option value="1.5" style={{ color: 'var(--text-primary)' }}>1.5x</option>
+                  <option value="1.75" style={{ color: 'var(--text-primary)' }}>1.75x</option>
+                  <option value="2.0" style={{ color: 'var(--text-primary)' }}>2.0x</option>
+                </select>
+              </div>
+
+              {/* 音量滑块 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button 
+                  onClick={() => {
+                    if (!audioPlayerRef.current) return;
+                    const newVol = volume > 0 ? 0 : 0.8;
+                    audioPlayerRef.current.volume = newVol;
+                    setVolume(newVol);
+                  }}
+                  style={{ 
+                    border: 'none', 
+                    background: 'transparent', 
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  {volume === 0 ? <Icons.Mute /> : <Icons.Volume />}
+                </button>
+                <input 
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={volume}
+                  onChange={(e) => {
+                    const newVol = parseFloat(e.target.value);
+                    if (audioPlayerRef.current) audioPlayerRef.current.volume = newVol;
+                    setVolume(newVol);
+                  }}
+                  style={{ 
+                    width: '70px', 
+                    height: '3px',
+                    accentColor: 'var(--primary)',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+            </div>
           </div>
         )}
 

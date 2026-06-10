@@ -62,11 +62,110 @@ def extract_xiaoyuzhou_comments(data):
     comments_list.sort(key=lambda x: x.get("likes", 0), reverse=True)
     return comments_list
 
+def clean_html_to_text(html_content: str) -> str:
+    if not html_content:
+        return ""
+    soup = BeautifulSoup(html_content, "html.parser")
+    # Replace <br> and <br/> with newline
+    for br in soup.find_all(["br", "br/"]):
+        br.replace_with("\n")
+    # Add newlines around paragraph-like block elements
+    for block in soup.find_all(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li"]):
+        block.insert_before("\n")
+        block.insert_after("\n")
+    # Get text with no separator
+    text = soup.get_text(separator="")
+    # Normalize consecutive newlines
+    import re
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    # Remove leading/trailing spaces on each line
+    lines = [line.strip() for line in text.split('\n')]
+    return '\n'.join(lines).strip()
+
 class PodcastDownloader:
     def __init__(self):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
+
+    def parse_metadata(self, url: str) -> dict:
+        """
+        仅抓取并解析链接元数据而不下载音频文件
+        """
+        # 判断是否为小宇宙链接
+        if "xiaoyuzhoufm.com" in url:
+            return self.parse_xiaoyuzhou(url)
+            
+        # 判断是否为 Bilibili 链接
+        elif "bilibili.com" in url or "b23.tv" in url:
+            real_url = url
+            if "b23.tv" in url:
+                try:
+                    with httpx.Client(trust_env=False, follow_redirects=True) as client:
+                        resp = client.head(url, timeout=5.0)
+                        real_url = str(resp.url)
+                except Exception as e:
+                    print(f"⚠️ [LOG] 还原 Bilibili 短链接失败: {e}")
+            
+            bv_match = re.search(r"(BV[a-zA-Z0-9]+)", real_url)
+            if not bv_match:
+                raise Exception("未能在链接中解析出 Bilibili BV 号")
+            bvid = bv_match.group(1)
+            
+            mobile_url = f"https://m.bilibili.com/video/{bvid}"
+            mobile_headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+                "Referer": "https://m.bilibili.com/"
+            }
+            
+            with httpx.Client(trust_env=False) as client:
+                r = client.get(mobile_url, headers=mobile_headers, timeout=15.0)
+                if r.status_code != 200:
+                    raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
+                
+                html = r.text
+                state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
+                if not state_match:
+                    raise Exception("未能从 Bilibili 移动端网页中解析 window.__INITIAL_STATE__")
+                
+                state = json.loads(state_match.group(1))
+                view_info = state.get("video", {}).get("viewInfo", {})
+                title = view_info.get("title", "未知 Bilibili 视频")
+                desc = view_info.get("desc", "")
+                uploader = view_info.get("owner", {}).get("name", "B站UP主")
+                
+                return {
+                    "title": title,
+                    "podcast_name": uploader,
+                    "audio_url": url,
+                    "shownotes": desc,
+                    "like_count": view_info.get("stat", {}).get("like", 0),
+                    "comment_count": view_info.get("stat", {}).get("reply", 0),
+                    "comments": [],
+                    "image_url": view_info.get("pic", ""),
+                    "source": "bilibili_private"
+                }
+        else:
+            # 使用 yt-dlp 抓取通用媒体信息 (不下载)
+            ydl_opts = {
+                'ffmpeg_location': FFMPEG_BIN_DIR,
+                'quiet': True,
+                'nocheckcertificate': True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get('title', '未知音频')
+                return {
+                    "title": title,
+                    "podcast_name": info.get('uploader', '未知上传者'),
+                    "audio_url": url,
+                    "shownotes": info.get('description', ''),
+                    "like_count": info.get('like_count', 0),
+                    "comment_count": info.get('comment_count', 0),
+                    "comments": [],
+                    "image_url": info.get('thumbnail', ''),
+                    "source": "ytdlp"
+                }
 
     def parse_xiaoyuzhou(self, url: str) -> dict:
         """
@@ -102,7 +201,7 @@ class PodcastDownloader:
             podcast_data = find_nested_key(data, "podcast")
             if podcast_data and "title" in podcast_data:
                 podcast_name = podcast_data["title"]
-            like_count = find_nested_key(data, "likeCount") or 0
+            like_count = find_nested_key(data, "clapCount") or find_nested_key(data, "likeCount") or 0
             comment_count = find_nested_key(data, "commentCount") or 0
         else:
             audio_url = episode_data.get("audioUrl")
@@ -118,8 +217,30 @@ class PodcastDownloader:
             title = episode_data.get("title", "未命名播客")
             shownotes = episode_data.get("shownotes") or episode_data.get("description") or ""
             podcast_name = episode_data.get("podcast", {}).get("title", "未知播客")
-            like_count = episode_data.get("likeCount", 0)
+            like_count = episode_data.get("clapCount") or episode_data.get("likeCount", 0)
             comment_count = episode_data.get("commentCount", 0)
+
+        # Extract pubDate
+        pub_date = ""
+        if episode_data:
+            pub_date = episode_data.get("pubDate") or ""
+        if not pub_date:
+            pub_date = find_nested_key(data, "pubDate") or ""
+
+        # Extract cover image URL
+        image_url = ""
+        if episode_data:
+            image_data = episode_data.get("image") or episode_data.get("podcast", {}).get("image")
+            if isinstance(image_data, dict):
+                image_url = image_data.get("picUrl") or ""
+        if not image_url:
+            podcast_data = find_nested_key(data, "podcast")
+            if podcast_data and "image" in podcast_data:
+                image_data = podcast_data["image"]
+                if isinstance(image_data, dict):
+                    image_url = image_data.get("picUrl") or ""
+            if not image_url:
+                image_url = find_nested_key(data, "picUrl") or ""
 
         if not audio_url:
             raise Exception("解析失败，未能在网页中找到音频下载直链")
@@ -128,7 +249,7 @@ class PodcastDownloader:
         comments = extract_xiaoyuzhou_comments(data)
 
         # 获取 Shownotes 中的文本（去除 HTML 标签）
-        clean_shownotes = BeautifulSoup(shownotes, "html.parser").get_text(separator="\n") if shownotes else ""
+        clean_shownotes = clean_html_to_text(shownotes) if shownotes else ""
 
         return {
             "title": title,
@@ -138,6 +259,8 @@ class PodcastDownloader:
             "like_count": like_count,
             "comment_count": comment_count,
             "comments": comments[:30],  # 取前 30 条热门评论进行情感/含金量分析
+            "image_url": image_url,
+            "pub_date": pub_date,
             "source": "xiaoyuzhou"
         }
 
@@ -329,6 +452,7 @@ class PodcastDownloader:
                 "like_count": view_info.get("stat", {}).get("like", 0),
                 "comment_count": view_info.get("stat", {}).get("reply", 0),
                 "comments": [],
+                "image_url": view_info.get("pic", ""),
                 "source": "bilibili_private"
             }
             
@@ -364,6 +488,7 @@ class PodcastDownloader:
                     "like_count": info.get('like_count', 0),
                     "comment_count": info.get('comment_count', 0),
                     "comments": [],
+                    "image_url": info.get('thumbnail', ''),
                     "source": "ytdlp"
                 }
                 

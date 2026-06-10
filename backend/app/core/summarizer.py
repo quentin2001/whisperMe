@@ -7,12 +7,13 @@ class PodcastSummarizer:
         # 动态读取配置，实现热更新
         pass
 
-    def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None) -> str:
+    def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None) -> str:
         """
         根据播客元数据、热门评论以及转录剧本，调用大模型生成报告（支持本地与在线 API 切换）
         """
-        # 1. 读取实时配置
-        summary_mode = config.get("summary_mode", "local")
+        # 1. 如果没有传入指定的 summary_mode，则读取实时配置兜底
+        if not summary_mode:
+            summary_mode = config.get("summary_mode", "local")
         
         # 2. 确定接口地址、API Key 和目标模型
         if summary_mode == "online":
@@ -60,7 +61,7 @@ class PodcastSummarizer:
         full_comments_text = "\n".join(comments_text_lines) if comments_text_lines else "暂无评论数据"
 
         # 5. 限制长文本大小（如果是本地模型为了安全限制大小，在线大模型通常可以大一些）
-        max_char_len = 80000 if summary_mode == "online" else 30000
+        max_char_len = 80000 if summary_mode == "online" else 45000
         if len(full_transcript_text) > max_char_len:
             print(f"⚠️ [LOG] 转录剧本字数较多 ({len(full_transcript_text)}字)，为了防止超出大模型上下文窗口进行安全裁剪...")
             half_len = max_char_len // 2

@@ -38,6 +38,7 @@ class LocalDatabase:
                     "id": t.get("id"),
                     "url": t.get("url"),
                     "asr_mode": t.get("asr_mode", "local"),
+                    "summary_mode": t.get("summary_mode", "local"),
                     "title": t.get("title", "未命名任务"),
                     "podcast_name": t.get("podcast_name", "未知播客"),
                     "status": t.get("status", "pending"),
@@ -46,7 +47,12 @@ class LocalDatabase:
                     "error_message": t.get("error_message"),
                     "like_count": t.get("metadata", {}).get("like_count", 0),
                     "comment_count": t.get("metadata", {}).get("comment_count", 0),
-                    "obsidian_synced": t.get("obsidian_synced", False)
+                    "obsidian_synced": t.get("obsidian_synced", False),
+                    "image_url": t.get("image_url", ""),
+                    "metadata": {
+                        "pub_date": t.get("metadata", {}).get("pub_date", ""),
+                        "source": t.get("metadata", {}).get("source", "")
+                    }
                 })
             # 按时间逆序排序
             tasks_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -60,19 +66,21 @@ class LocalDatabase:
                     return t
             return None
 
-    def add_task(self, task_id: str, url: str, asr_mode: str = "local") -> dict:
+    def add_task(self, task_id: str, url: str, asr_mode: str = "local", summary_mode: str = "local") -> dict:
         with self.lock:
             data = self._read_data()
             new_task = {
                 "id": task_id,
                 "url": url,
                 "asr_mode": asr_mode,
+                "summary_mode": summary_mode,
                 "title": "等待解析中...",
                 "podcast_name": "等待解析...",
                 "status": "pending",
                 "progress": 0.0,
                 "error_message": None,
                 "created_at": datetime.now().isoformat(),
+                "image_url": "",
                 "metadata": {
                     "title": "等待解析...",
                     "podcast_name": "等待解析...",
@@ -80,6 +88,7 @@ class LocalDatabase:
                     "like_count": 0,
                     "comment_count": 0,
                     "comments": [],
+                    "image_url": "",
                     "source": "unknown"
                 },
                 "transcript": [],
