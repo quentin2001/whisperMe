@@ -420,3 +420,136 @@ class PodcastTranscriber:
             print(f"⚠️ [LOG 警告] 提取声纹特征特征时出错: {e}")
             return {}
 
+    def cluster_segments_to_paragraphs(self, podcast_id: str, segments: list[dict]) -> list[dict]:
+        import json
+        if not segments:
+            return []
+        
+        # 1. 规则层 (Rule-based clustering)
+        clustered = []
+        current_cluster = {
+            "speaker": segments[0]["speaker"],
+            "texts": [segments[0]["text"]],
+            "start": segments[0]["start"],
+            "end": segments[0]["end"]
+        }
+        
+        for seg in segments[1:]:
+            # 若前后两条文本属于同一个说话人，且时间间隔小于 1.2 秒，则拼接
+            if seg["speaker"] == current_cluster["speaker"] and (seg["start"] - current_cluster["end"] < 1.2):
+                current_cluster["texts"].append(seg["text"])
+                current_cluster["end"] = seg["end"]
+            else:
+                clustered.append(current_cluster)
+                current_cluster = {
+                    "speaker": seg["speaker"],
+                    "texts": [seg["text"]],
+                    "start": seg["start"],
+                    "end": seg["end"]
+                }
+        clustered.append(current_cluster)
+        
+        # Convert texts to a single string
+        paragraphs = []
+        for idx, cl in enumerate(clustered):
+            raw_content = "".join(cl["texts"]) if any(ord(c) > 127 for c in "".join(cl["texts"])) else " ".join(cl["texts"])
+            paragraphs.append({
+                "id": f"{podcast_id}-p{idx}",
+                "podcast_id": podcast_id,
+                "speaker": cl["speaker"],
+                "content": raw_content.strip(),
+                "start_time": round(cl["start"], 2),
+                "end_time": round(cl["end"], 2)
+            })
+            
+        # 2. LLM 语义缝合 (Optional LLM Sewing)
+        from app.config import config
+        enable_llm_sewing = config.get("enable_llm_semantic_sewing", False)
+        
+        if enable_llm_sewing and len(paragraphs) > 0:
+            print(f"🤖 [LOG] 启动 LLM 语义段落缝合，共 {len(paragraphs)} 个初步段落...")
+            try:
+                # To prevent overloading LLM context and avoid timeout, we batch calls (e.g. 20 paragraphs per batch)
+                batch_size = 20
+                for i in range(0, len(paragraphs), batch_size):
+                    batch = paragraphs[i:i+batch_size]
+                    
+                    # Prepare input JSON
+                    llm_input = [{"index": idx, "raw_content": p["content"]} for idx, p in enumerate(batch)]
+                    
+                    prompt = f"""你是一个专业的速记文本整理助手。
+下面是一份播客转录的初步拼接段落列表（以 JSON 数组形式给出，每个元素包含 index 和 raw_content）。
+请在【绝对不改变、不添加、不删减任何原字词】的前提下，对每个段落进行“语义缝合”：
+1. 仅理顺标点符号，将口语中的语气词或停顿转换为合适的标点（如逗号、句号、问号、叹号）。
+2. 确保绝对不改变任何原文的字词顺序或内容，不添加解释性文字，也不要合并不同的 index 段落。
+3. 输出格式必须为标准的 JSON 数组，每个元素包含 index（数字）和 sewn_content（缝合后的段落内容文本）字段，与输入的 index 一一对应。
+
+输入：
+{json.dumps(llm_input, ensure_ascii=False, indent=2)}
+
+请直接输出 JSON 数组内容，不要包含 ```json 或 ``` 格式块，不要包含任何 markdown 语法或前言后语。"""
+
+                    sewn_json_str = self._call_llm(prompt)
+                    
+                    # Try to parse the output
+                    # Strip code blocks if LLM still included them
+                    cleaned_str = sewn_json_str.strip()
+                    if cleaned_str.startswith("```json"):
+                        cleaned_str = cleaned_str[7:]
+                    if cleaned_str.startswith("```"):
+                        cleaned_str = cleaned_str[3:]
+                    if cleaned_str.endswith("```"):
+                        cleaned_str = cleaned_str[:-3]
+                    cleaned_str = cleaned_str.strip()
+                    
+                    try:
+                        sewn_results = json.loads(cleaned_str)
+                        for item in sewn_results:
+                            idx = item.get("index")
+                            content = item.get("sewn_content")
+                            if idx is not None and 0 <= idx < len(batch) and content:
+                                batch[idx]["content"] = content
+                        print(f"✅ [LOG] 批量语义缝合成功 (段落 {i} 到 {i+len(batch)})")
+                    except Exception as parse_err:
+                        print(f"⚠️ [LOG] 解析 LLM 语义缝合输出失败: {parse_err}，此批次将保留原始规则拼接内容。")
+                        print(f"原始输出: {sewn_json_str[:300]}...")
+            except Exception as llm_err:
+                print(f"❌ [LOG] 语义段落缝合出错: {llm_err}，系统自动降级回纯规则拼接模式。")
+                
+        return paragraphs
+
+    def _call_llm(self, prompt: str) -> str:
+        from app.config import config
+        import httpx
+        
+        summary_mode = config.get("summary_mode", "local")
+        if summary_mode == "online":
+            api_key = config.get("online_summary_api_key", "").strip()
+            base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
+            target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
+            api_url = f"{base_url.rstrip('/')}/chat/completions"
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+        else:
+            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+            target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
+            base_url = ollama_url.rstrip('/')
+            api_url = f"{base_url}/v1/chat/completions" if '/v1' not in base_url else f"{base_url}/chat/completions"
+            headers = {"Content-Type": "application/json"}
+            
+        payload = {
+            "model": target_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "temperature": 0.1
+        }
+        
+        with httpx.Client(timeout=120.0, trust_env=False) as client:
+            response = client.post(api_url, json=payload, headers=headers)
+            if response.status_code != 200:
+                raise Exception(f"LLM API error (code {response.status_code}): {response.text}")
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
+
+

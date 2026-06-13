@@ -15,7 +15,21 @@ class LocalDatabase:
         with self.lock:
             if not os.path.exists(DB_FILE_PATH):
                 with open(DB_FILE_PATH, "w", encoding="utf-8") as f:
-                    json.dump({"tasks": []}, f, ensure_ascii=False, indent=2)
+                    json.dump({"tasks": [], "paragraphs": [], "cards": [], "links": []}, f, ensure_ascii=False, indent=2)
+            else:
+                try:
+                    with open(DB_FILE_PATH, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    modified = False
+                    for key in ["paragraphs", "cards", "links"]:
+                        if key not in data:
+                            data[key] = []
+                            modified = True
+                    if modified:
+                        with open(DB_FILE_PATH, "w", encoding="utf-8") as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"⚠️ [DB INIT ERROR] Migration failed: {e}")
 
     def _read_data(self) -> dict:
         try:
@@ -118,6 +132,121 @@ class LocalDatabase:
             initial_count = len(data.get("tasks", []))
             data["tasks"] = [t for t in data["tasks"] if t.get("id") != task_id]
             if len(data["tasks"]) < initial_count:
+                # Cascade delete paragraphs, cards, and links associated with this podcast
+                data["paragraphs"] = [p for p in data.get("paragraphs", []) if p.get("podcast_id") != task_id]
+                data["cards"] = [c for c in data.get("cards", []) if c.get("podcast_id") != task_id]
+                # Filter out links whose cards were deleted
+                remaining_card_ids = {c["id"] for c in data["cards"]}
+                data["links"] = [l for l in data.get("links", []) if l.get("source_card_id") in remaining_card_ids and l.get("target_card_id") in remaining_card_ids]
+                
+                self._write_data(data)
+                return True
+            return False
+
+    def get_paragraphs_by_podcast(self, podcast_id: str) -> list[dict]:
+        with self.lock:
+            data = self._read_data()
+            return [p for p in data.get("paragraphs", []) if p.get("podcast_id") == podcast_id]
+
+    def add_paragraphs(self, paragraphs: list[dict]):
+        with self.lock:
+            data = self._read_data()
+            if "paragraphs" not in data:
+                data["paragraphs"] = []
+            
+            # Prevent duplicates by removing existing paragraphs for these IDs
+            new_ids = {p["id"] for p in paragraphs}
+            data["paragraphs"] = [p for p in data["paragraphs"] if p["id"] not in new_ids]
+            
+            data["paragraphs"].extend(paragraphs)
+            self._write_data(data)
+
+    def get_all_cards(self) -> list[dict]:
+        with self.lock:
+            data = self._read_data()
+            return data.get("cards", [])
+
+    def get_cards_by_podcast(self, podcast_id: str) -> list[dict]:
+        with self.lock:
+            data = self._read_data()
+            return [c for c in data.get("cards", []) if c.get("podcast_id") == podcast_id]
+
+    def get_card(self, card_id: str) -> dict:
+        with self.lock:
+            data = self._read_data()
+            for c in data.get("cards", []):
+                if c.get("id") == card_id:
+                    return c
+            return None
+
+    def create_card(self, card: dict) -> dict:
+        with self.lock:
+            data = self._read_data()
+            if "cards" not in data:
+                data["cards"] = []
+            
+            # Remove any existing card with the same ID or same paragraph_id to avoid duplication
+            data["cards"] = [c for c in data["cards"] if c["id"] != card["id"] and c["paragraph_id"] != card["paragraph_id"]]
+            
+            data["cards"].append(card)
+            self._write_data(data)
+            return card
+
+    def update_card(self, card_id: str, **kwargs) -> dict:
+        with self.lock:
+            data = self._read_data()
+            for c in data.get("cards", []):
+                if c.get("id") == card_id:
+                    for k, v in kwargs.items():
+                        c[k] = v
+                    self._write_data(data)
+                    return c
+            return None
+
+    def delete_card(self, card_id: str) -> bool:
+        with self.lock:
+            data = self._read_data()
+            initial_count = len(data.get("cards", []))
+            data["cards"] = [c for c in data["cards"] if c.get("id") != card_id]
+            if len(data["cards"]) < initial_count:
+                # Also delete associated links
+                data["links"] = [l for l in data.get("links", []) if l.get("source_card_id") != card_id and l.get("target_card_id") != card_id]
+                self._write_data(data)
+                return True
+            return False
+
+    def get_all_links(self) -> list[dict]:
+        with self.lock:
+            data = self._read_data()
+            return data.get("links", [])
+
+    def create_link(self, link: dict) -> dict:
+        with self.lock:
+            data = self._read_data()
+            if "links" not in data:
+                data["links"] = []
+            
+            # Check if this link already exists
+            exists = False
+            for l in data["links"]:
+                if (l["source_card_id"] == link["source_card_id"] and l["target_card_id"] == link["target_card_id"]) or \
+                   (l["source_card_id"] == link["target_card_id"] and l["target_card_id"] == link["source_card_id"]):
+                    l["my_synthesis"] = link["my_synthesis"]
+                    exists = True
+                    break
+            
+            if not exists:
+                data["links"].append(link)
+                
+            self._write_data(data)
+            return link
+
+    def delete_link(self, link_id: str) -> bool:
+        with self.lock:
+            data = self._read_data()
+            initial_count = len(data.get("links", []))
+            data["links"] = [l for l in data["links"] if l.get("id") != link_id]
+            if len(data["links"]) < initial_count:
                 self._write_data(data)
                 return True
             return False

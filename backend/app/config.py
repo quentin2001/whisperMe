@@ -64,7 +64,9 @@ def load_config():
         "summary_mode": "local",
         "online_summary_api_key": "",
         "online_summary_base_url": "https://api.openai.com/v1",
-        "online_summary_model": "gpt-4o-mini"
+        "online_summary_model": "gpt-4o-mini",
+        "enable_llm_semantic_sewing": False,
+        "webhook_url": ""
     }
 
     if not CONFIG_FILE_PATH.exists():

@@ -20,7 +20,8 @@ const Icons = {
   PlayPlayer: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '2px' }}><polygon points="6 3 21 12 6 21"></polygon></svg>,
   PausePlayer: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"></rect><rect x="15" y="4" width="4" height="16" rx="1"></rect></svg>,
   Volume: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>,
-  Mute: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>
+  Mute: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>,
+  Sandbox: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
 };
 
 // ==================== 📝 自研高性能 Markdown 渲染器 ====================
@@ -430,6 +431,7 @@ const BACKEND_URL = "http://127.0.0.1:8000";
 const TRANSLATIONS = {
   'zh-CN': {
     'dashboard': '我的播客库',
+    'sandbox': '🎰 认知沙盒',
     'settings': '系统设置',
     'center_sub': '本地播客声纹自动化处理中心',
     'cpu': 'CPU 占用率',
@@ -830,8 +832,180 @@ const TRANSLATIONS = {
   }
 };
 
+// ==================== 🃏 认知沙盒卡片单项组件 (带 3D 翻转) ====================
+function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveTab, setActiveTaskId, targetParagraphIdRef, handleTimeJump }) {
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const handleAnchorClick = (e) => {
+    e.stopPropagation(); // 阻止卡片翻转
+    
+    // 溯源跳转
+    setActiveTaskId(card.podcast_id);
+    setActiveTab('detail');
+    targetParagraphIdRef.current = card.paragraph_id;
+  };
+
+  return (
+    <div 
+      id={`card-${card.id}`}
+      onMouseEnter={() => setHoveredCardId(card.id)}
+      onMouseLeave={() => setHoveredCardId(null)}
+      onClick={() => setIsFlipped(!isFlipped)}
+      className="perspective-container"
+      style={{
+        height: '240px',
+        cursor: 'pointer',
+        opacity: shouldDim ? 0.35 : 1,
+        transform: isHoveredSelf ? 'scale(1.03) translateY(-4px)' : 'scale(1) translateY(0)',
+        boxShadow: isHoveredSelf ? '0 12px 30px rgba(0, 0, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
+        transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
+        zIndex: isHoveredSelf ? 2 : 1
+      }}
+    >
+      <div className={`flip-card-inner ${isFlipped ? 'is-flipped' : ''}`}>
+        
+        {/* 卡牌正面 */}
+        <div className="flip-card-front glass-panel" style={{
+          padding: '16px',
+          background: 'rgba(20, 20, 28, 0.55)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          border: '1px solid var(--border-color)',
+          height: '100%'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '80%' }}>
+              {card.podcast_image_url ? (
+                <img src={card.podcast_image_url} alt="cover" style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '14px' }}>🎙️</span>
+              )}
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {card.podcast_name}
+              </span>
+            </div>
+            
+            {/* 🧭 溯源锚点 */}
+            <button
+              onClick={handleAnchorClick}
+              className="btn-ghost"
+              style={{
+                padding: '4px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                transition: 'transform 0.2s'
+              }}
+              title="🧭 跳转到播客原点播放"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center', overflow: 'hidden' }}>
+            <h4 style={{ fontSize: '13.5px', fontWeight: '750', color: 'var(--text-primary)', margin: 0, lineBreak: 'anywhere', lineHeight: '1.4' }}>
+              {card.spark_title}
+            </h4>
+            <p style={{
+              fontSize: '11.5px',
+              color: 'var(--text-secondary)',
+              margin: 0,
+              lineHeight: '1.5',
+              fontStyle: 'italic',
+              display: '-webkit-box',
+              WebkitLineClamp: '4',
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden'
+            }}>
+              "{card.quote}"
+            </p>
+          </div>
+
+          {/* Footer (Metadata indicator) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '9px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '6px' }}>
+            <span>E-Factor: {card.efactor?.toFixed(1)}</span>
+            <span style={{
+              color: card.status === 'warning' ? 'var(--error)' : 'var(--success)',
+              fontWeight: '600'
+            }}>
+              {card.status === 'warning' ? '🔥 警报' : '🟢 记忆稳固'}
+            </span>
+          </div>
+        </div>
+
+        {/* 卡牌背面 */}
+        <div className="flip-card-back glass-panel" style={{
+          padding: '18px',
+          background: 'rgba(30, 24, 38, 0.75)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          border: '1px solid var(--accent)',
+          height: '100%'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', justifyContent: 'center' }}>
+            <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold', letterSpacing: '1px' }}>💡 AI 为何重要 (Why It Matters)</span>
+            <p style={{
+              fontSize: '12.5px',
+              color: 'var(--text-primary)',
+              lineHeight: '1.6',
+              margin: 0,
+              textAlign: 'left'
+            }}>
+              {card.why_it_matters}
+            </p>
+          </div>
+          
+          <div style={{ textAlign: 'center', fontSize: '9px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
+            点击卡片翻回正面
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'detail', 'config'
+  
+  // ==================== 🧠 认知沙盒 (The Mind Sandbox) 状态 ====================
+  const [hoveredParagraphId, setHoveredParagraphId] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  };
+  
+  const [sandboxCards, setSandboxCards] = useState([]);
+  const [dueCards, setDueCards] = useState([]);
+  const [cardLinks, setCardLinks] = useState([]);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [spinReelsResolved, setSpinReelsResolved] = useState([false, false, false]);
+  const [reviewedCardIds, setReviewedCardIds] = useState(new Set());
+  const [forgottenCardIds, setForgottenCardIds] = useState(new Set());
+  const [selectedCardId, setSelectedCardId] = useState(null);
+  const [linkingSourceCardId, setLinkingSourceCardId] = useState(null);
+  
+  const [activeCollider, setActiveCollider] = useState(null);
+  const [colliderSynthesis, setColliderSynthesis] = useState('');
+  const [colliderLoading, setColliderLoading] = useState(false);
+  
+  const targetParagraphIdRef = useRef(null);
+  const [hoveredCardId, setHoveredCardId] = useState(null);
+  const [svgPaths, setSvgPaths] = useState([]);
+  const svgRef = useRef(null);
+  const gridRef = useRef(null);
   
   const t = (key) => {
     const langDict = TRANSLATIONS[language] || TRANSLATIONS['zh-CN'];
@@ -885,6 +1059,13 @@ export default function App() {
   });
 
   const [asrMode, setAsrMode] = useState('local'); // 'local' | 'online'
+
+  // Prompt 编辑状态
+  const [promptData, setPromptData] = useState({
+    base_prompt: '',
+    action_prompt: ''
+  });
+  const [promptSaveStatus, setPromptSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   
   // 配置热保存/状态辅助变量
   const [isDirty, setIsDirty] = useState(false);
@@ -990,7 +1171,7 @@ export default function App() {
   };
 
   // 配置页面二级分类及多语言状态
-  const [configSubTab, setConfigSubTab] = useState('general'); // 'general', 'asr', 'llm', 'notifications'
+  const [configSubTab, setConfigSubTab] = useState('llm'); // 'general', 'asr', 'llm', 'notifications'
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('appLanguage') || 'zh-CN';
   });
@@ -1156,6 +1337,7 @@ export default function App() {
   useEffect(() => {
     fetchTasks();
     fetchConfig();
+    fetchPrompt();
     fetchPerformance();
     const interval = setInterval(fetchTasks, 4000); // 4秒轮询一次任务状态
     const perfInterval = setInterval(fetchPerformance, 5000); // 5秒轮询一次性能状态
@@ -1195,8 +1377,360 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'config') {
       fetchConfig();
+      fetchPrompt();
     }
   }, [activeTab]);
+
+  // ==================== 🧠 认知沙盒 生命周期与数据拉取 ====================
+  // URL 参数解析溯源跳转
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const taskId = params.get('task_id');
+    const paragraphId = params.get('paragraph_id');
+    if (taskId) {
+      setActiveTaskId(taskId);
+      setActiveTab('detail');
+      targetParagraphIdRef.current = paragraphId;
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // 监听任务详情加载，并在段落列表渲染后执行定位与播放
+  useEffect(() => {
+    if (activeTask && targetParagraphIdRef.current && activeTask.paragraphs) {
+      const paraId = targetParagraphIdRef.current;
+      targetParagraphIdRef.current = null; // 消费
+      
+      const targetPara = activeTask.paragraphs.find(p => p.id === paraId);
+      if (targetPara) {
+        // 跳转播放时间
+        handleTimeJump(targetPara.start_time);
+        
+        // 滚动并高亮闪烁
+        setTimeout(() => {
+          const el = document.getElementById(paraId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('glow-highlight');
+            setTimeout(() => {
+              el.classList.remove('glow-highlight');
+            }, 3000);
+          }
+        }, 600);
+      }
+    }
+  }, [activeTask]);
+
+  // 切换到沙盒时自动更新所有数据
+  useEffect(() => {
+    if (activeTab === 'sandbox') {
+      fetchSandboxData();
+    }
+  }, [activeTab]);
+
+  const fetchSandboxData = async () => {
+    try {
+      // 1. 获取所有卡片
+      const cardsRes = await fetch(`${BACKEND_URL}/api/cards`);
+      if (cardsRes.status === 200) {
+        const cards = await cardsRes.json();
+        setSandboxCards(cards);
+      }
+      
+      // 2. 获取连线数据
+      const linksRes = await fetch(`${BACKEND_URL}/api/links`);
+      if (linksRes.status === 200) {
+        const links = await linksRes.json();
+        setCardLinks(links);
+      }
+      
+      // 3. 获取待复习卡片
+      const dueRes = await fetch(`${BACKEND_URL}/api/cards/due`);
+      if (dueRes.status === 200) {
+        const due = await dueRes.json();
+        setDueCards(due);
+      }
+    } catch (err) {
+      console.error("无法加载认知沙盒数据:", err);
+    }
+  };
+
+  // 动态计算卡片网格连线坐标
+  const calculateLinks = () => {
+    if (!svgRef.current || !gridRef.current || sandboxCards.length === 0 || cardLinks.length === 0) {
+      setSvgPaths([]);
+      return;
+    }
+
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const paths = [];
+
+    cardLinks.forEach(link => {
+      const elA = document.getElementById(`card-${link.source_card_id}`);
+      const elB = document.getElementById(`card-${link.target_card_id}`);
+      
+      if (elA && elB) {
+        const rectA = elA.getBoundingClientRect();
+        const rectB = elB.getBoundingClientRect();
+        
+        // 计算两张卡片的中心坐标（相对于 SVG 容器）
+        const x1 = rectA.left - svgRect.left + rectA.width / 2;
+        const y1 = rectA.top - svgRect.top + rectA.height / 2;
+        const x2 = rectB.left - svgRect.left + rectB.width / 2;
+        const y2 = rectB.top - svgRect.top + rectB.height / 2;
+        
+        // 绘制一条平滑的贝塞尔曲线
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const cx1 = x1 + dx * 0.25;
+        const cy1 = y1 + dy * 0.1;
+        const cx2 = x1 + dx * 0.75;
+        const cy2 = y2 - dy * 0.1;
+        
+        paths.push({
+          id: link.id,
+          source: link.source_card_id,
+          target: link.target_card_id,
+          synthesis: link.my_synthesis,
+          d: `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`,
+          isGold: !!link.my_synthesis
+        });
+      }
+    });
+    setSvgPaths(paths);
+  };
+
+  // 监听窗口缩放与卡片变化，动态刷新路径
+  useEffect(() => {
+    if (activeTab === 'sandbox') {
+      const timer = setTimeout(calculateLinks, 500);
+      window.addEventListener('resize', calculateLinks);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', calculateLinks);
+      };
+    }
+  }, [activeTab, sandboxCards, cardLinks]);
+
+  // ==================== 🧠 认知沙盒 操作处理器 ====================
+  // 浏览器音频合成提醒声音
+  const playAudioSynth = (type) => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const time = ctx.currentTime;
+      
+      if (type === 'spin') {
+        // 低频嗡嗡声 + 齿轮刻度声
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(90, time);
+        osc.frequency.exponentialRampToValueAtTime(320, time + 1.2);
+        gain.gain.setValueAtTime(0.04, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 1.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + 1.2);
+        
+        // 6声齿轮点击音效
+        for (let i = 0; i < 6; i++) {
+          const tickOsc = ctx.createOscillator();
+          const tickGain = ctx.createGain();
+          tickOsc.type = 'triangle';
+          tickOsc.frequency.setValueAtTime(700 - i * 60, time + i * 0.2);
+          tickGain.gain.setValueAtTime(0.03, time + i * 0.2);
+          tickGain.gain.exponentialRampToValueAtTime(0.001, time + i * 0.2 + 0.04);
+          tickOsc.connect(tickGain);
+          tickGain.connect(ctx.destination);
+          tickOsc.start(time + i * 0.2);
+          tickOsc.stop(time + i * 0.2 + 0.04);
+        }
+      } else if (type === 'resolve') {
+        // 清脆风铃声 (大三和弦)
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, time + idx * 0.04);
+          gain.gain.setValueAtTime(0.05, time + idx * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.04 + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time + idx * 0.04);
+          osc.stop(time + idx * 0.04 + 0.45);
+        });
+      } else if (type === 'tamed') {
+        // 成功音效 (上行音阶)
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, time + idx * 0.08);
+          gain.gain.setValueAtTime(0.06, time + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time + idx * 0.08);
+          osc.stop(time + idx * 0.08 + 0.25);
+        });
+      } else if (type === 'forgot') {
+        // 警示音效
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, time);
+        osc.frequency.linearRampToValueAtTime(100, time + 0.35);
+        gain.gain.setValueAtTime(0.06, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + 0.35);
+      }
+    } catch (e) {
+      console.warn("Web Audio API warning:", e);
+    }
+  };
+
+  // 老虎机摇杆动作
+  const handleSpinSlotMachine = async () => {
+    if (isSpinning) return;
+    
+    setIsSpinning(true);
+    setSpinReelsResolved([false, false, false]);
+    setReviewedCardIds(new Set());
+    setForgottenCardIds(new Set());
+    playAudioSynth('spin');
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/cards/due`);
+      if (res.status === 200) {
+        const cards = await res.json();
+        setDueCards(cards);
+        
+        // 滚轮停滞动画时间
+        setTimeout(() => {
+          setSpinReelsResolved([true, false, false]);
+          playAudioSynth('resolve');
+        }, 800);
+        
+        setTimeout(() => {
+          setSpinReelsResolved([true, true, false]);
+          playAudioSynth('resolve');
+        }, 1400);
+        
+        setTimeout(() => {
+          setSpinReelsResolved([true, true, true]);
+          playAudioSynth('resolve');
+          setIsSpinning(false);
+          if (cards.length === 0) {
+            showToast("ℹ️ 当前没有待复习的历史卡片，请先去详情页沉淀一些吧！");
+          } else {
+            showToast("🎰 卡片打捞出舱！命运之轮已选定观点");
+          }
+        }, 2000);
+      } else {
+        setIsSpinning(false);
+        showToast("❌ 捞取卡片失败，请重试");
+      }
+    } catch (err) {
+      setIsSpinning(false);
+      showToast("❌ 无法连接到后端服务");
+    }
+  };
+
+  // 卡片滑块提交复习
+  const handleReviewCard = async (cardId, direction) => {
+    playAudioSynth(direction === 'left' ? 'tamed' : 'forgot');
+    
+    // 乐观更新
+    const nextReviewed = new Set(reviewedCardIds);
+    nextReviewed.add(cardId);
+    setReviewedCardIds(nextReviewed);
+    
+    if (direction === 'right') {
+      const nextForgotten = new Set(forgottenCardIds);
+      nextForgotten.add(cardId);
+      setForgottenCardIds(nextForgotten);
+    }
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/cards/${cardId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction })
+      });
+      if (res.status === 200) {
+        if (direction === 'left') {
+          showToast("✅ 卡片已驯服！已自动推迟下一次复习时间。");
+        } else {
+          showToast("🔥 卡片已置为警告状态！今晚将自动推送移动端复习。");
+        }
+        fetchSandboxData();
+      } else {
+        showToast("❌ 提交复习失败");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ 无法连接到后端服务");
+    }
+  };
+
+  // 启动 AI 对撞机
+  const handleOpenCollider = async () => {
+    setColliderLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/cards/collider`);
+      if (res.status === 200) {
+        const data = await res.json();
+        setActiveCollider(data);
+        setColliderSynthesis('');
+        setColliderLoading(false);
+      } else {
+        const errData = await res.json();
+        setColliderLoading(false);
+        alert(errData.detail || "无法启动对撞机，请先去详情页沉淀至少2张卡片！");
+      }
+    } catch (err) {
+      setColliderLoading(false);
+      alert("启动对撞机失败，请检查后端服务是否就绪！");
+    }
+  };
+
+  // 提交对撞合成灵感
+  const handleCollideSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!colliderSynthesis.trim() || !activeCollider) return;
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_card_id: activeCollider.card_a.id,
+          target_card_id: activeCollider.card_b.id,
+          my_synthesis: colliderSynthesis.trim()
+        })
+      });
+      if (res.status === 200) {
+        playAudioSynth('resolve');
+        showToast("💥 跨界观点成功对撞！金色的灵感连线已永久镌刻！");
+        setActiveCollider(null);
+        setColliderSynthesis('');
+        fetchSandboxData();
+      } else {
+        showToast("❌ 保存对撞灵感失败");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ 无法连接到后端服务");
+    }
+  };
 
   const fetchTasks = async () => {
     try {
@@ -1235,6 +1769,83 @@ export default function App() {
       setTimeout(() => {
         isFetchingConfig.current = false;
       }, 100);
+    }
+  };
+
+  const DEFAULT_BASE_PROMPT = `请根据下面提供的【播客单集 Shownotes】、【听众热门评论】和【播客对话转录文本】，生成一份详尽、结构清晰的【播客价值总结分析报告】。
+
+核心防伪守则（必须严格遵守，否则视为失败）：
+1. 严禁臆测发散：所有分析结论、嘉宾立场、议题提炼及评级，必须100%基于下方提供的事实源数据。严禁使用你自身固有知识库中的外部信息去扩展或脑补播客中未提及的事情或技术细节。
+2. 拒绝幻觉，空值如实报告：如果播客转录本中完全没有提及某人、某事或某个观点，哪怕该词出现在了 Shownotes 简介里，也绝对不得在总结中编造其对话内容，必须如实标注转录文本中未讨论或未提及。
+3. 精准引用：提炼核心观点和发言人立场时，必须直接引用（或高度提炼）转录文本中的原话、金句或提及的具体事例，并指明是谁说的。
+4. 客观呈现听众反馈：舆情分析部分必须完全基于热门听众评论列表中的实际留言，不得凭空编造听众情感走向。`;
+
+  const DEFAULT_ACTION_PROMPT = `请以 Markdown 格式输出以下结构的内容（严禁输出结构外的发散废话，直接输出报告正文）：
+
+## 1. 播客概要与含金量评级
+- **核心主旨**：用2-3句话精准总结这期播客实际讨论的核心主题（拒绝大话空话，紧扣转录事实）。
+- **目标受众**：根据播客讨论内容的专业深度，说明适合哪些细分人群收听。
+- **含金量评级与判定理由**：请给出评级（A+ / A / B / C / D 之一），并从内容信息密度、观点的独特性和知识实用度三个维度，基于转录中的干货多寡简述判定理由。
+- **推荐等级**：是否值得花时间复听（值得去听 / 仅看总结即可 / 建议避坑）。
+
+## 2. 核心观点与议题提炼
+请梳理出播客实际讨论的3-5个核心议题。对每个议题：
+- **议题名称**
+- **核心论点**：结合不同人的发言总结其达成共识或分歧。
+- **关键论据/金句**：必须包含转录中发言人提到过的原话、金句或他们讲到的具体案例。
+
+## 3. 发言人画像与立场分析
+- **角色定位**：说明都有谁参与了说话，谁是主持人（Host），谁是嘉宾（Guest）。
+- **立场与风格**：简述各位发言人的核心立场、讨论风格以及观点倾向，切忌根据发言人的名气脑补其背景，只分析其在此单集中的言论表现。
+- **互动氛围**：他们之间的互动如何（比如是和谐互补，还是存在观点的交锋摩擦）。
+
+## 4. 听众口碑与评论区舆情分析
+- **听众主要反馈**：评论区大家最赞同的观点是什么？有没有提出不同的质疑？（必须从提供的评论列表中提取，无评论则写暂无评论数据）。
+- **评论情感极性**：正向期待为主 / 中立探讨 / 存在争议偏见。
+- **社会共鸣点**：这期播客勾起了听众什么共鸣或情绪。
+
+## 5. 事实一致性与局限性声明
+请在此处特别说明：本报告有哪些内容是简介（Shownotes）中提到但转录对话中实际并未展开讨论的？（若有，请逐一列出；若无，写 Shownotes 提及内容与实际转录文本一致）。`;
+
+  const handleResetPrompt = () => {
+    if (window.confirm("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。")) {
+      setPromptData({
+        base_prompt: DEFAULT_BASE_PROMPT,
+        action_prompt: DEFAULT_ACTION_PROMPT
+      });
+    }
+  };
+
+  // 加载 Prompt 配置
+  const fetchPrompt = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/prompt`);
+      if (res.ok) {
+        const data = await res.json();
+        setPromptData(data);
+      }
+    } catch (e) {
+      console.error('无法加载 Prompt 配置:', e);
+    }
+  };
+
+  // 保存 Prompt 配置
+  const handleSavePrompt = async () => {
+    setPromptSaveStatus('saving');
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(promptData)
+      });
+      if (res.ok) {
+        setPromptSaveStatus('saved');
+        setTimeout(() => setPromptSaveStatus('idle'), 3000);
+      } else {
+        setPromptSaveStatus('error');
+      }
+    } catch (e) {
+      setPromptSaveStatus('error');
     }
   };
 
@@ -1519,6 +2130,35 @@ export default function App() {
     }
   };
 
+  // 沉淀段落为卡片
+  const handleSedimentParagraph = async (paragraphId, podcastId) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/cards/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paragraph_id: paragraphId, podcast_id: podcastId })
+      });
+      if (res.status === 200) {
+        // 更新本地段落已沉淀状态
+        if (activeTask && activeTask.paragraphs) {
+          const updatedParas = activeTask.paragraphs.map(p => {
+            if (p.id === paragraphId) {
+              return { ...p, sedimented: true };
+            }
+            return p;
+          });
+          setActiveTask({ ...activeTask, paragraphs: updatedParas });
+        }
+        showToast("✨ 成功将该段落沉淀为知识闪光卡片！");
+      } else {
+        showToast("❌ 沉淀卡片失败，请重试");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ 无法连接到后端服务");
+    }
+  };
+
   // 获取所有说话人唯一列表
   const getUniqueSpeakers = () => {
     if (!activeTask || !activeTask.transcript) return [];
@@ -1590,6 +2230,21 @@ export default function App() {
             >
               <Icons.Home />
               {t('dashboard')}
+            </button>
+
+            <button 
+              onClick={() => { setActiveTab('sandbox'); setActiveTaskId(null); }}
+              className="btn-ghost" 
+              style={{ 
+                justifyContent: 'flex-start', 
+                background: activeTab === 'sandbox' ? 'var(--primary-glow)' : 'transparent',
+                borderColor: activeTab === 'sandbox' ? 'var(--primary)' : 'transparent',
+                color: activeTab === 'sandbox' ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'sandbox' ? '700' : '500'
+              }}
+            >
+              <Icons.Sandbox />
+              {t('sandbox')}
             </button>
             
             <button 
@@ -2148,6 +2803,484 @@ export default function App() {
             </div>
           )}
 
+          {/* ==================== PANEL 4: COGNITIVE SANDBOX ==================== */}
+          {activeTab === 'sandbox' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', width: '100%', maxWidth: '1100px', margin: '0 auto', paddingBottom: '60px' }}>
+              
+              {/* ── 顶部组件：认知老虎机 ── */}
+              <div className="glass-panel" style={{ padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: '750', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      🎰 认知老虎机 (Insight Slot Machine)
+                    </h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                      根据遗忘曲线自动打捞历史观点。每天拉动摇杆一次，唤醒沉睡在大脑深处的通感火花。
+                    </p>
+                  </div>
+                  <button 
+                    onClick={handleSpinSlotMachine}
+                    disabled={isSpinning}
+                    className="btn-glow" 
+                    style={{ 
+                      padding: '10px 24px', 
+                      fontSize: '14px', 
+                      height: '42px', 
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+                      border: 'none',
+                      cursor: isSpinning ? 'not-allowed' : 'pointer',
+                      opacity: isSpinning ? 0.7 : 1
+                    }}
+                  >
+                    🎰 {isSpinning ? '捞取中...' : '拉动认知摇杆'}
+                  </button>
+                </div>
+
+                {/* 3轨卡牌槽位 */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', minHeight: '220px' }}>
+                  {[0, 1, 2].map((idx) => {
+                    const isResolved = spinReelsResolved[idx];
+                    const card = dueCards[idx];
+                    const isReviewed = card && reviewedCardIds.has(card.id);
+                    const isForgotten = card && forgottenCardIds.has(card.id);
+
+                    // 1. 如果老虎机正在旋转
+                    if (isSpinning && !isResolved) {
+                      return (
+                        <div key={idx} className="glass-panel" style={{ 
+                          height: '240px', 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          background: 'rgba(0,0,0,0.4)',
+                          borderColor: 'var(--primary-glow)',
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          <div className="slot-reel-anim" style={{ display: 'flex', flexDirection: 'column', gap: '15px', position: 'absolute' }}>
+                            <div style={{ fontSize: '24px', textAlign: 'center' }}>🧠</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>通感联结中...</div>
+                            <div style={{ fontSize: '24px', textAlign: 'center' }}>💡</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>灵感抽取中...</div>
+                            <div style={{ fontSize: '24px', textAlign: 'center' }}>✨</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>记忆重组中...</div>
+                            <div style={{ fontSize: '24px', textAlign: 'center' }}>🧭</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>溯源重塑中...</div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // 2. 如果已停止，且该位置存在卡片
+                    if (isResolved && card) {
+                      return (
+                        <div key={idx} className={`glass-panel ${isForgotten ? 'flame-effect' : ''}`} style={{ 
+                          height: '240px', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          background: 'rgba(25, 25, 35, 0.45)',
+                          borderColor: isForgotten ? '#f7768e' : 'var(--border-color)',
+                          transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                          opacity: isReviewed && !isForgotten ? 0.6 : 1,
+                          transform: isReviewed && !isForgotten ? 'scale(0.97)' : 'scale(1)',
+                        }}>
+                          {/* 封面、来源和标题 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {card.podcast_image_url ? (
+                                <img src={card.podcast_image_url} alt="cover" style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} />
+                              ) : (
+                                <span>🎙️</span>
+                              )}
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.podcast_name}</span>
+                            </div>
+                            <h4 style={{ fontSize: '13px', fontWeight: '750', color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.spark_title}</h4>
+                            <p style={{ 
+                              fontSize: '11.5px', 
+                              color: 'var(--text-secondary)', 
+                              margin: 0,
+                              lineHeight: '1.5',
+                              display: '-webkit-box',
+                              WebkitLineClamp: '4',
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              fontStyle: 'italic'
+                            }}>
+                              "{card.quote}"
+                            </p>
+                          </div>
+
+                          {/* 命运滑块或操作Badge */}
+                          <div>
+                            {!isReviewed ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
+                                  <span>👈 我已驯服它</span>
+                                  <span>糟糕忘了 👉</span>
+                                </div>
+                                <input 
+                                  type="range"
+                                  min="-100"
+                                  max="100"
+                                  defaultValue="0"
+                                  className="glass-slider"
+                                  style={{ width: '100%', cursor: 'ew-resize' }}
+                                  onMouseUp={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    if (val <= -70) {
+                                      handleReviewCard(card.id, 'left');
+                                    } else if (val >= 70) {
+                                      handleReviewCard(card.id, 'right');
+                                    } else {
+                                      e.target.value = 0;
+                                    }
+                                  }}
+                                  onTouchEnd={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    if (val <= -70) {
+                                      handleReviewCard(card.id, 'left');
+                                    } else if (val >= 70) {
+                                      handleReviewCard(card.id, 'right');
+                                    } else {
+                                      e.target.value = 0;
+                                    }
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                padding: '6px 10px', 
+                                borderRadius: '6px',
+                                background: isForgotten ? 'rgba(247, 118, 142, 0.15)' : 'rgba(115, 218, 202, 0.15)',
+                                color: isForgotten ? '#f7768e' : '#73daca',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                marginTop: '10px',
+                                border: isForgotten ? '1px solid rgba(247, 118, 142, 0.3)' : '1px solid rgba(115, 218, 202, 0.3)',
+                              }}>
+                                {isForgotten ? '🔥 遗忘！稍后通知二次复习' : '✅ 已驯服！已推迟下次唤醒'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // 3. 初始或空状态 (Idle)
+                    return (
+                      <div key={idx} className="glass-panel" style={{ 
+                        height: '240px', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        background: 'rgba(0,0,0,0.25)',
+                        borderStyle: 'dashed',
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-muted)',
+                        transition: 'all 0.3s'
+                      }}>
+                        <span style={{ fontSize: '32px', opacity: 0.15, fontWeight: '800' }}>?</span>
+                        <span style={{ fontSize: '10px', marginTop: '8px', color: 'var(--text-muted)' }}>卡牌槽 {idx + 1} 已就绪</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── 下部组件：网状时间轴画布 ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: '750', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      🧭 认知时间轴画布 (Networked Timeline)
+                    </h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                      您在节目中高亮沉淀的所有卡片都将平铺于此。悬停卡片可直观观察大块脑图中的关联连线。
+                    </p>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      onClick={handleOpenCollider}
+                      disabled={colliderLoading}
+                      className="btn-ghost" 
+                      style={{ 
+                        padding: '8px 18px', 
+                        fontSize: '12.5px', 
+                        height: '36px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        border: '1px solid var(--accent-glow)',
+                        color: 'var(--accent)',
+                        background: 'var(--accent-glow)'
+                      }}
+                    >
+                      💥 启动 AI 强力对撞机
+                    </button>
+                  </div>
+                </div>
+
+                {/* 网格画布包容器 */}
+                <div 
+                  ref={gridRef}
+                  style={{ 
+                    position: 'relative', 
+                    width: '100%', 
+                    background: 'rgba(0, 0, 0, 0.15)',
+                    borderRadius: 'var(--radius-md)',
+                    minHeight: '400px',
+                    padding: '24px 20px'
+                  }}
+                >
+                  {/* SVG 画布层 */}
+                  <svg 
+                    ref={svgRef}
+                    style={{ 
+                      position: 'absolute', 
+                      top: 0, 
+                      left: 0, 
+                      width: '100%', 
+                      height: '100%', 
+                      pointerEvents: 'none', 
+                      zIndex: 0 
+                    }}
+                  >
+                    <defs>
+                      <linearGradient id="gold-neon" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#e0af68" />
+                        <stop offset="100%" stopColor="#ff9e64" />
+                      </linearGradient>
+                      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+                    
+                    {svgPaths.map((path) => {
+                      const isHovered = hoveredCardId === path.source || hoveredCardId === path.target;
+                      
+                      return (
+                        <g key={path.id}>
+                          <path 
+                            d={path.d} 
+                            fill="none" 
+                            stroke={isHovered ? (path.isGold ? 'url(#gold-neon)' : '#73daca') : (path.isGold ? 'rgba(224, 175, 104, 0.25)' : 'rgba(122, 162, 247, 0.12)')} 
+                            strokeWidth={isHovered ? 3.5 : 1.5}
+                            filter={isHovered ? 'url(#glow)' : 'none'}
+                            style={{ 
+                              transition: 'stroke 0.3s, stroke-width 0.3s, filter 0.3s',
+                              strokeDasharray: path.isGold ? '5,5' : 'none'
+                            }}
+                          />
+                          {isHovered && path.synthesis && (
+                            <foreignObject 
+                              x={(path.d.match(/M\s+([\d.]+)/)?.[1] * 1 + path.d.match(/,\s+([\d.]+)\s*$/)?.[1] * 1) / 2 - 80 || 100}
+                              y={(path.d.match(/M\s+[\d.]+\s+([\d.]+)/)?.[1] * 1 + path.d.match(/,\s+[\d.]+\s+([\d.]+)\s*$/)?.[1] * 1) / 2 - 35 || 100}
+                              width="160"
+                              height="70"
+                            >
+                              <div style={{
+                                background: 'rgba(18, 18, 24, 0.95)',
+                                border: '1px solid #e0af68',
+                                borderRadius: '6px',
+                                padding: '6px 8px',
+                                fontSize: '10px',
+                                color: '#e0af68',
+                                textAlign: 'center',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                lineHeight: '1.4'
+                              }}>
+                                💡 跨界感悟: "{path.synthesis}"
+                              </div>
+                            </foreignObject>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </svg>
+
+                  {/* 卡片实体列表网格 */}
+                  {sandboxCards.length === 0 ? (
+                    <div className="glass-panel" style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)', zIndex: 1, position: 'relative' }}>
+                      <span style={{ fontSize: '36px' }}>🧭</span>
+                      <p style={{ fontSize: '14px', marginTop: '12px' }}>沙盒中目前还没有沉淀任何观点卡牌</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>请先打开播客库详情页，鼠标悬停到语义段落上，点击 ⭐ 按钮进行沉淀吧！</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', position: 'relative', zIndex: 1 }}>
+                      {sandboxCards.map((card) => {
+                        const isHoveredSelf = hoveredCardId === card.id;
+                        // Determine if we should dim this card:
+                        const isAnyCardHovered = hoveredCardId !== null;
+                        const isConnected = isAnyCardHovered && cardLinks.some(link => 
+                          (link.source_card_id === hoveredCardId && link.target_card_id === card.id) ||
+                          (link.target_card_id === hoveredCardId && link.source_card_id === card.id)
+                        );
+                        const shouldDim = isAnyCardHovered && !isHoveredSelf && !isConnected;
+
+                        return (
+                          <CardItem 
+                            key={card.id}
+                            card={card}
+                            shouldDim={shouldDim}
+                            isHoveredSelf={isHoveredSelf}
+                            setHoveredCardId={setHoveredCardId}
+                            setActiveTab={setActiveTab}
+                            setActiveTaskId={setActiveTaskId}
+                            targetParagraphIdRef={targetParagraphIdRef}
+                            handleTimeJump={handleTimeJump}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── 隐藏彩蛋：AI 强力对撞机 Modal ── */}
+              {activeCollider && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  background: 'rgba(5, 5, 8, 0.8)',
+                  backdropFilter: 'blur(15px)',
+                  WebkitBackdropFilter: 'blur(15px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000,
+                  padding: '20px'
+                }}>
+                  <div className="glass-panel" style={{
+                    width: '100%',
+                    maxWidth: '740px',
+                    padding: '28px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-hover)',
+                    borderRadius: '16px',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px',
+                    position: 'relative'
+                  }}>
+                    {/* 关闭按钮 */}
+                    <button 
+                      onClick={() => setActiveCollider(null)}
+                      className="btn-ghost"
+                      style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+                    >
+                      ✕
+                    </button>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ fontSize: '24px' }}>💥</span>
+                      <h3 style={{ fontSize: '16.5px', fontWeight: '750', color: 'var(--text-primary)', margin: '6px 0 0 0' }}>AI 强力对撞机 (The AI Collider)</h3>
+                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>发现异界观点的隐秘联结，撞击跨界灵感火花</p>
+                    </div>
+
+                    {/* 卡片对比区 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', position: 'relative' }}>
+                      {/* 卡牌 A */}
+                      <div className="glass-panel" style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', minHeight: '140px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold' }}>观点 A · {activeCollider.card_a.podcast_name}</div>
+                        <h4 style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>{activeCollider.card_a.spark_title}</h4>
+                        <p style={{ fontSize: '10.5px', color: 'var(--text-secondary)', margin: 0, fontStyle: 'italic', display: '-webkit-box', WebkitLineClamp: '3', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          "{activeCollider.card_a.quote}"
+                        </p>
+                      </div>
+
+                      {/* 卡牌 B */}
+                      <div className="glass-panel" style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', minHeight: '140px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold' }}>观点 B · {activeCollider.card_b.podcast_name}</div>
+                        <h4 style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>{activeCollider.card_b.spark_title}</h4>
+                        <p style={{ fontSize: '10.5px', color: 'var(--text-secondary)', margin: 0, fontStyle: 'italic', display: '-webkit-box', WebkitLineClamp: '3', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          "{activeCollider.card_b.quote}"
+                        </p>
+                      </div>
+
+                      {/* 连线装饰 */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '30px',
+                        height: '2px',
+                        background: 'linear-gradient(90deg, var(--accent), var(--primary))',
+                        boxShadow: '0 0 10px rgba(122,162,247,0.5)',
+                        zIndex: 10
+                      }} />
+                    </div>
+
+                    {/* AI 对撞提问气泡 */}
+                    <div style={{
+                      background: 'var(--primary-glow)',
+                      border: '1px solid rgba(122, 162, 247, 0.3)',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      position: 'relative'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <span style={{ fontSize: '16px' }}>🤖</span>
+                        <p style={{ fontSize: '12px', color: 'var(--text-primary)', margin: 0, lineHeight: '1.5', fontWeight: '600' }}>
+                          {activeCollider.question}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 用户灵感输入框 */}
+                    <form onSubmit={handleCollideSubmit} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input 
+                        type="text"
+                        value={colliderSynthesis}
+                        onChange={(e) => setColliderSynthesis(e.target.value)}
+                        placeholder="输入你的跨界融合灵感（例如：虽然领域不同，但都提到了逆境中的客观性...）"
+                        className="glass-input"
+                        required
+                        style={{ flex: 1, height: '40px', padding: '0 14px', fontSize: '12px' }}
+                      />
+                      <button 
+                        type="submit"
+                        className="btn-glow" 
+                        style={{ 
+                          padding: '0 20px', 
+                          height: '40px', 
+                          fontSize: '13px', 
+                          fontWeight: '700',
+                          background: 'linear-gradient(135deg, var(--accent), var(--primary))',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        💥 对撞合成
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
           {/* ==================== PANEL 2: DETAIL WORKSPACE ==================== */}
           {activeTab === 'detail' && activeTask && (
             <div ref={containerRef} style={{ display: 'flex', flex: '1', height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative', gap: '0' }}>
@@ -2317,7 +3450,83 @@ export default function App() {
                 
                 {/* 剧本对话渲染区 */}
                 <div style={{ flex: '1', overflowY: 'auto', padding: '20px' }}>
-                  {activeTask.transcript && activeTask.transcript.length > 0 ? (
+                  {activeTask.paragraphs && activeTask.paragraphs.length > 0 ? (
+                    <div className="dialogue-container">
+                      {activeTask.paragraphs.map((para, idx) => {
+                        const isPlayingLine = currentTime >= para.start_time && currentTime <= para.end_time;
+                        const speakerName = formatSpeakerName(para.speaker, activeTask.speaker_mappings);
+                        
+                        return (
+                          <div 
+                            key={para.id} 
+                            id={para.id}
+                            onMouseEnter={() => setHoveredParagraphId(para.id)}
+                            onMouseLeave={() => setHoveredParagraphId(null)}
+                            onClick={() => handleTimeJump(para.start_time)}
+                            className={`dialogue-bubble dialogue-bubble-para ${isPlayingLine ? 'active-playing' : ''}`}
+                            style={{ 
+                              position: 'relative',
+                              paddingRight: '45px',
+                              cursor: 'pointer',
+                              transition: 'border 0.2s, box-shadow 0.2s',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '10px'
+                            }}
+                          >
+                            <div className="dialogue-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="speaker-badge" style={{ background: 'var(--border-hover)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                                  {speakerName}
+                                </span>
+                              </div>
+                              <span className="time-stamp" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                {(() => {
+                                  const startMin = Math.floor(para.start_time / 60);
+                                  const startSec = Math.floor(para.start_time % 60);
+                                  const startHour = Math.floor(startMin / 60);
+                                  const minRem = startMin % 60;
+                                  return `[${startHour.toString().padStart(2, '0')}:${minRem.toString().padStart(2, '0')}:${startSec.toString().padStart(2, '0')}]`;
+                                })()}
+                              </span>
+                            </div>
+                            <div className="dialogue-text" style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: '1.6', wordBreak: 'break-all' }}>{para.content}</div>
+                            
+                            {/* 一键沉淀星号图标 (鼠标 Hover 时显现) */}
+                            <button
+                              className="sediment-star-btn btn-ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSedimentParagraph(para.id, activeTask.id);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                right: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                padding: '6px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 10,
+                                color: para.sedimented ? 'var(--warning)' : 'var(--text-muted)'
+                              }}
+                              title={para.sedimented ? "已沉淀到知识沙盒" : "一键沉淀到知识沙盒"}
+                            >
+                              {para.sedimented ? (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--warning)" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="star-anim"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : activeTask.transcript && activeTask.transcript.length > 0 ? (
                     <div className="dialogue-container">
                       {activeTask.transcript.map((seg, idx) => {
                         const isPlayingLine = currentTime >= seg.start && currentTime <= seg.end;
@@ -2329,16 +3538,17 @@ export default function App() {
                             ref={isPlayingLine ? activeBubbleRef : null}
                             onClick={() => handleTimeJump(seg.start)}
                             className={`dialogue-bubble ${isPlayingLine ? 'active-playing' : ''}`}
+                            style={{ padding: '12px', marginBottom: '10px', borderRadius: '8px', cursor: 'pointer' }}
                           >
-                            <div className="dialogue-meta">
+                            <div className="dialogue-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <span className="speaker-badge">
+                                <span className="speaker-badge" style={{ background: 'var(--border-hover)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
                                   {speakerName}
                                 </span>
                               </div>
-                              <span className="time-stamp">{seg.timestamp_str}</span>
+                              <span className="time-stamp" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{seg.timestamp_str}</span>
                             </div>
-                            <div className="dialogue-text">{seg.text}</div>
+                            <div className="dialogue-text" style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: '1.6', wordBreak: 'break-all' }}>{seg.text}</div>
                           </div>
                         );
                       })}
@@ -2603,48 +3813,118 @@ export default function App() {
 
           {/* ==================== PANEL 3: CONFIG FORM ==================== */}
           {activeTab === 'config' && (
-            <div className="glass-panel" style={{ maxWidth: '780px', margin: '0 auto', padding: '30px', position: 'relative' }}>
-              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* Configuration Sub-tabs Navigation */}
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', maxWidth: '1200px' }}>
+
+              {/* ── Left Sidebar Navigation ── */}
+              <div style={{
+                width: '230px',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                position: 'sticky',
+                top: '24px',
+                alignSelf: 'flex-start',
+                background: 'var(--bg-surface)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '16px',
+                boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.7)',
+                minHeight: '540px'
+              }}>
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  letterSpacing: '0.12em',
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  padding: '4px 8px 10px 8px',
+                  borderBottom: '1px solid var(--border-color)',
+                  marginBottom: '8px'
+                }}>{t('sys_config_header')}</div>
+                {[
+                  { id: 'llm',     icon: '✨', label: 'AI 总结',    desc: 'LLM 模型与 Prompt' },
+                  { id: 'asr',     icon: '🎙️', label: '语音转录',   desc: 'ASR 引擎配置' },
+                  { id: 'notifications', icon: '✉️', label: '消息通知', desc: 'SMTP 邮件推送' },
+                  { id: 'general', icon: '🎨', label: '外观与语言', desc: '主题、配色、语言' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setConfigSubTab(tab.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      border: configSubTab === tab.id ? '1px solid var(--primary)' : '1px solid transparent',
+                      background: configSubTab === tab.id ? 'var(--primary-glow)' : 'rgba(255,255,255,0.02)',
+                      color: configSubTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s ease',
+                      width: '100%',
+                    }}
+                    onMouseEnter={e => { if (configSubTab !== tab.id) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={e => { if (configSubTab !== tab.id) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                  >
+                    <span style={{ fontSize: '18px', flexShrink: 0 }}>{tab.icon}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '13px', fontWeight: configSubTab === tab.id ? '700' : '600', whiteSpace: 'nowrap' }}>{tab.label}</span>
+                      <span style={{ fontSize: '10.5px', color: configSubTab === tab.id ? 'var(--primary)' : 'var(--text-muted)', opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.desc}</span>
+                    </div>
+                  </button>
+                ))}
+
+                <div style={{ flexGrow: 1 }} />
+
+                {/* ── Auto-save status and control bar ── */}
                 <div style={{
                   display: 'flex',
-                  gap: '8px',
-                  borderBottom: '1px solid var(--border-color)',
-                  paddingBottom: '12px',
-                  marginBottom: '10px',
-                  overflowX: 'auto'
+                  flexDirection: 'column',
+                  gap: '12px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid var(--border-color)',
+                  marginTop: '16px'
                 }}>
-                  {[
-                    { id: 'general', label: t('tab_appearance') },
-                    { id: 'asr', label: t('tab_asr') },
-                    { id: 'llm', label: t('tab_llm') },
-                    { id: 'notifications', label: t('tab_notifications') }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setConfigSubTab(tab.id)}
-                      className="btn-ghost"
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        background: configSubTab === tab.id ? 'var(--primary-glow)' : 'transparent',
-                        borderColor: configSubTab === tab.id ? 'var(--primary)' : 'transparent',
-                        color: configSubTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
-                        fontWeight: configSubTab === tab.id ? '700' : '500',
-                        fontSize: '13px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoSaveEnabled}
+                      onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                      style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                    />
+                    <span>{t('auto_save_chk')}</span>
+                  </label>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '500', minHeight: '16px' }}>
+                      {saveStatus === 'saving' && t('save_status_saving')}
+                      {saveStatus === 'saved' && t('save_status_saved')}
+                      {saveStatus === 'unsaved' && (autoSaveEnabled ? t('save_status_unsaved') : t('save_status_unsaved_manual'))}
+                      {saveStatus === 'error' && t('save_status_error')}
+                      {saveStatus === 'idle' && t('save_status_idle')}
+                    </span>
+                    {!autoSaveEnabled && (
+                      <button 
+                        type="submit" 
+                        form="settings-form"
+                        className="btn-glow" 
+                        style={{ width: '100%', padding: '8px 16px', fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                      >
+                        <Icons.Check /> {t('save_btn')}
+                      </button>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* ── Right Content Panel ── */}
+              <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '24px', position: 'relative' }}>
+              <form id="settings-form" onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
 
                 {/* 0. 外观与语言设置 (Appearance & Language Settings) */}
                 {configSubTab === 'general' && (
@@ -3332,6 +4612,136 @@ export default function App() {
                       )}
                     </div>
 
+                    {/* ── Prompt 编辑卡片 ── */}
+                    <div className="settings-card" style={{ gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                          <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🧠 总结 Prompt 模板
+                          </h3>
+                          <p className="settings-card-subtitle">自定义发给大模型的系统指令与输出格式要求，修改后立即对新任务生效</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={handleResetPrompt}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: 'rgba(255,255,255,0.03)',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                          >
+                            ↩️ 恢复默认
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={handleSavePrompt}
+                            style={{
+                              padding: '8px 20px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--primary)',
+                              background: promptSaveStatus === 'saved' ? 'var(--primary-glow)' : promptSaveStatus === 'error' ? 'rgba(255,80,80,0.12)' : 'var(--primary-glow)',
+                              color: promptSaveStatus === 'error' ? '#ff5050' : 'var(--primary)',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '700',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}
+                          >
+                            {promptSaveStatus === 'saving' ? '⏳ 保存中...' : promptSaveStatus === 'saved' ? '✅ 已保存' : promptSaveStatus === 'error' ? '❌ 保存失败' : '💾 保存 Prompt'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Base Prompt */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          🔒 防幻觉守则 / 基础指令 (Base Prompt)
+                        </label>
+                        <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
+                          注入给大模型的核心行为准则（防止脑补/幻觉）。数据块（转录文本、评论等）会自动注入在本段与 Action Prompt 之间。
+                        </p>
+                        <textarea
+                          value={promptData.base_prompt}
+                          onChange={(e) => setPromptData(prev => ({ ...prev, base_prompt: e.target.value }))}
+                          className="glass-input"
+                          rows={10}
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
+                            fontSize: '12px',
+                            lineHeight: '1.7',
+                            resize: 'vertical',
+                            borderRadius: '8px',
+                            background: 'rgba(0,0,0,0.25)',
+                            color: 'var(--text-primary)',
+                            boxSizing: 'border-box',
+                            minHeight: '200px'
+                          }}
+                          placeholder="输入基础 Prompt（角色定义、防幻觉规则等）..."
+                        />
+                      </div>
+
+                      {/* Action Prompt */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          📋 输出格式指令 (Action Prompt)
+                        </label>
+                        <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
+                          定义总结报告的具体输出章节与格式（章节结构、评级维度等）。这部分出现在数据块之后。
+                        </p>
+                        <textarea
+                          value={promptData.action_prompt}
+                          onChange={(e) => setPromptData(prev => ({ ...prev, action_prompt: e.target.value }))}
+                          className="glass-input"
+                          rows={14}
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
+                            fontSize: '12px',
+                            lineHeight: '1.7',
+                            resize: 'vertical',
+                            borderRadius: '8px',
+                            background: 'rgba(0,0,0,0.25)',
+                            color: 'var(--text-primary)',
+                            boxSizing: 'border-box',
+                            minHeight: '280px'
+                          }}
+                          placeholder="输入输出格式 Prompt（要求的章节、格式、评级等）..."
+                        />
+                      </div>
+
+                      {/* 结构说明 */}
+                      <div style={{
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'rgba(var(--primary-rgb, 122,162,247), 0.06)',
+                        border: '1px solid rgba(var(--primary-rgb, 122,162,247), 0.15)',
+                        fontSize: '11.5px',
+                        color: 'var(--text-secondary)',
+                        lineHeight: '1.6'
+                      }}>
+                        💡 <strong>最终 Prompt 拼接顺序：</strong>
+                        <code style={{ display: 'block', marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', lineHeight: '1.8' }}>
+                          [Base Prompt] → [播客元数据 + 评论 + 转录文本（自动注入）] → [Action Prompt]
+                        </code>
+                      </div>
+                    </div>
+
                   </div>
                 )}
 
@@ -3459,53 +4869,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 粘性悬浮保存底栏 */}
-                <div style={{
-                  position: 'sticky',
-                  bottom: '-30px',
-                  margin: '30px -30px -30px -30px',
-                  padding: '16px 30px',
-                  background: 'rgba(20, 20, 25, 0.88)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  borderTop: '1px solid var(--border-color)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  zIndex: 100,
-                  borderBottomLeftRadius: '14px',
-                  borderBottomRightRadius: '14px',
-                  boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.35)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={autoSaveEnabled}
-                        onChange={(e) => setAutoSaveEnabled(e.target.checked)}
-                        style={{ cursor: 'pointer', width: '15px', height: '15px' }}
-                      />
-                      <span>{t('auto_save_chk')}</span>
-                    </label>
-                    <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                      {saveStatus === 'saving' && t('save_status_saving')}
-                      {saveStatus === 'saved' && t('save_status_saved')}
-                      {saveStatus === 'unsaved' && (autoSaveEnabled ? t('save_status_unsaved') : t('save_status_unsaved_manual'))}
-                      {saveStatus === 'error' && t('save_status_error')}
-                      {saveStatus === 'idle' && t('save_status_idle')}
-                    </span>
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    {!autoSaveEnabled && (
-                      <button type="submit" className="btn-glow" style={{ padding: '10px 24px', fontSize: '13px' }}>
-                        <Icons.Check /> {t('save_btn')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
               </form>
+              </div>
             </div>
           )}
 
@@ -3797,6 +5162,32 @@ export default function App() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 全局丝滑 Toast 提示层 */}
+        {toastVisible && (
+          <div style={{
+            position: 'fixed',
+            bottom: '40px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(18, 18, 28, 0.95)',
+            border: '1px solid var(--primary)',
+            boxShadow: '0 8px 32px rgba(122, 162, 247, 0.4)',
+            color: 'var(--text-primary)',
+            padding: '12px 24px',
+            borderRadius: '10px',
+            zIndex: 99999,
+            fontSize: '13px',
+            fontWeight: '600',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: 'star-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            {toastMessage}
           </div>
         )}
 

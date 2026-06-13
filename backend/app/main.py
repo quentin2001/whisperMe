@@ -18,7 +18,7 @@ from app.core.transcriber import PodcastTranscriber
 from app.core.summarizer import PodcastSummarizer
 from app.core.notifier import PodcastNotifier
 from app.core.queue_manager import queue_manager
-
+from app.core.prompt_manager import load_prompt, save_prompt
 app = FastAPI(title="whisperMe Local Podcast Processor", version="1.0.0")
 
 # 配置 CORS 跨域请求（前端 Vite 运行在 5173，后端运行在 8000）
@@ -140,6 +140,8 @@ class UpdateConfigRequest(BaseModel):
     online_summary_api_key: str = ""
     online_summary_base_url: str = "https://api.openai.com/v1"
     online_summary_model: str = "gpt-4o-mini"
+    enable_llm_semantic_sewing: bool = False
+    webhook_url: str = ""
 
 
 # --- 智能声纹特征与大模型命名推理引擎 ---
@@ -504,6 +506,15 @@ def run_podcast_pipeline(task_id: str, url: str):
         )
         db.update_task(task_id, transcript=merged_transcript, progress=75.0)
 
+        # Step 4.2: 运行语义段落聚合 (Semantic Chunking)
+        try:
+            print("⏳ [LOG] 正在运行语义分块聚合管道...")
+            paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
+            db.add_paragraphs(paragraphs)
+            print(f"✅ [LOG] 成功为任务 {task_id} 聚合出 {len(paragraphs)} 个语义段落。")
+        except Exception as chunk_ex:
+            print(f"⚠️ [LOG 警告] 语义分块聚合失败: {chunk_ex}")
+
         # Step 4.5: 提取声纹特征特征，并进行智能特征及上下文改名
         if not db.get_task(task_id):
             raise Exception("TASK_CANCELLED")
@@ -639,6 +650,28 @@ def get_task_details(task_id: str):
     if task.get("status") == "pending":
         pos = queue_manager.get_queue_position(task.get("id"))
         task["queue_position"] = pos
+        
+    # 注入段落与沉淀状态
+    if task.get("status") == "completed":
+        try:
+            paragraphs = db.get_paragraphs_by_podcast(task_id)
+            if not paragraphs and task.get("transcript"):
+                paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, task.get("transcript"))
+                db.add_paragraphs(paragraphs)
+            
+            # Check sedimented status
+            podcast_cards = db.get_cards_by_podcast(task_id)
+            sedimented_paragraph_ids = {c["paragraph_id"] for c in podcast_cards}
+            for p in paragraphs:
+                p["sedimented"] = p["id"] in sedimented_paragraph_ids
+                
+            task["paragraphs"] = paragraphs
+        except Exception as e:
+            print(f"⚠️ [LOG ERROR] Failed to inject paragraphs: {e}")
+            task["paragraphs"] = []
+    else:
+        task["paragraphs"] = []
+        
     return sanitize_floats(task)
 
 @app.post("/api/tasks")
@@ -1018,6 +1051,426 @@ def update_global_config(req: UpdateConfigRequest):
     notifier = PodcastNotifier()
     
     return {"success": True}
+
+@app.get("/api/prompt")
+def get_prompt():
+    return load_prompt()
+
+@app.post("/api/prompt")
+def set_prompt(req: dict):
+    save_prompt(req)
+    return {"status": "ok"}
+
+# ==================== 🧠 认知沙盒 API 端点 ====================
+import random
+import json
+
+class CreateCardRequest(BaseModel):
+    paragraph_id: str
+    podcast_id: str
+
+class ReviewCardRequest(BaseModel):
+    direction: str  # "left" or "right"
+
+class CreateLinkRequest(BaseModel):
+    source_card_id: str
+    target_card_id: str
+    my_synthesis: str
+
+def call_llm(prompt: str) -> str:
+    import httpx
+    from app.config import config
+    
+    summary_mode = config.get("summary_mode", "local")
+    if summary_mode == "online":
+        api_key = config.get("online_summary_api_key", "").strip()
+        base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
+        target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
+        api_url = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+        target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
+        base_url = ollama_url.rstrip('/')
+        api_url = f"{base_url}/v1/chat/completions" if '/v1' not in base_url else f"{base_url}/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        
+    payload = {
+        "model": target_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "temperature": 0.1
+    }
+    
+    with httpx.Client(timeout=120.0, trust_env=False) as client:
+        response = client.post(api_url, json=payload, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"LLM API error (code {response.status_code}): {response.text}")
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
+
+@app.get("/api/paragraphs")
+def get_paragraphs(podcast_id: str):
+    paragraphs = db.get_paragraphs_by_podcast(podcast_id)
+    if not paragraphs:
+        # Check if task exists and has a transcript
+        task = db.get_task(podcast_id)
+        if not task or not task.get("transcript"):
+            return []
+        try:
+            print(f"🔄 [LOG] 为老任务 {podcast_id} 动态生成语义段落...")
+            paragraphs = transcriber.cluster_segments_to_paragraphs(podcast_id, task.get("transcript"))
+            db.add_paragraphs(paragraphs)
+        except Exception as e:
+            print(f"❌ [LOG ERROR] 动态生成段落失败: {e}")
+            return []
+    
+    # Check if each paragraph has been sedimented (has an associated card)
+    podcast_cards = db.get_cards_by_podcast(podcast_id)
+    sedimented_paragraph_ids = {c["paragraph_id"] for c in podcast_cards}
+    for p in paragraphs:
+        p["sedimented"] = p["id"] in sedimented_paragraph_ids
+        
+    return paragraphs
+
+@app.post("/api/cards/create")
+def create_card(req: CreateCardRequest):
+    # Check if card already exists for this paragraph
+    existing_cards = db.get_all_cards()
+    for c in existing_cards:
+        if c.get("paragraph_id") == req.paragraph_id:
+            return c
+
+    # Fetch paragraph
+    paragraphs = db.get_paragraphs_by_podcast(req.podcast_id)
+    paragraph = None
+    for p in paragraphs:
+        if p["id"] == req.paragraph_id:
+            paragraph = p
+            break
+            
+    if not paragraph:
+        # Try generating on the fly
+        paragraphs = get_paragraphs(req.podcast_id)
+        for p in paragraphs:
+            if p["id"] == req.paragraph_id:
+                paragraph = p
+                break
+    
+    if not paragraph:
+        raise HTTPException(status_code=404, detail="未找到对应的语义段落")
+        
+    # Call LLM to extract spark_title and why_it_matters
+    quote = paragraph["content"]
+    prompt = f"""你是一个知识内化与卡片记忆提取专家。
+请根据下面的播客转录原话，提取出一个闪光标题（Spark Title）和为何重要（Why It Matters）的解释。
+
+原话内容：
+「{quote}」
+
+要求：
+1. 闪光标题：精炼、醒目、深刻，能一针见血指出这段话的核心观点，不超过 15 字。
+2. 为何重要：用一两句话解释该观点的含金量、底层逻辑或启发性意义，语气理性中肯，不超过 60 字。
+3. 必须以 JSON 格式输出，包含 "spark_title" 和 "why_it_matters" 两个字段。
+4. 不要包含 ```json 或 ``` 格式块，只输出纯 JSON 字符串，不要有任何其他内容。"""
+
+    try:
+        response_str = call_llm(prompt)
+        cleaned_str = response_str.strip()
+        if cleaned_str.startswith("```json"):
+            cleaned_str = cleaned_str[7:]
+        if cleaned_str.startswith("```"):
+            cleaned_str = cleaned_str[3:]
+        if cleaned_str.endswith("```"):
+            cleaned_str = cleaned_str[:-3]
+        cleaned_str = cleaned_str.strip()
+        
+        parsed = json.loads(cleaned_str)
+        spark_title = parsed.get("spark_title", "未命名观点").strip()
+        why_it_matters = parsed.get("why_it_matters", "原话具有深刻启发意义。").strip()
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] LLM 卡片提炼失败: {e}")
+        # Fallback values
+        spark_title = quote[:15] + "..." if len(quote) > 15 else quote
+        why_it_matters = "由于大模型连接失败或解析异常，该卡片以默认模式生成。原话非常关键，值得反复记忆复习。"
+
+    from datetime import datetime, timedelta
+    card_id = str(uuid.uuid4())
+    tomorrow = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    card = {
+        "id": card_id,
+        "paragraph_id": req.paragraph_id,
+        "podcast_id": req.podcast_id,
+        "spark_title": spark_title,
+        "quote": quote,
+        "why_it_matters": why_it_matters,
+        "efactor": 2.5,
+        "interval": 1,
+        "next_review_date": tomorrow,
+        "status": "active",
+        "created_at": datetime.now().isoformat()
+    }
+    
+    db.create_card(card)
+    return card
+
+@app.get("/api/cards")
+def get_cards():
+    cards = db.get_all_cards()
+    # Populate with podcast info (title, image_url, etc.)
+    for c in cards:
+        task = db.get_task(c["podcast_id"])
+        if task:
+            c["podcast_title"] = task.get("title", "未知标题")
+            c["podcast_image_url"] = task.get("image_url", "")
+            c["podcast_name"] = task.get("podcast_name", "未知播客")
+            
+            # Find the paragraph start_time & end_time
+            paras = db.get_paragraphs_by_podcast(c["podcast_id"])
+            for p in paras:
+                if p["id"] == c["paragraph_id"]:
+                    c["start_time"] = p.get("start_time", 0)
+                    c["end_time"] = p.get("end_time", 0)
+                    break
+    return cards
+
+@app.get("/api/cards/due")
+def get_due_cards():
+    from datetime import datetime
+    today = datetime.today().strftime("%Y-%m-%d")
+    all_cards = db.get_all_cards()
+    
+    # Filter for active and warning cards
+    valid_cards = [c for c in all_cards if c.get("status") in ["active", "warning"]]
+    
+    # Filter due cards
+    due_cards = [c for c in valid_cards if c.get("next_review_date", "") <= today]
+    
+    # Sort due cards: prioritize warnings first, then recently created
+    due_cards.sort(key=lambda x: (0 if x.get("status") == "warning" else 1, x.get("created_at", "")), reverse=True)
+    
+    # Populate podcast details
+    def populate_card_details(c):
+        task = db.get_task(c["podcast_id"])
+        if task:
+            c["podcast_title"] = task.get("title", "未知标题")
+            c["podcast_image_url"] = task.get("image_url", "")
+            c["podcast_name"] = task.get("podcast_name", "未知播客")
+            # Get start/end time
+            paras = db.get_paragraphs_by_podcast(c["podcast_id"])
+            for p in paras:
+                if p["id"] == c["paragraph_id"]:
+                    c["start_time"] = p.get("start_time", 0)
+                    c["end_time"] = p.get("end_time", 0)
+                    break
+        return c
+
+    due_cards = [populate_card_details(c) for c in due_cards]
+    
+    # If we have at least 3 due cards, return the top 3
+    if len(due_cards) >= 3:
+        return due_cards[:3]
+        
+    # Otherwise, backfill with random active/warning cards that are NOT due
+    non_due_cards = [c for c in valid_cards if c.get("next_review_date", "") > today]
+    import random
+    random.shuffle(non_due_cards)
+    
+    needed = 3 - len(due_cards)
+    backfill_cards = non_due_cards[:needed]
+    backfill_cards = [populate_card_details(c) for c in backfill_cards]
+    
+    result = due_cards + backfill_cards
+    # If still less than 3, just return whatever we have
+    return result
+
+@app.post("/api/cards/{card_id}/review")
+def review_card(card_id: str, req: ReviewCardRequest):
+    card = db.get_card(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+        
+    from datetime import datetime, timedelta
+    today = datetime.today()
+    
+    efactor = card.get("efactor", 2.5)
+    interval = card.get("interval", 1)
+    
+    if req.direction == "left":
+        # Tamed (Success, quality = 4)
+        new_status = "active"
+        if interval == 1:
+            new_interval = 6
+        elif interval == 6:
+            new_interval = 12
+        else:
+            new_interval = int(round(interval * efactor))
+            
+        new_efactor = efactor
+        next_date = (today + timedelta(days=new_interval)).strftime("%Y-%m-%d")
+    else:
+        # Forgot (Failure, quality = 1)
+        new_status = "warning"
+        new_interval = 1
+        new_efactor = max(1.3, efactor - 0.2)
+        next_date = (today + timedelta(days=1)).strftime("%Y-%m-%d") # Review again tomorrow
+        
+        # Trigger notifier!
+        try:
+            task = db.get_task(card["podcast_id"])
+            podcast_title = task.get("title", "未知标题") if task else "未知播客"
+            podcast_name = task.get("podcast_name", "未知播客") if task else "未知播客"
+            
+            # Send desktop notification
+            notifier.send_desktop_notification(
+                title=f"🧠 记忆唤醒警报: 【{card['spark_title']}】",
+                message=f"该卡片已被设为遗忘提醒。原文: {card['quote'][:60]}..."
+            )
+            
+            # If webhook is configured
+            webhook_url = config.get("webhook_url", "").strip()
+            if webhook_url:
+                import httpx
+                # Build localized routing link (e.g. localhost jump link)
+                source_link = f"http://localhost:5173/?task_id={card['podcast_id']}&paragraph_id={card['paragraph_id']}"
+                payload = {
+                    "msg_type": "text",
+                    "text": {
+                        "content": f"🧠 【知识遗忘唤醒警告】\n闪光点: {card['spark_title']}\n原话: {card['quote']}\nAI 提炼: {card['why_it_matters']}\n播客来源: {podcast_name} - 《{podcast_title}》\n🧭 溯源链接: {source_link}"
+                    }
+                }
+                # We do this asynchronously to avoid blocking the API response
+                def send_webhook_async(url, payload):
+                    try:
+                        with httpx.Client(timeout=10.0, trust_env=False) as client:
+                            client.post(url, json=payload)
+                            print("🔔 [LOG] Webhook notification sent successfully.")
+                    except Exception as wh_err:
+                        print(f"⚠️ [LOG WARNING] Webhook notification failed: {wh_err}")
+                
+                import threading
+                threading.Thread(target=send_webhook_async, args=(webhook_url, payload), daemon=True).start()
+                
+        except Exception as notif_err:
+            print(f"⚠️ [LOG ERROR] 发送复习失败通知失败: {notif_err}")
+            
+    db.update_card(
+        card_id,
+        status=new_status,
+        efactor=new_efactor,
+        interval=new_interval,
+        next_review_date=next_date
+    )
+    
+    return db.get_card(card_id)
+
+@app.get("/api/links")
+def get_links():
+    return db.get_all_links()
+
+@app.post("/api/links")
+def create_link(req: CreateLinkRequest):
+    import uuid
+    from datetime import datetime
+    
+    # Verify both cards exist
+    card_a = db.get_card(req.source_card_id)
+    card_b = db.get_card(req.target_card_id)
+    if not card_a or not card_b:
+        raise HTTPException(status_code=404, detail="关联的卡片不存在")
+        
+    link = {
+        "id": str(uuid.uuid4()),
+        "source_card_id": req.source_card_id,
+        "target_card_id": req.target_card_id,
+        "my_synthesis": req.my_synthesis.strip(),
+        "created_at": datetime.now().isoformat()
+    }
+    db.create_link(link)
+    return link
+
+@app.get("/api/cards/collider")
+def get_collider():
+    cards = db.get_all_cards()
+    if len(cards) < 2:
+        raise HTTPException(status_code=400, detail="本地卡片盒中卡片数量少于2张，无法启动 AI 对撞机")
+        
+    links = db.get_all_links()
+    
+    # Helper to check if two card IDs are already linked
+    def is_linked(id_a, id_b):
+        for l in links:
+            if (l["source_card_id"] == id_a and l["target_card_id"] == id_b) or \
+               (l["source_card_id"] == id_b and l["target_card_id"] == id_a):
+                return True
+        return False
+        
+    # Find all pairs of cards that are not yet linked
+    unlinked_pairs = []
+    for i in range(len(cards)):
+        for j in range(i+1, len(cards)):
+            if not is_linked(cards[i]["id"], cards[j]["id"]):
+                unlinked_pairs.append((cards[i], cards[j]))
+                
+    if not unlinked_pairs:
+        raise HTTPException(status_code=400, detail="所有卡片均已建立关联，AI 对撞机没有可对撞的脑洞啦！")
+        
+    # Select a pair (prioritize cards from different podcasts for more creative collision)
+    diff_podcast_pairs = [p for p in unlinked_pairs if p[0]["podcast_id"] != p[1]["podcast_id"]]
+    pair = random.choice(diff_podcast_pairs) if diff_podcast_pairs else random.choice(unlinked_pairs)
+    
+    card_a, card_b = pair
+    
+    prompt = f"""你是一个创意无限的跨界知识对撞与链接专家。你擅长在看似完全无关的两个观点中，发现它们底层的通感、共鸣或矛盾火花。
+
+下面是两个知识卡片观点：
+卡片 A：
+- 标题：{card_a['spark_title']}
+- 原文：{card_a['quote']}
+
+卡片 B：
+- 标题：{card_b['spark_title']}
+- 原文：{card_b['quote']}
+
+你的任务是：
+1. 找出这两个观点底层逻辑深处的呼应点、互补点或冲突性火花。
+2. 作为一个跨界对撞机，向用户提一个深刻的、极具启发性的对撞问题（不超过 60 字）。
+3. 提问语气类似：“主人，我发现这两个人在不同领域都在强调/探讨【...】。你觉得它们是一回事吗？” 或 “主人，观点A强调...，而观点B指出...。它们碰撞在一起，是否意味着【...】？”
+4. 必须以 JSON 格式输出，包含一个字段 "question"（字符串）。
+5. 直接输出 JSON 字符串，不要包含 ```json 或 ``` 格式块，不要有任何多余文字。"""
+
+    try:
+        response_str = call_llm(prompt)
+        cleaned_str = response_str.strip()
+        if cleaned_str.startswith("```json"):
+            cleaned_str = cleaned_str[7:]
+        if cleaned_str.startswith("```"):
+            cleaned_str = cleaned_str[3:]
+        if cleaned_str.endswith("```"):
+            cleaned_str = cleaned_str[:-3]
+        cleaned_str = cleaned_str.strip()
+        
+        parsed = json.loads(cleaned_str)
+        question = parsed.get("question", "我发现这两个观点底层都在强调一些共同的事情。你觉得它们是一回事吗？")
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] Collider AI prompt failed: {e}")
+        question = f"主人，我发现【{card_a['spark_title']}】与【{card_b['spark_title']}】之间或许有独特的默契。你觉得它们有什么底层联系吗？"
+
+    # Populate podcast name
+    for c in [card_a, card_b]:
+        task = db.get_task(c["podcast_id"])
+        if task:
+            c["podcast_title"] = task.get("title", "未知标题")
+            c["podcast_name"] = task.get("podcast_name", "未知播客")
+            
+    return {
+        "card_a": card_a,
+        "card_b": card_b,
+        "question": question
+    }
 
 # 辅助读取配置
 def load_config_dict():
