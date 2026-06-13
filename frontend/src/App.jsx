@@ -3640,11 +3640,11 @@ export default function App() {
                             className={`dialogue-bubble dialogue-bubble-para ${isPlayingLine ? 'active-playing' : ''}`}
                             style={{ 
                               position: 'relative',
+                              padding: '12px',
                               paddingRight: '45px',
                               cursor: 'pointer',
                               transition: 'border 0.2s, box-shadow 0.2s',
                               borderRadius: '8px',
-                              padding: '12px',
                               marginBottom: '10px'
                             }}
                           >
@@ -5283,11 +5283,12 @@ export default function App() {
                   max={duration || 100}
                   value={currentTime}
                   onChange={handleSeek}
+                  className="player-progress-bar"
                   style={{ 
                     flex: '1', 
                     height: '4px', 
                     borderRadius: '2px', 
-                    background: 'rgba(255,255,255,0.1)',
+                    background: `linear-gradient(to right, var(--primary) ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255, 255, 255, 0.1) ${duration > 0 ? (currentTime / duration) * 100 : 0}%)`,
                     outline: 'none',
                     cursor: 'pointer',
                     accentColor: 'var(--primary)',

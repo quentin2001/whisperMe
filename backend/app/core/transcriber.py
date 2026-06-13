@@ -115,8 +115,8 @@ class PodcastTranscriber:
             print(f"📡 [LOG] 正在使用在线 ASR 模式进行识别。目标 API: {online_base_url} | 模型: {online_model}")
             print(f"📦 [LOG] 音频总时长: {audio_duration:.2f} 秒")
 
-            # 2. 分片处理逻辑 (每片最大 10 分钟 = 600 秒)
-            chunk_length = 600.0
+            # 2. 分片处理逻辑 (每片最大 2 分钟 = 120 秒，确保转录精度并防御时间线偏斜)
+            chunk_length = 120.0
             num_chunks = math.ceil(audio_duration / chunk_length)
             
             for i in range(num_chunks):
@@ -129,13 +129,13 @@ class PodcastTranscriber:
                 print(f"✂️ [LOG] 正在提取分片 {i+1}/{num_chunks}: 从 {start_offset:.2f}s 开始，时长 {slice_duration:.2f}s...")
 
                 try:
-                    # 使用 FFmpeg 提取对应分片并压缩为 32kbps mono MP3
+                    # 使用 FFmpeg 提取对应分片并压缩为 32kbps mono MP3，-ss 放在 -i 之后以确保时间轴切片精确
                     cmd = [
                         FFMPEG_PATH, 
                         '-y', 
+                        '-i', get_short_path_name(wav_path), 
                         '-ss', str(start_offset),
                         '-t', str(slice_duration),
-                        '-i', get_short_path_name(wav_path), 
                         '-codec:a', 'libmp3lame', 
                         '-b:a', '32k', 
                         '-ac', '1', 
@@ -171,6 +171,10 @@ class PodcastTranscriber:
                             {
                                 "role": "user",
                                 "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "请将这段音频非常精准地转录为汉字，并保留语气，请完整地逐字转录所有说话内容，绝对不要进行任何总结、大纲概括或省略。"
+                                    },
                                     {
                                         "type": "input_audio",
                                         "input_audio": {
@@ -216,6 +220,23 @@ class PodcastTranscriber:
                     sentences = [s.strip() for s in sentences if s.strip()]
                     if not sentences:
                         continue
+
+                    # 过滤相邻重复句，防范 ASR 幻觉循环引发的字句重复与时间线漂移
+                    import re
+                    def clean_txt(text):
+                        return re.sub(r'[^\w\s]', '', text).strip()
+                    
+                    deduped_sentences = []
+                    for s in sentences:
+                        if not deduped_sentences:
+                            deduped_sentences.append(s)
+                        else:
+                            if clean_txt(s) != clean_txt(deduped_sentences[-1]):
+                                deduped_sentences.append(s)
+                    sentences = deduped_sentences
+                    if not sentences:
+                        continue
+
 
                     total_chars = sum(len(s) for s in sentences)
                     if total_chars == 0:
@@ -280,6 +301,21 @@ class PodcastTranscriber:
                 language="zh"
             )
             whisper_segments = list(whisper_segments_raw)
+            # 过滤相邻重复句，防止本地 Whisper 幻觉循环
+            import re
+            def clean_txt(text):
+                return re.sub(r'[^\w\s]', '', text).strip()
+            
+            deduped_whisper_segments = []
+            for seg in whisper_segments:
+                if not deduped_whisper_segments:
+                    deduped_whisper_segments.append(seg)
+                else:
+                    if clean_txt(seg.text) != clean_txt(deduped_whisper_segments[-1].text):
+                        deduped_whisper_segments.append(seg)
+                    else:
+                        deduped_whisper_segments[-1].end = seg.end
+            whisper_segments = deduped_whisper_segments
             duration = info.duration if info and info.duration else 1.0
         
         has_diarization = len(diarization_segments) > 0

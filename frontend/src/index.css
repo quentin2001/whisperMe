@@ -619,3 +619,37 @@ body {
   animation: slot-blink 1.2s infinite ease-in-out;
 }
 
+/* 自定义播放器进度条滑块样式 */
+.player-progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s;
+}
+
+.player-progress-bar:hover::-webkit-slider-thumb {
+  transform: scale(1.3);
+  background: var(--accent);
+}
+
+.player-progress-bar::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s;
+}
+
+.player-progress-bar:hover::-moz-range-thumb {
+  transform: scale(1.3);
+  background: var(--accent);
+}
+
+
