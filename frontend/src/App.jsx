@@ -431,7 +431,7 @@ const BACKEND_URL = "http://127.0.0.1:8000";
 const TRANSLATIONS = {
   'zh-CN': {
     'dashboard': '我的播客库',
-    'sandbox': '🎰 认知沙盒',
+    'sandbox': '认知沙盒',
     'settings': '系统设置',
     'center_sub': '本地播客声纹自动化处理中心',
     'cpu': 'CPU 占用率',
@@ -532,6 +532,7 @@ const TRANSLATIONS = {
   },
   'zh-TW': {
     'dashboard': '我的播客庫',
+    'sandbox': '認知沙盒',
     'settings': '系統設定',
     'center_sub': '在地播客聲紋自動化處理中心',
     'cpu': 'CPU 使用率',
@@ -632,6 +633,7 @@ const TRANSLATIONS = {
   },
   'en-US': {
     'dashboard': 'My Podcast Library',
+    'sandbox': 'Cognitive Sandbox',
     'settings': 'Settings',
     'center_sub': 'Local Podcast Voiceprint Automation Center',
     'cpu': 'CPU Usage',
@@ -732,6 +734,7 @@ const TRANSLATIONS = {
   },
   'ja-JP': {
     'dashboard': 'ポッドキャストライブラリ',
+    'sandbox': '認知サンドボックス',
     'settings': 'システム設定',
     'center_sub': 'ローカル音声ダイアリゼーション処理センター',
     'cpu': 'CPU使用率',
@@ -867,7 +870,7 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         {/* 卡牌正面 */}
         <div className="flip-card-front glass-panel" style={{
           padding: '16px',
-          background: 'rgba(20, 20, 28, 0.55)',
+          background: 'var(--bg-surface)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -944,7 +947,7 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         {/* 卡牌背面 */}
         <div className="flip-card-back glass-panel" style={{
           padding: '18px',
-          background: 'rgba(30, 24, 38, 0.75)',
+          background: 'var(--bg-surface-hover)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -974,6 +977,41 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
   );
 }
 
+const DEFAULT_BASE_PROMPT = `请根据下面提供的【播客单集 Shownotes】、【听众热门评论】和【播客对话转录文本】，生成一份详尽、结构清晰的【播客价值总结分析报告】。
+
+核心防伪守则（必须严格遵守，否则视为失败）：
+1. 严禁臆测发散：所有分析结论、嘉宾立场、议题提炼及评级，必须100%基于下方提供的事实源数据。严禁使用你自身固有知识库中的外部信息去扩展或脑补播客中未提及的事情或技术细节。
+2. 拒绝幻觉，空值如实报告：如果播客转录本中完全没有提及某人、某事或某个观点，哪怕该词出现在了 Shownotes 简介里，也绝对不得在总结中编造其对话内容，必须如实标注转录文本中未讨论或未提及。
+3. 精准引用：提炼核心观点和发言人立场时，必须直接引用（或高度提炼）转录文本中的原话、金句或提及的具体事例，并指明是谁说的。
+4. 客观呈现听众反馈：舆情分析部分必须完全基于热门听众评论列表中的实际留言，不得凭空编造听众情感走向。`;
+
+const DEFAULT_ACTION_PROMPT = `请以 Markdown 格式输出以下结构的内容（严禁输出结构外的发散废话，直接输出报告正文）：
+
+## 1. 播客概要与含金量评级
+- **核心主旨**：用2-3句话精准总结这期播客实际讨论的核心主题（拒绝大话空话，紧扣转录事实）。
+- **目标受众**：根据播客讨论内容的专业深度，说明适合哪些细分人群收听。
+- **含金量评级与判定理由**：请给出评级（A+ / A / B / C / D 之一），并从内容信息密度、观点的独特性和知识实用度三个维度，基于转录中的干货多寡简述判定理由。
+- **推荐等级**：是否值得花时间复听（值得去听 / 仅看总结即可 / 建议避坑）。
+
+## 2. 核心观点与议题提炼
+请梳理出播客实际讨论的3-5个核心议题。对每个议题：
+- **议题名称**
+- **核心论点**：结合不同人的发言总结其达成共识或分歧。
+- **关键论据/金句**：必须包含转录中发言人提到过的原话、金句或他们讲到的具体案例。
+
+## 3. 发言人画像与立场分析
+- **角色定位**：说明都有谁参与了说话，谁是主持人（Host），谁是嘉宾（Guest）。
+- **立场与风格**：简述各位发言人的核心立场、讨论风格以及观点倾向，切忌根据发言人的名气脑补其背景，只分析其在此单集中的言论表现。
+- **互动氛围**：他们之间的互动如何（比如是和谐互补，还是存在观点的交锋摩擦）。
+
+## 4. 听众口碑与评论区舆情分析
+- **听众主要反馈**：评论区大家最赞同的观点是什么？有没有提出不同的质疑？（必须从提供的评论列表中提取，无评论则写暂无评论数据）。
+- **评论情感极性**：正向期待为主 / 中立探讨 / 存在争议偏见。
+- **社会共鸣点**：这期播客勾起了听众什么共鸣或情绪。
+
+## 5. 事实一致性与局限性声明
+请在此处特别说明：本报告有哪些内容是简介（Shownotes）中提到但转录对话中实际并未展开讨论的？（若有，请逐一列出；若无，写 Shownotes 提及内容与实际转录文本一致）。`;
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'detail', 'config'
   
@@ -991,6 +1029,7 @@ export default function App() {
   const [dueCards, setDueCards] = useState([]);
   const [cardLinks, setCardLinks] = useState([]);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [leverActive, setLeverActive] = useState(false);
   const [spinReelsResolved, setSpinReelsResolved] = useState([false, false, false]);
   const [reviewedCardIds, setReviewedCardIds] = useState(new Set());
   const [forgottenCardIds, setForgottenCardIds] = useState(new Set());
@@ -1062,8 +1101,8 @@ export default function App() {
 
   // Prompt 编辑状态
   const [promptData, setPromptData] = useState({
-    base_prompt: '',
-    action_prompt: ''
+    base_prompt: DEFAULT_BASE_PROMPT,
+    action_prompt: DEFAULT_ACTION_PROMPT
   });
   const [promptSaveStatus, setPromptSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   
@@ -1598,6 +1637,15 @@ export default function App() {
   };
 
   // 老虎机摇杆动作
+  const triggerLeverPull = () => {
+    if (isSpinning) return;
+    setLeverActive(true);
+    setTimeout(() => {
+      setLeverActive(false);
+      handleSpinSlotMachine();
+    }, 300);
+  };
+
   const handleSpinSlotMachine = async () => {
     if (isSpinning) return;
     
@@ -1772,40 +1820,7 @@ export default function App() {
     }
   };
 
-  const DEFAULT_BASE_PROMPT = `请根据下面提供的【播客单集 Shownotes】、【听众热门评论】和【播客对话转录文本】，生成一份详尽、结构清晰的【播客价值总结分析报告】。
 
-核心防伪守则（必须严格遵守，否则视为失败）：
-1. 严禁臆测发散：所有分析结论、嘉宾立场、议题提炼及评级，必须100%基于下方提供的事实源数据。严禁使用你自身固有知识库中的外部信息去扩展或脑补播客中未提及的事情或技术细节。
-2. 拒绝幻觉，空值如实报告：如果播客转录本中完全没有提及某人、某事或某个观点，哪怕该词出现在了 Shownotes 简介里，也绝对不得在总结中编造其对话内容，必须如实标注转录文本中未讨论或未提及。
-3. 精准引用：提炼核心观点和发言人立场时，必须直接引用（或高度提炼）转录文本中的原话、金句或提及的具体事例，并指明是谁说的。
-4. 客观呈现听众反馈：舆情分析部分必须完全基于热门听众评论列表中的实际留言，不得凭空编造听众情感走向。`;
-
-  const DEFAULT_ACTION_PROMPT = `请以 Markdown 格式输出以下结构的内容（严禁输出结构外的发散废话，直接输出报告正文）：
-
-## 1. 播客概要与含金量评级
-- **核心主旨**：用2-3句话精准总结这期播客实际讨论的核心主题（拒绝大话空话，紧扣转录事实）。
-- **目标受众**：根据播客讨论内容的专业深度，说明适合哪些细分人群收听。
-- **含金量评级与判定理由**：请给出评级（A+ / A / B / C / D 之一），并从内容信息密度、观点的独特性和知识实用度三个维度，基于转录中的干货多寡简述判定理由。
-- **推荐等级**：是否值得花时间复听（值得去听 / 仅看总结即可 / 建议避坑）。
-
-## 2. 核心观点与议题提炼
-请梳理出播客实际讨论的3-5个核心议题。对每个议题：
-- **议题名称**
-- **核心论点**：结合不同人的发言总结其达成共识或分歧。
-- **关键论据/金句**：必须包含转录中发言人提到过的原话、金句或他们讲到的具体案例。
-
-## 3. 发言人画像与立场分析
-- **角色定位**：说明都有谁参与了说话，谁是主持人（Host），谁是嘉宾（Guest）。
-- **立场与风格**：简述各位发言人的核心立场、讨论风格以及观点倾向，切忌根据发言人的名气脑补其背景，只分析其在此单集中的言论表现。
-- **互动氛围**：他们之间的互动如何（比如是和谐互补，还是存在观点的交锋摩擦）。
-
-## 4. 听众口碑与评论区舆情分析
-- **听众主要反馈**：评论区大家最赞同的观点是什么？有没有提出不同的质疑？（必须从提供的评论列表中提取，无评论则写暂无评论数据）。
-- **评论情感极性**：正向期待为主 / 中立探讨 / 存在争议偏见。
-- **社会共鸣点**：这期播客勾起了听众什么共鸣或情绪。
-
-## 5. 事实一致性与局限性声明
-请在此处特别说明：本报告有哪些内容是简介（Shownotes）中提到但转录对话中实际并未展开讨论的？（若有，请逐一列出；若无，写 Shownotes 提及内容与实际转录文本一致）。`;
 
   const handleResetPrompt = () => {
     if (window.confirm("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。")) {
@@ -2819,7 +2834,7 @@ export default function App() {
                     </p>
                   </div>
                   <button 
-                    onClick={handleSpinSlotMachine}
+                    onClick={triggerLeverPull}
                     disabled={isSpinning}
                     className="btn-glow" 
                     style={{ 
@@ -2840,161 +2855,314 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 3轨卡牌槽位 */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', minHeight: '220px' }}>
-                  {[0, 1, 2].map((idx) => {
-                    const isResolved = spinReelsResolved[idx];
-                    const card = dueCards[idx];
-                    const isReviewed = card && reviewedCardIds.has(card.id);
-                    const isForgotten = card && forgottenCardIds.has(card.id);
-
-                    // 1. 如果老虎机正在旋转
-                    if (isSpinning && !isResolved) {
-                      return (
-                        <div key={idx} className="glass-panel" style={{ 
-                          height: '240px', 
-                          display: 'flex', 
-                          flexDirection: 'column',
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          background: 'rgba(0,0,0,0.4)',
-                          borderColor: 'var(--primary-glow)',
-                          overflow: 'hidden',
-                          position: 'relative'
-                        }}>
-                          <div className="slot-reel-anim" style={{ display: 'flex', flexDirection: 'column', gap: '15px', position: 'absolute' }}>
-                            <div style={{ fontSize: '24px', textAlign: 'center' }}>🧠</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>通感联结中...</div>
-                            <div style={{ fontSize: '24px', textAlign: 'center' }}>💡</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>灵感抽取中...</div>
-                            <div style={{ fontSize: '24px', textAlign: 'center' }}>✨</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>记忆重组中...</div>
-                            <div style={{ fontSize: '24px', textAlign: 'center' }}>🧭</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>溯源重塑中...</div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // 2. 如果已停止，且该位置存在卡片
-                    if (isResolved && card) {
-                      return (
-                        <div key={idx} className={`glass-panel ${isForgotten ? 'flame-effect' : ''}`} style={{ 
-                          height: '240px', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          justifyContent: 'space-between',
-                          padding: '16px',
-                          background: 'rgba(25, 25, 35, 0.45)',
-                          borderColor: isForgotten ? '#f7768e' : 'var(--border-color)',
-                          transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                          opacity: isReviewed && !isForgotten ? 0.6 : 1,
-                          transform: isReviewed && !isForgotten ? 'scale(0.97)' : 'scale(1)',
-                        }}>
-                          {/* 封面、来源和标题 */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {card.podcast_image_url ? (
-                                <img src={card.podcast_image_url} alt="cover" style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} />
-                              ) : (
-                                <span>🎙️</span>
-                              )}
-                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.podcast_name}</span>
-                            </div>
-                            <h4 style={{ fontSize: '13px', fontWeight: '750', color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.spark_title}</h4>
-                            <p style={{ 
-                              fontSize: '11.5px', 
-                              color: 'var(--text-secondary)', 
-                              margin: 0,
-                              lineHeight: '1.5',
-                              display: '-webkit-box',
-                              WebkitLineClamp: '4',
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              fontStyle: 'italic'
-                            }}>
-                              "{card.quote}"
-                            </p>
-                          </div>
-
-                          {/* 命运滑块或操作Badge */}
-                          <div>
-                            {!isReviewed ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
-                                  <span>👈 我已驯服它</span>
-                                  <span>糟糕忘了 👉</span>
-                                </div>
-                                <input 
-                                  type="range"
-                                  min="-100"
-                                  max="100"
-                                  defaultValue="0"
-                                  className="glass-slider"
-                                  style={{ width: '100%', cursor: 'ew-resize' }}
-                                  onMouseUp={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    if (val <= -70) {
-                                      handleReviewCard(card.id, 'left');
-                                    } else if (val >= 70) {
-                                      handleReviewCard(card.id, 'right');
-                                    } else {
-                                      e.target.value = 0;
-                                    }
-                                  }}
-                                  onTouchEnd={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    if (val <= -70) {
-                                      handleReviewCard(card.id, 'left');
-                                    } else if (val >= 70) {
-                                      handleReviewCard(card.id, 'right');
-                                    } else {
-                                      e.target.value = 0;
-                                    }
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                alignItems: 'center', 
-                                padding: '6px 10px', 
-                                borderRadius: '6px',
-                                background: isForgotten ? 'rgba(247, 118, 142, 0.15)' : 'rgba(115, 218, 202, 0.15)',
-                                color: isForgotten ? '#f7768e' : '#73daca',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                marginTop: '10px',
-                                border: isForgotten ? '1px solid rgba(247, 118, 142, 0.3)' : '1px solid rgba(115, 218, 202, 0.3)',
-                              }}>
-                                {isForgotten ? '🔥 遗忘！稍后通知二次复习' : '✅ 已驯服！已推迟下次唤醒'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // 3. 初始或空状态 (Idle)
-                    return (
-                      <div key={idx} className="glass-panel" style={{ 
-                        height: '240px', 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        background: 'rgba(0,0,0,0.25)',
-                        borderStyle: 'dashed',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-muted)',
-                        transition: 'all 0.3s'
-                      }}>
-                        <span style={{ fontSize: '32px', opacity: 0.15, fontWeight: '800' }}>?</span>
-                        <span style={{ fontSize: '10px', marginTop: '8px', color: 'var(--text-muted)' }}>卡牌槽 {idx + 1} 已就绪</span>
+                {/* Physical Slot Machine Chassis & Lever Wrapper */}
+                <div style={{
+                  display: 'flex',
+                  gap: '30px',
+                  alignItems: 'center',
+                  background: 'linear-gradient(180deg, rgba(30, 30, 45, 0.25) 0%, rgba(15, 15, 25, 0.45) 100%)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '20px',
+                  padding: '24px 30px',
+                  boxShadow: '0 20px 45px rgba(0, 0, 0, 0.4), inset 0 1px 10px rgba(255, 255, 255, 0.03)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  {/* Left: Arcade Slot Machine Frame */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
+                    {/* Blinking lights border bezel */}
+                    <div style={{
+                      position: 'relative',
+                      padding: '20px 18px',
+                      background: 'rgba(5, 5, 8, 0.9)',
+                      borderRadius: '16px',
+                      border: '3px solid var(--primary)',
+                      boxShadow: '0 0 15px rgba(122, 162, 247, 0.15), inset 0 0 25px rgba(0, 0, 0, 0.9)'
+                    }}>
+                      {/* Blinking Bulbs around the bezel (top) */}
+                      <div style={{ position: 'absolute', top: '5px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
+                        {[...Array(9)].map((_, i) => (
+                          <div key={i} className="slot-bulb" style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: i % 2 === 0 ? 'var(--primary)' : 'var(--accent)',
+                            animationDelay: `${i * 0.1}s`,
+                            boxShadow: '0 0 8px currentColor'
+                          }} />
+                        ))}
                       </div>
-                    );
-                  })}
+                      
+                      {/* Blinking Bulbs around the bezel (bottom) */}
+                      <div style={{ position: 'absolute', bottom: '5px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
+                        {[...Array(9)].map((_, i) => (
+                          <div key={i} className="slot-bulb" style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: i % 2 === 1 ? 'var(--primary)' : 'var(--accent)',
+                            animationDelay: `${i * 0.1}s`,
+                            boxShadow: '0 0 8px currentColor'
+                          }} />
+                        ))}
+                      </div>
+
+                      {/* 3 reels screen container */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '16px',
+                        background: '#040406',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        boxShadow: 'inset 0 10px 25px rgba(0, 0, 0, 0.95)',
+                        position: 'relative',
+                        minHeight: '240px'
+                      }}>
+                        {/* 3D Cylindrical Shadow Overlay */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 18%, rgba(0,0,0,0) 82%, rgba(0,0,0,0.85) 100%)',
+                          pointerEvents: 'none',
+                          zIndex: 5,
+                          borderRadius: '8px'
+                        }} />
+
+                        {[0, 1, 2].map((idx) => {
+                          const isResolved = spinReelsResolved[idx];
+                          const card = dueCards[idx];
+                          const isReviewed = card && reviewedCardIds.has(card.id);
+                          const isForgotten = card && forgottenCardIds.has(card.id);
+
+                          // 1. 如果老虎机正在旋转
+                          if (isSpinning && !isResolved) {
+                            return (
+                              <div key={idx} className="glass-panel" style={{ 
+                                height: '240px', 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                background: 'rgba(0,0,0,0.45)',
+                                borderColor: 'var(--primary-glow)',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                zIndex: 1
+                              }}>
+                                <div className="slot-reel-anim" style={{ display: 'flex', flexDirection: 'column', gap: '15px', position: 'absolute' }}>
+                                  <div style={{ fontSize: '24px', textAlign: 'center' }}>🧠</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>通感联结中...</div>
+                                  <div style={{ fontSize: '24px', textAlign: 'center' }}>💡</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>灵感抽取中...</div>
+                                  <div style={{ fontSize: '24px', textAlign: 'center' }}>✨</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>记忆重组中...</div>
+                                  <div style={{ fontSize: '24px', textAlign: 'center' }}>🧭</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>追踪锚定中...</div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 2. 如果已停止，且该位置存在卡片
+                          if (isResolved && card) {
+                            return (
+                              <div key={idx} className={`glass-panel ${isForgotten ? 'flame-effect' : ''}`} style={{ 
+                                height: '240px', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                justifyContent: 'space-between',
+                                padding: '16px',
+                                background: 'var(--bg-surface)',
+                                borderColor: isForgotten ? 'var(--error)' : 'var(--border-color)',
+                                transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                opacity: isReviewed && !isForgotten ? 0.6 : 1,
+                                transform: isReviewed && !isForgotten ? 'scale(0.97)' : 'scale(1)',
+                                zIndex: 1
+                              }}>
+                                {/* 封面、来源和标题 */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {card.podcast_image_url ? (
+                                      <img src={card.podcast_image_url} alt="cover" style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} />
+                                    ) : (
+                                      <span>🎙️</span>
+                                    )}
+                                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.podcast_name}</span>
+                                  </div>
+                                  <h4 style={{ fontSize: '13px', fontWeight: '750', color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.spark_title}</h4>
+                                  <p style={{ 
+                                    fontSize: '11.5px', 
+                                    color: 'var(--text-secondary)', 
+                                    margin: 0,
+                                    lineHeight: '1.5',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: '4',
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    fontStyle: 'italic'
+                                  }}>
+                                    "{card.quote}"
+                                  </p>
+                                </div>
+
+                                {/* 命运滑块或操作Badge */}
+                                <div>
+                                  {!isReviewed ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
+                                        <span>👈 我已驯服它</span>
+                                        <span>糟糕忘了 👉</span>
+                                      </div>
+                                      <input 
+                                        type="range"
+                                        min="-100"
+                                        max="100"
+                                        defaultValue="0"
+                                        className="glass-slider"
+                                        style={{ width: '100%', cursor: 'ew-resize' }}
+                                        onMouseUp={(e) => {
+                                          const val = parseInt(e.target.value);
+                                          if (val <= -70) {
+                                            handleReviewCard(card.id, 'left');
+                                          } else if (val >= 70) {
+                                            handleReviewCard(card.id, 'right');
+                                          } else {
+                                            e.target.value = 0;
+                                          }
+                                        }}
+                                        onTouchEnd={(e) => {
+                                          const val = parseInt(e.target.value);
+                                          if (val <= -70) {
+                                            handleReviewCard(card.id, 'left');
+                                          } else if (val >= 70) {
+                                            handleReviewCard(card.id, 'right');
+                                          } else {
+                                            e.target.value = 0;
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'center', 
+                                      alignItems: 'center', 
+                                      padding: '6px 10px', 
+                                      borderRadius: '6px',
+                                      background: isForgotten ? 'rgba(247, 118, 142, 0.15)' : 'rgba(115, 218, 202, 0.15)',
+                                      color: isForgotten ? '#f7768e' : '#73daca',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      marginTop: '10px',
+                                      border: isForgotten ? '1px solid rgba(247, 118, 142, 0.3)' : '1px solid rgba(115, 218, 202, 0.3)',
+                                    }}>
+                                      {isForgotten ? '🔥 遗忘！稍后通知二次复习' : '✅ 已驯服！已推迟下次唤醒'}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 3. 初始或空状态 (Idle)
+                          return (
+                            <div key={idx} className="glass-panel" style={{ 
+                              height: '240px', 
+                              display: 'flex', 
+                              flexDirection: 'column',
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              background: 'rgba(0,0,0,0.2)',
+                              borderStyle: 'dashed',
+                              borderColor: 'var(--border-color)',
+                              color: 'var(--text-muted)',
+                              transition: 'all 0.3s',
+                              zIndex: 1
+                            }}>
+                              <span style={{ fontSize: '32px', opacity: 0.15, fontWeight: '800' }}>?</span>
+                              <span style={{ fontSize: '10px', marginTop: '8px', color: 'var(--text-muted)' }}>卡牌槽 {idx + 1} 已就绪</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: The Physical Lever */}
+                  <div 
+                    onClick={triggerLeverPull}
+                    style={{
+                      width: '60px',
+                      height: '220px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      position: 'relative',
+                      cursor: isSpinning ? 'not-allowed' : 'pointer',
+                      userSelect: 'none',
+                      flexShrink: 0
+                    }}
+                  >
+                    {/* Lever Slot Box */}
+                    <div style={{
+                      width: '28px',
+                      height: '70px',
+                      background: '#121218',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '6px',
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '16px',
+                      boxShadow: 'inset 0 4px 8px rgba(0,0,0,0.8)'
+                    }} />
+                    
+                    {/* Lever Rod (The Metal Pole) */}
+                    <div style={{
+                      width: '8px',
+                      height: '100px',
+                      background: 'linear-gradient(90deg, #777 0%, #ddd 50%, #555 100%)',
+                      borderRadius: '4px',
+                      position: 'absolute',
+                      bottom: '40px',
+                      left: '26px',
+                      transformOrigin: 'bottom center',
+                      transform: leverActive ? 'rotateX(70deg) scaleY(0.4) translateY(35px)' : 'rotateX(0deg) scaleY(1) translateY(0)',
+                      transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                      zIndex: 2,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                    }}>
+                      {/* Red Glowing Knob */}
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 8px 8px, #ff4d4d, #990000)',
+                        position: 'absolute',
+                        top: '-22px',
+                        left: '-10px',
+                        boxShadow: isSpinning ? '0 0 8px rgba(255, 77, 77, 0.4)' : '0 4px 10px rgba(255, 77, 77, 0.6), 0 0 15px rgba(255, 77, 77, 0.2)',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                      }} />
+                    </div>
+
+                    {/* Pivot joint decoration */}
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #555, #222)',
+                      border: '2px solid #888',
+                      position: 'absolute',
+                      bottom: '32px',
+                      left: '22px',
+                      zIndex: 3
+                    }} />
+                  </div>
                 </div>
               </div>
 
@@ -3038,10 +3206,15 @@ export default function App() {
                   style={{ 
                     position: 'relative', 
                     width: '100%', 
-                    background: 'rgba(0, 0, 0, 0.15)',
-                    borderRadius: 'var(--radius-md)',
-                    minHeight: '400px',
-                    padding: '24px 20px'
+                    backgroundColor: 'rgba(10, 10, 15, 0.25)',
+                    backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px)',
+                    backgroundSize: '24px 24px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-lg)',
+                    minHeight: '450px',
+                    padding: '32px 24px',
+                    boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.4)',
+                    overflow: 'hidden'
                   }}
                 >
                   {/* SVG 画布层 */}
@@ -3079,9 +3252,10 @@ export default function App() {
                             stroke={isHovered ? (path.isGold ? 'url(#gold-neon)' : '#73daca') : (path.isGold ? 'rgba(224, 175, 104, 0.25)' : 'rgba(122, 162, 247, 0.12)')} 
                             strokeWidth={isHovered ? 3.5 : 1.5}
                             filter={isHovered ? 'url(#glow)' : 'none'}
+                            className={isHovered ? "flow-path" : ""}
                             style={{ 
                               transition: 'stroke 0.3s, stroke-width 0.3s, filter 0.3s',
-                              strokeDasharray: path.isGold ? '5,5' : 'none'
+                              strokeDasharray: !isHovered && path.isGold ? '5,5' : 'none'
                             }}
                           />
                           {isHovered && path.synthesis && (
@@ -3490,7 +3664,38 @@ export default function App() {
                                 })()}
                               </span>
                             </div>
-                            <div className="dialogue-text" style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: '1.6', wordBreak: 'break-all' }}>{para.content}</div>
+                            <div className="dialogue-text" style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: '1.6', wordBreak: 'break-all' }}>
+                              {para.sentences && para.sentences.length > 0 ? (
+                                para.sentences.map((sentence, sIdx) => {
+                                  const isPlayingSentence = currentTime >= sentence.start && currentTime <= sentence.end;
+                                  return (
+                                    <span 
+                                      key={sIdx}
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // Avoid triggering parent div onClick
+                                        handleTimeJump(sentence.start);
+                                      }}
+                                      className={`sentence-span ${isPlayingSentence ? 'active-sentence' : ''}`}
+                                      style={{
+                                        cursor: 'pointer',
+                                        padding: '1px 3px',
+                                        borderRadius: '4px',
+                                        background: isPlayingSentence ? 'rgba(122, 162, 247, 0.22)' : 'transparent',
+                                        color: isPlayingSentence ? 'var(--primary)' : 'inherit',
+                                        transition: 'background 0.2s, color 0.2s',
+                                        marginRight: '4px',
+                                        display: 'inline',
+                                      }}
+                                      title={`跳转播放 [${Math.floor(sentence.start)}s]`}
+                                    >
+                                      {sentence.text}
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                para.content
+                              )}
+                            </div>
                             
                             {/* 一键沉淀星号图标 (鼠标 Hover 时显现) */}
                             <button
@@ -3813,7 +4018,7 @@ export default function App() {
 
           {/* ==================== PANEL 3: CONFIG FORM ==================== */}
           {activeTab === 'config' && (
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', maxWidth: '1200px' }}>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%' }}>
 
               {/* ── Left Sidebar Navigation ── */}
               <div style={{
@@ -3832,7 +4037,7 @@ export default function App() {
                 borderRadius: 'var(--radius-md)',
                 padding: '16px',
                 boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.7)',
-                minHeight: '540px'
+                minHeight: '400px'
               }}>
                 <div style={{
                   fontSize: '11px',
@@ -3878,53 +4083,62 @@ export default function App() {
                     </div>
                   </button>
                 ))}
+              </div>
 
-                <div style={{ flexGrow: 1 }} />
+              {/* ── Right Content Panel ── */}
+              <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '24px', position: 'relative' }}>
+              <form id="settings-form" onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
 
-                {/* ── Auto-save status and control bar ── */}
+                {/* Horizontal Save & Auto-Save Control Bar */}
                 <div style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  paddingTop: '16px',
-                  borderTop: '1px solid var(--border-color)',
-                  marginTop: '16px'
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingBottom: '16px',
+                  borderBottom: '1px solid var(--border-color)',
+                  marginBottom: '10px',
+                  flexWrap: 'wrap',
+                  gap: '16px'
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-                    <input
-                      type="checkbox"
-                      checked={autoSaveEnabled}
-                      onChange={(e) => setAutoSaveEnabled(e.target.checked)}
-                      style={{ cursor: 'pointer', width: '15px', height: '15px' }}
-                    />
-                    <span>{t('auto_save_chk')}</span>
-                  </label>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '500', minHeight: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {configSubTab === 'general' && <>🎨外观与语言</>}
+                      {configSubTab === 'asr' && <>🎙️语音转录</>}
+                      {configSubTab === 'llm' && <>✨AI 总结</>}
+                      {configSubTab === 'notifications' && <>✉️消息通知</>}
+                    </h3>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={autoSaveEnabled}
+                        onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <span>{t('auto_save_chk')}</span>
+                    </label>
+
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '500', minHeight: '16px', display: 'inline-block' }}>
                       {saveStatus === 'saving' && t('save_status_saving')}
                       {saveStatus === 'saved' && t('save_status_saved')}
                       {saveStatus === 'unsaved' && (autoSaveEnabled ? t('save_status_unsaved') : t('save_status_unsaved_manual'))}
                       {saveStatus === 'error' && t('save_status_error')}
-                      {saveStatus === 'idle' && t('save_status_idle')}
                     </span>
+
                     {!autoSaveEnabled && (
                       <button 
                         type="submit" 
                         form="settings-form"
                         className="btn-glow" 
-                        style={{ width: '100%', padding: '8px 16px', fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                        style={{ padding: '6px 16px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
                         <Icons.Check /> {t('save_btn')}
                       </button>
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* ── Right Content Panel ── */}
-              <div className="glass-panel" style={{ flex: 1, minWidth: 0, padding: '24px', position: 'relative' }}>
-              <form id="settings-form" onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
 
                 {/* 0. 外观与语言设置 (Appearance & Language Settings) */}
                 {configSubTab === 'general' && (

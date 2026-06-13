@@ -655,8 +655,10 @@ def get_task_details(task_id: str):
     if task.get("status") == "completed":
         try:
             paragraphs = db.get_paragraphs_by_podcast(task_id)
-            if not paragraphs and task.get("transcript"):
+            is_old_format = paragraphs and len(paragraphs) > 0 and ("sentences" not in paragraphs[0] or not isinstance(paragraphs[0].get("sentences"), list))
+            if (not paragraphs or is_old_format) and task.get("transcript"):
                 paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, task.get("transcript"))
+                db.delete_paragraphs_by_podcast(task_id)
                 db.add_paragraphs(paragraphs)
             
             # Check sedimented status
@@ -1114,14 +1116,16 @@ def call_llm(prompt: str) -> str:
 @app.get("/api/paragraphs")
 def get_paragraphs(podcast_id: str):
     paragraphs = db.get_paragraphs_by_podcast(podcast_id)
-    if not paragraphs:
+    is_old_format = paragraphs and len(paragraphs) > 0 and ("sentences" not in paragraphs[0] or not isinstance(paragraphs[0].get("sentences"), list))
+    if not paragraphs or is_old_format:
         # Check if task exists and has a transcript
         task = db.get_task(podcast_id)
         if not task or not task.get("transcript"):
             return []
         try:
-            print(f"🔄 [LOG] 为老任务 {podcast_id} 动态生成语义段落...")
+            print(f"🔄 [LOG] 为老任务 {podcast_id} 动态生成（或重新生成）语义段落...")
             paragraphs = transcriber.cluster_segments_to_paragraphs(podcast_id, task.get("transcript"))
+            db.delete_paragraphs_by_podcast(podcast_id)
             db.add_paragraphs(paragraphs)
         except Exception as e:
             print(f"❌ [LOG ERROR] 动态生成段落失败: {e}")

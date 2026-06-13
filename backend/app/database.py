@@ -148,6 +148,13 @@ class LocalDatabase:
             data = self._read_data()
             return [p for p in data.get("paragraphs", []) if p.get("podcast_id") == podcast_id]
 
+    def delete_paragraphs_by_podcast(self, podcast_id: str):
+        with self.lock:
+            data = self._read_data()
+            if "paragraphs" in data:
+                data["paragraphs"] = [p for p in data["paragraphs"] if p.get("podcast_id") != podcast_id]
+                self._write_data(data)
+
     def add_paragraphs(self, paragraphs: list[dict]):
         with self.lock:
             data = self._read_data()

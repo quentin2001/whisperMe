@@ -425,41 +425,82 @@ class PodcastTranscriber:
         if not segments:
             return []
         
-        # 1. 规则层 (Rule-based clustering)
+        # 1. 规则层 (Rule-based clustering with length constraints)
         clustered = []
         current_cluster = {
-            "speaker": segments[0]["speaker"],
-            "texts": [segments[0]["text"]],
-            "start": segments[0]["start"],
-            "end": segments[0]["end"]
+            "speaker": segments[0].get("speaker", "UNKNOWN_SPEAKER"),
+            "texts": [segments[0].get("text", "")],
+            "start": segments[0].get("start", 0.0),
+            "end": segments[0].get("end", 0.0),
+            "segments": [segments[0]]
         }
         
+        sentence_endings = {"。", "！", "？", ".", "!", "?", "”", "\"", "」", "；", ";"}
+        
         for seg in segments[1:]:
-            # 若前后两条文本属于同一个说话人，且时间间隔小于 1.2 秒，则拼接
-            if seg["speaker"] == current_cluster["speaker"] and (seg["start"] - current_cluster["end"] < 1.2):
-                current_cluster["texts"].append(seg["text"])
-                current_cluster["end"] = seg["end"]
+            seg_speaker = seg.get("speaker", "UNKNOWN_SPEAKER")
+            seg_text = seg.get("text", "")
+            seg_start = seg.get("start", 0.0)
+            seg_end = seg.get("end", 0.0)
+            
+            # Calculate current cumulative character length
+            current_len = sum(len(t) for t in current_cluster["texts"])
+            
+            # Check if we should split the paragraph
+            should_split = False
+            
+            # Condition 1: Speaker changed
+            if seg_speaker != current_cluster["speaker"]:
+                should_split = True
+            # Condition 2: Time gap between segments is too large (>= 1.2 seconds)
+            elif (seg_start - current_cluster["end"]) >= 1.2:
+                should_split = True
+            # Condition 3: Paragraph is already long, split on next sentence ending
+            elif current_len >= 220:
+                last_text = current_cluster["texts"][-1].strip()
+                if last_text and last_text[-1] in sentence_endings:
+                    should_split = True
+                # Condition 4: Hard limit to prevent extremely long paragraphs
+                elif current_len >= 320:
+                    should_split = True
+            
+            if not should_split:
+                current_cluster["texts"].append(seg_text)
+                current_cluster["end"] = seg_end
+                current_cluster["segments"].append(seg)
             else:
                 clustered.append(current_cluster)
                 current_cluster = {
-                    "speaker": seg["speaker"],
-                    "texts": [seg["text"]],
-                    "start": seg["start"],
-                    "end": seg["end"]
+                    "speaker": seg_speaker,
+                    "texts": [seg_text],
+                    "start": seg_start,
+                    "end": seg_end,
+                    "segments": [seg]
                 }
         clustered.append(current_cluster)
         
-        # Convert texts to a single string
+        # Convert texts to a single string and retain sentence list
         paragraphs = []
         for idx, cl in enumerate(clustered):
             raw_content = "".join(cl["texts"]) if any(ord(c) > 127 for c in "".join(cl["texts"])) else " ".join(cl["texts"])
+            
+            # Build list of original sentences
+            sentences_list = []
+            for s in cl["segments"]:
+                sentences_list.append({
+                    "text": s.get("text", ""),
+                    "start": round(s.get("start", 0.0), 2),
+                    "end": round(s.get("end", 0.0), 2)
+                })
+                
             paragraphs.append({
                 "id": f"{podcast_id}-p{idx}",
                 "podcast_id": podcast_id,
                 "speaker": cl["speaker"],
                 "content": raw_content.strip(),
                 "start_time": round(cl["start"], 2),
-                "end_time": round(cl["end"], 2)
+                "end_time": round(cl["end"], 2),
+                "sentences": sentences_list
             })
             
         # 2. LLM 语义缝合 (Optional LLM Sewing)

@@ -588,3 +588,34 @@ body {
   100% { transform: scale(1); opacity: 0; }
 }
 
+/* 句子微高亮悬停效果 */
+.sentence-span {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sentence-span:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-primary) !important;
+}
+
+/* 认知时间轴画布流光动效 */
+@keyframes flow-line {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.flow-path {
+  stroke-dasharray: 6, 6;
+  animation: flow-line 1s linear infinite;
+}
+
+/* 老虎机亮灯闪烁效果 */
+@keyframes slot-blink {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 12px var(--primary); }
+}
+
+.slot-bulb {
+  animation: slot-blink 1.2s infinite ease-in-out;
+}
+
