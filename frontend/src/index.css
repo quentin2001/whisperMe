@@ -652,4 +652,357 @@ body {
   background: var(--accent);
 }
 
+/* ==================== 🎰 老虎机物理机箱仿真样式 ==================== */
+
+/* 老虎机仿物理机箱 */
+.slot-cabinet {
+  background: #1a1c23;
+  border: 8px double #d4af37; /* 双轨纯金色金属外框 */
+  border-radius: 28px;
+  padding: 24px 28px;
+  box-shadow: 
+    0 30px 70px rgba(0, 0, 0, 0.9),
+    inset 0 4px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.75),
+    0 0 35px rgba(212, 175, 55, 0.2);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 侧边木纹饰板 3D 视觉深度 */
+.slot-cabinet::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: -14px;
+  right: -14px;
+  background: linear-gradient(90deg, #5c2f16 0%, #291105 25%, transparent 25%, transparent 75%, #291105 75%, #5c2f16 100%);
+  z-index: -1;
+  border-radius: 14px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+}
+
+/* 顶部警灯/警报器 */
+.slot-siren {
+  position: absolute;
+  top: -38px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 38px;
+  background: radial-gradient(circle at 50% 25%, #ff4d4d 20%, #b30000 60%, #660000 100%);
+  border: 3.5px solid #d1d5db; /* 铬合金金属底座 */
+  border-bottom: none;
+  border-radius: 30px 30px 0 0;
+  box-shadow: 
+    inset 0 4px 8px rgba(255, 255, 255, 0.5),
+    0 -3px 15px rgba(255, 77, 77, 0.4);
+  z-index: 100;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slot-siren::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -8px;
+  right: -8px;
+  height: 6px;
+  background: linear-gradient(90deg, #9ca3af 0%, #f3f4f6 50%, #4b5563 100%);
+  border: 1px solid #4b5563;
+  border-radius: 2px;
+}
+
+.slot-siren.flashing {
+  animation: siren-alert 0.3s infinite alternate ease-in-out;
+}
+
+@keyframes siren-alert {
+  0% { 
+    background: radial-gradient(circle at 50% 25%, #ff8888 20%, #ef4444 60%, #990000 100%);
+    box-shadow: 
+      inset 0 4px 8px rgba(255, 255, 255, 0.6),
+      0 0 35px #ef4444, 
+      0 0 70px rgba(239, 68, 68, 0.7);
+    transform: translateX(-50%) scale(1.05);
+  }
+  100% { 
+    background: radial-gradient(circle at 50% 25%, #cc0000 20%, #7f1d1d 70%, #4a0404 100%);
+    box-shadow: 
+      inset 0 2px 4px rgba(255, 255, 255, 0.15),
+      0 0 10px rgba(239, 68, 68, 0.15);
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* 霓虹招牌 */
+.slot-marquee {
+  background: linear-gradient(180deg, #18152b 0%, #080612 100%);
+  border: 3.5px solid #ffd700;
+  border-radius: 12px 12px 6px 6px;
+  padding: 12px 16px;
+  text-align: center;
+  box-shadow: 
+    inset 0 0 15px rgba(255, 215, 0, 0.35),
+    0 5px 15px rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.slot-marquee::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.12), transparent 75%);
+  pointer-events: none;
+}
+
+.slot-marquee-title {
+  font-family: 'Impact', 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #fff;
+  text-transform: uppercase;
+  text-shadow: 
+    0 0 6px #fff,
+    0 0 12px #ffd700,
+    0 0 22px #ff8800,
+    0 0 45px #ff3300;
+  margin: 0;
+  animation: text-glow-pulse 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes text-glow-pulse {
+  0% { filter: brightness(1) contrast(1); }
+  100% { filter: brightness(1.2) contrast(1.1); text-shadow: 0 0 8px #fff, 0 0 15px #ffd700, 0 0 30px #ffaa00, 0 0 60px #ff3300; }
+}
+
+/* 按钮控制台/操作台面 */
+.slot-deck {
+  background: linear-gradient(180deg, #2a2e37 0%, #15181d 100%);
+  border: 3px solid #3d4351;
+  border-top: 4px solid #5a6275; /* 突出操作台顶面边缘 */
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 
+    inset 0 2px 4px rgba(255, 255, 255, 0.1),
+    0 8px 20px rgba(0, 0, 0, 0.7);
+  margin-top: 8px;
+  position: relative;
+}
+
+/* 3D 物理圆按钮 */
+.slot-btn-glossy {
+  background: radial-gradient(circle at 50% 30%, #ef4444 0%, #991b1b 100%);
+  border: 2px solid #fca5a5;
+  border-radius: 50%;
+  width: 54px;
+  height: 54px;
+  color: #fff;
+  font-family: 'Impact', 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 
+    0 0 0 3.5px #4b5563, /* 金属电镀外圈 */
+    0 5px 0 #7f1d1d, /* 3D按钮高度 */
+    0 8px 12px rgba(0, 0, 0, 0.65);
+  transition: all 0.1s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.slot-btn-glossy:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.slot-btn-glossy:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 
+    0 0 0 3.5px #4b5563,
+    0 2px 0 #7f1d1d,
+    0 4px 6px rgba(0, 0, 0, 0.6);
+}
+
+.slot-btn-glossy.btn-blue {
+  background: radial-gradient(circle at 50% 30%, #3b82f6 0%, #1d4ed8 100%);
+  border-color: #93c5fd;
+  box-shadow: 
+    0 0 0 3.5px #4b5563,
+    0 5px 0 #1e3a8a,
+    0 8px 12px rgba(0, 0, 0, 0.65);
+}
+
+.slot-btn-glossy.btn-blue:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 
+    0 0 0 3.5px #4b5563,
+    0 2px 0 #1e3a8a,
+    0 4px 6px rgba(0, 0, 0, 0.6);
+}
+
+.slot-btn-glossy:disabled {
+  background: radial-gradient(circle at 50% 30%, #4b5563 0%, #2d3748 100%);
+  border-color: #94a3b8;
+  box-shadow: 
+    0 0 0 3.5px #4b5563,
+    0 1px 0 #1e293b,
+    0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: not-allowed;
+  transform: translateY(3px);
+  filter: opacity(0.65) grayscale(0.5);
+}
+
+/* 仿真投币孔 */
+.coin-slot {
+  width: 54px;
+  height: 40px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 3.5px solid #475569; /* 磨砂钢质面板 */
+  border-radius: 8px;
+  position: relative;
+  box-shadow: 
+    inset 0 3px 6px rgba(0, 0, 0, 0.95),
+    0 1px 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.coin-slot::after {
+  content: '';
+  width: 4px;
+  height: 22px;
+  background: #000;
+  border-radius: 1px;
+  box-shadow: 0 0 5px rgba(249, 115, 22, 0.5); /* 投币缝隙微弱橙光 */
+}
+
+.coin-slot-label {
+  font-size: 6px;
+  font-weight: 900;
+  color: #f97316;
+  text-shadow: 0 0 4px #ea580c;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  animation: neon-blink 2.5s infinite;
+}
+
+@keyframes neon-blink {
+  0%, 88%, 93%, 100% { opacity: 1; }
+  90%, 95% { opacity: 0.3; }
+}
+
+/* 掉币口/出币盘 */
+.slot-tray {
+  height: 48px;
+  background: linear-gradient(180deg, #070a0f 0%, #151b26 100%);
+  border: 3.5px solid #334155;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 
+    inset 0 8px 16px rgba(0, 0, 0, 0.95),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  margin-top: 4px;
+}
+
+.slot-tray-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 8px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-weight: 800;
+  position: absolute;
+  top: 4px;
+}
+
+/* 实体仿真金币堆 */
+.coin-pile {
+  display: flex;
+  gap: 2px;
+  position: absolute;
+  bottom: 2px;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.gold-coin {
+  width: 16px;
+  height: 16px;
+  background: radial-gradient(circle at 4px 4px, #ffe066 10%, #d4af37 60%, #8c6b2d 100%);
+  border: 1px solid #aa8010;
+  border-radius: 50%;
+  box-shadow: 
+    0 2.5px 3px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  display: inline-block;
+  position: relative;
+}
+
+.gold-coin:nth-child(even) {
+  transform: translateY(-2px) rotate(12deg);
+  margin-left: -5px;
+}
+
+.gold-coin:nth-child(3n) {
+  transform: translateY(-1px) rotate(-8deg);
+  margin-left: -3px;
+}
+
+/* 纸带卡片物理卷轴效果 */
+.paper-reel-strip {
+  background: linear-gradient(180deg, #bbbbbb 0%, #fcfcfc 14%, #ffffff 50%, #fcfcfc 86%, #bbbbbb 100%);
+  border-left: 2px solid #ccc;
+  border-right: 2px solid #ccc;
+  box-shadow: 
+    inset 0 24px 24px -8px rgba(0, 0, 0, 0.8),
+    inset 0 -24px 24px -8px rgba(0, 0, 0, 0.8),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 滚轮高速旋转 */
+@keyframes reel-spin-fast {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.reel-spinning-strip {
+  animation: reel-spin-fast 0.12s infinite linear;
+}
+
+/* 滚轮停止时物理回弹 */
+@keyframes reel-bounce {
+  0% { transform: translateY(-40px); }
+  40% { transform: translateY(14px); }
+  65% { transform: translateY(-7px); }
+  85% { transform: translateY(3px); }
+  100% { transform: translateY(0); }
+}
+
+.reel-stop-bounce {
+  animation: reel-bounce 0.6s cubic-bezier(0.25, 0.65, 0.5, 1) forwards;
+}
+
+
+
 
