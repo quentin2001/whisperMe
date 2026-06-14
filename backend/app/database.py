@@ -63,6 +63,8 @@ class LocalDatabase:
                     "comment_count": t.get("metadata", {}).get("comment_count", 0),
                     "obsidian_synced": t.get("obsidian_synced", False),
                     "image_url": t.get("image_url", ""),
+                    "restoring": t.get("restoring", False),
+                    "restore_progress": t.get("restore_progress", 0),
                     "metadata": {
                         "pub_date": t.get("metadata", {}).get("pub_date", ""),
                         "source": t.get("metadata", {}).get("source", "")

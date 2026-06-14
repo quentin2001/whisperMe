@@ -934,11 +934,18 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
     if os.path.exists(local_file_path):
         return {"success": True, "message": "音频文件已存在，无需重新下载"}
         
+    # 在数据库中初始化修复状态和进度
+    db.update_task(task_id, restoring=True, restore_progress=0.0)
+        
     # 启动后台任务进行下载修复
     def do_redownload():
         try:
             print(f"📥 [LOG] 启动后台音频修复重新下载, 原始链接: {task['url']}")
-            local_path, metadata = downloader.download_url_audio(task['url'])
+            
+            def restore_progress_callback(percent):
+                db.update_task(task_id, restore_progress=round(percent, 1))
+                
+            local_path, metadata = downloader.download_url_audio(task['url'], progress_callback=restore_progress_callback)
             
             # 如果下载后的文件名和数据库记录的不一致，则将其重命名
             downloaded_filename = os.path.basename(local_path)
@@ -947,8 +954,10 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
                 expected_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
                 shutil.move(downloaded_expected_path, expected_path)
             print(f"✅ [LOG] 音频文件修复重新下载成功: {filename}")
+            db.update_task(task_id, restoring=False, restore_progress=100.0)
         except Exception as e:
             print(f"❌ [LOG] 音频文件修复重新下载失败: {e}")
+            db.update_task(task_id, restoring=False, restore_progress=0.0)
             
     background_tasks.add_task(do_redownload)
     return {"success": True, "message": "已在后台启动音频文件下载修复"}

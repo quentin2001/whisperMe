@@ -1147,6 +1147,7 @@ body {
   border: 2px solid rgba(255, 235, 122, 0.4);
   pointer-events: none;
   z-index: 10;
+  background: none !important;
 }
 
 .gold-theme-cabinet::after {

@@ -1136,6 +1136,10 @@ export default function App() {
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const audioPlayerRef = useRef(null);
   const activeBubbleRef = useRef(null);
+  const activeTaskRef = useRef(null);
+  useEffect(() => {
+    activeTaskRef.current = activeTask;
+  }, [activeTask]);
 
   // 可拖拽的分栏布局状态
   const [leftWidth, setLeftWidth] = useState(55); // 初始左侧占比百分比
@@ -1408,9 +1412,10 @@ export default function App() {
     setIsRedownloading(false);
     if (activeTaskId) {
       fetchTaskDetail(activeTaskId);
-      // 开启专属的详情轮询，如果任务正在执行中
+      // 开启专属的详情轮询，如果任务正在执行中或正在修复中
       const detailInterval = setInterval(() => {
-        if (activeTask && (activeTask.status === 'downloading' || activeTask.status === 'transcribing' || activeTask.status === 'summarizing')) {
+        const t = activeTaskRef.current;
+        if (t && (t.status === 'downloading' || t.status === 'transcribing' || t.status === 'summarizing' || t.restoring)) {
           fetchTaskDetail(activeTaskId, true);
         }
       }, 3000);
@@ -1419,6 +1424,23 @@ export default function App() {
       setActiveTask(null);
     }
   }, [activeTaskId]);
+
+  // 3.1 监听修复状态完成，触发重新载入音频播放器
+  useEffect(() => {
+    if (activeTask && !activeTask.restoring && activeTask.restore_progress === 100.0) {
+      fetch(`${BACKEND_URL}${activeTask.audio_url}`, { method: 'HEAD' })
+        .then(res => {
+          if (res.status === 200) {
+            setIsAudioMissing(false);
+            setIsRedownloading(false);
+            if (audioPlayerRef.current) {
+              audioPlayerRef.current.load();
+            }
+          }
+        })
+        .catch(err => console.error("HEAD check failed for audio URL", err));
+    }
+  }, [activeTask]);
 
   // 4. 切换到配置页时动态刷新配置参数，避免组件挂载时后端未就绪导致显示为空
   useEffect(() => {
@@ -3153,7 +3175,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {isAudioMissing && (
+                {(isAudioMissing || activeTask.restoring) && (
                   <div style={{
                     padding: '10px 20px',
                     background: 'rgba(239, 68, 68, 0.15)',
@@ -3173,7 +3195,7 @@ export default function App() {
                     </div>
                     <button 
                       onClick={() => handleRestoreAudio(activeTask.id)}
-                      disabled={isRedownloading}
+                      disabled={isRedownloading || activeTask.restoring}
                       style={{
                         background: 'rgba(239, 68, 68, 0.25)',
                         border: '1px solid #f87171',
@@ -3181,18 +3203,18 @@ export default function App() {
                         padding: '4px 10px',
                         borderRadius: '4px',
                         fontSize: '12px',
-                        cursor: isRedownloading ? 'not-allowed' : 'pointer',
+                        cursor: (isRedownloading || activeTask.restoring) ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px'
                       }}
-                      onMouseEnter={(e) => { if(!isRedownloading) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)'; }}
-                      onMouseLeave={(e) => { if(!isRedownloading) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'; }}
+                      onMouseEnter={(e) => { if(!(isRedownloading || activeTask.restoring)) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)'; }}
+                      onMouseLeave={(e) => { if(!(isRedownloading || activeTask.restoring)) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'; }}
                     >
-                      {isRedownloading ? (
+                      {(isRedownloading || activeTask.restoring) ? (
                         <>
-                          正在下载修复...
+                          正在下载修复 {activeTask.restore_progress !== undefined ? Math.round(activeTask.restore_progress) : 0}%
                         </>
                       ) : '[点击重新下载修复]'}
                     </button>
