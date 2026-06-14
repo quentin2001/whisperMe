@@ -850,6 +850,8 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
     targetParagraphIdRef.current = card.paragraph_id;
   };
 
+  const isSynthesis = !!card.is_synthesis;
+
   return (
     <div 
       id={`card-${card.id}`}
@@ -862,7 +864,9 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         cursor: 'pointer',
         opacity: shouldDim ? 0.35 : 1,
         transform: isHoveredSelf ? 'scale(1.03) translateY(-4px)' : 'scale(1) translateY(0)',
-        boxShadow: isHoveredSelf ? '0 12px 30px rgba(0, 0, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
+        boxShadow: isSynthesis
+          ? (isHoveredSelf ? '0 12px 30px rgba(212, 175, 55, 0.45)' : '0 4px 15px rgba(212, 175, 55, 0.15)')
+          : (isHoveredSelf ? '0 12px 30px rgba(0, 0, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.15)'),
         transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
         zIndex: isHoveredSelf ? 2 : 1
       }}
@@ -872,56 +876,60 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         {/* 卡牌正面 */}
         <div className="flip-card-front glass-panel" style={{
           padding: '16px',
-          background: 'var(--bg-surface)',
+          background: isSynthesis ? 'linear-gradient(135deg, rgba(38, 30, 10, 0.95) 0%, rgba(13, 10, 3, 0.98) 100%)' : 'var(--bg-surface)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          border: '1px solid var(--border-color)',
+          border: isSynthesis ? '2px solid #ffd700' : '1px solid var(--border-color)',
           height: '100%'
         }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '80%' }}>
-              {card.podcast_image_url ? (
+              {isSynthesis ? (
+                <span style={{ fontSize: '16px', filter: 'drop-shadow(0 0 4px #ffd700)' }}>💥</span>
+              ) : card.podcast_image_url ? (
                 <img src={card.podcast_image_url} alt="cover" style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontSize: '14px' }}>🎙️</span>
               )}
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: '11px', color: isSynthesis ? '#ffd700' : 'var(--text-secondary)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {card.podcast_name}
               </span>
             </div>
             
-            {/* 🧭 溯源锚点 */}
-            <button
-              onClick={handleAnchorClick}
-              className="btn-ghost"
-              style={{
-                padding: '4px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                color: 'var(--primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                transition: 'transform 0.2s'
-              }}
-              title="🧭 跳转到播客原点播放"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
-            </button>
+            {/* 🧭 溯源锚点（合成卡片不需要此锚点） */}
+            {!isSynthesis && (
+              <button
+                onClick={handleAnchorClick}
+                className="btn-ghost"
+                style={{
+                  padding: '4px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'transform 0.2s'
+                }}
+                title="🧭 跳转到播客原点播放"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+              </button>
+            )}
           </div>
 
           {/* Body */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'center', overflow: 'hidden' }}>
-            <h4 style={{ fontSize: '13.5px', fontWeight: '750', color: 'var(--text-primary)', margin: 0, lineBreak: 'anywhere', lineHeight: '1.4' }}>
+            <h4 style={{ fontSize: '13.5px', fontWeight: '750', color: isSynthesis ? '#fff' : 'var(--text-primary)', margin: 0, lineBreak: 'anywhere', lineHeight: '1.4' }}>
               {card.spark_title}
             </h4>
             <p style={{
               fontSize: '11.5px',
-              color: 'var(--text-secondary)',
+              color: isSynthesis ? 'rgba(255, 255, 255, 0.75)' : 'var(--text-secondary)',
               margin: 0,
               lineHeight: '1.5',
               fontStyle: 'italic',
@@ -935,13 +943,13 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
           </div>
 
           {/* Footer (Metadata indicator) */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '9px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '6px' }}>
-            <span>E-Factor: {card.efactor?.toFixed(1)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '9px', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
+            <span>{isSynthesis ? 'Synthesis Card' : `E-Factor: ${card.efactor?.toFixed(1)}`}</span>
             <span style={{
-              color: card.status === 'warning' ? 'var(--error)' : 'var(--success)',
-              fontWeight: '600'
+              color: isSynthesis ? '#ffd700' : (card.status === 'warning' ? 'var(--error)' : 'var(--success)'),
+              fontWeight: '800'
             }}>
-              {card.status === 'warning' ? '🔥 警报' : '🟢 记忆稳固'}
+              {isSynthesis ? '✨ 灵感合题' : (card.status === 'warning' ? '🔥 警报' : '🟢 记忆稳固')}
             </span>
           </div>
         </div>
@@ -949,15 +957,30 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         {/* 卡牌背面 */}
         <div className="flip-card-back glass-panel" style={{
           padding: '18px',
-          background: 'var(--bg-surface-hover)',
+          background: isSynthesis ? 'linear-gradient(135deg, rgba(20, 15, 5, 0.98) 0%, rgba(5, 4, 1, 0.99) 100%)' : 'var(--bg-surface-hover)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          border: '1px solid var(--accent)',
+          border: isSynthesis ? '2px solid #ffd700' : '1px solid var(--accent)',
           height: '100%'
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', justifyContent: 'center' }}>
-            <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold', letterSpacing: '1px' }}>💡 AI 为何重要 (Why It Matters)</span>
+            {isSynthesis ? (
+              <>
+                <span style={{ fontSize: '10px', color: '#ffd700', fontWeight: 'bold', letterSpacing: '1px' }}>🔮 对撞脑洞来源 (Collision Source)</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                  <div style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={card.parent_titles?.[0]}>
+                    1️⃣ {card.parent_titles?.[0] || '观点 A'}
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={card.parent_titles?.[1]}>
+                    2️⃣ {card.parent_titles?.[1] || '观点 B'}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold', letterSpacing: '1px' }}>💡 AI 为何重要 (Why It Matters)</span>
+            )}
+            
             <p style={{
               fontSize: '12.5px',
               color: 'var(--text-primary)',
@@ -1045,6 +1068,8 @@ export default function App() {
   const [activeCollider, setActiveCollider] = useState(null);
   const [colliderSynthesis, setColliderSynthesis] = useState('');
   const [colliderLoading, setColliderLoading] = useState(false);
+  const [radarSurprise, setRadarSurprise] = useState(null);
+  const [radarScanning, setRadarScanning] = useState(false);
   
   const targetParagraphIdRef = useRef(null);
   const [hoveredCardId, setHoveredCardId] = useState(null);
@@ -1501,8 +1526,9 @@ export default function App() {
     try {
       // 1. 获取所有卡片
       const cardsRes = await fetch(`${BACKEND_URL}/api/cards`);
+      let cards = [];
       if (cardsRes.status === 200) {
-        const cards = await cardsRes.json();
+        cards = await cardsRes.json();
         setSandboxCards(cards);
       }
       
@@ -1518,6 +1544,11 @@ export default function App() {
       if (dueRes.status === 200) {
         const due = await dueRes.json();
         setDueCards(due);
+      }
+
+      // 4. 自动认知雷达：如果卡片数 >= 2，且当前没有雷达惊喜结果，在后台偷偷发起一次探测
+      if (cards.length >= 2 && !radarSurprise) {
+        triggerRadarScan();
       }
     } catch (err) {
       console.error("无法加载认知沙盒数据:", err);
@@ -1759,6 +1790,28 @@ export default function App() {
     }
   };
 
+  // 触发认知雷达扫描
+  const triggerRadarScan = async () => {
+    setRadarScanning(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/cards/collider`);
+      if (res.status === 200) {
+        const data = await res.json();
+        setRadarSurprise(data);
+      }
+    } catch (err) {
+      console.error("认知雷达巡航扫描失败:", err);
+    } finally {
+      setRadarScanning(false);
+    }
+  };
+
+  const handleTriggerRadarCollider = (surprise) => {
+    setActiveCollider(surprise);
+    setColliderSynthesis('');
+    setRadarSurprise(null); // 消耗掉该惊喜，以便下次对撞完重新扫描
+  };
+
   // 启动 AI 对撞机
   const handleOpenCollider = async () => {
     setColliderLoading(true);
@@ -1800,6 +1853,7 @@ export default function App() {
         showToast("💥 跨界观点成功对撞！金色的灵感连线已永久镌刻！");
         setActiveCollider(null);
         setColliderSynthesis('');
+        setRadarSurprise(null); // 清理缓存的惊喜，重新触发扫描
         fetchSandboxData();
       } else {
         showToast("❌ 保存对撞灵感失败");
@@ -2969,6 +3023,54 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              {/* 📡 智能认知雷达 (Inspiration Radar Scout) */}
+              {(radarScanning || radarSurprise) && (
+                <div style={{
+                  background: 'linear-gradient(90deg, rgba(224, 175, 104, 0.08) 0%, rgba(255, 158, 100, 0.12) 100%)',
+                  border: '1px dashed rgba(224, 175, 104, 0.4)',
+                  borderRadius: '12px',
+                  padding: '12px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(224, 175, 104, 0.05)',
+                  animation: radarSurprise ? 'pulse-glow 3s infinite' : 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '20px', display: 'inline-block', animation: radarScanning ? 'spin 2s linear infinite' : 'bounce-slow 2s infinite' }}>
+                      {radarScanning ? '📡' : '⚡'}
+                    </span>
+                    <div>
+                      <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#ffd700', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {radarScanning ? '认知雷达正在巡航探测深层思维共鸣...' : `认知雷达捕捉：跨界思维奇点已锁定！(异界张力: ${radarSurprise.dissonance_index}%)`}
+                      </h4>
+                      <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                        {radarScanning ? '雷达正在卡片盒中扫描无关联的灵感粒子...' : `系统发现：《${radarSurprise.card_a?.spark_title}》与《${radarSurprise.card_b?.spark_title}》底层映射极强。`}
+                      </p>
+                    </div>
+                  </div>
+                  {radarSurprise && (
+                    <button 
+                      onClick={() => handleTriggerRadarCollider(radarSurprise)}
+                      className="btn-glow" 
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '12px',
+                        background: 'linear-gradient(135deg, #ffd700, #ff9e64)',
+                        color: '#0d0d15',
+                        fontWeight: '800',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
+                      }}
+                    >
+                      💥 开启对撞惊喜
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* 网格画布包容器 */}
               <div 

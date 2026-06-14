@@ -88,6 +88,123 @@ class PodcastDownloader:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
+    def resolve_host_via_doh(self, host: str) -> str:
+        """
+        通过 DoH 查询主机的真实 A 记录 IP
+        """
+        if not host or host.replace('.', '').isdigit():
+            return host
+        
+        import urllib.request
+        import json
+        import ssl
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        # 优先通过 AliDNS 官方 DoH 接口获取
+        try:
+            doh_url = f"https://223.5.5.5/resolve?name={host}&type=A"
+            req = urllib.request.Request(doh_url, headers={"Host": "dns.alidns.com"})
+            with urllib.request.urlopen(req, context=ctx, timeout=4) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                for ans in res_data.get("Answer", []):
+                    if ans.get("type") == 1:
+                        return ans.get("data")
+        except Exception:
+            pass
+            
+        # 备用方案：通过 Google DoH 接口获取
+        try:
+            doh_url = f"https://8.8.8.8/resolve?name={host}&type=A"
+            req = urllib.request.Request(doh_url)
+            with urllib.request.urlopen(req, context=ctx, timeout=4) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                for ans in res_data.get("Answer", []):
+                    if ans.get("type") == 1:
+                        return ans.get("data")
+        except Exception:
+            pass
+            
+        return None
+
+    def resolve_redirects_via_doh(self, url: str, max_redirects: int = 5) -> str:
+        """
+        在 Python 中使用 DoH 绕过 Fake-IP 透明代理，手动追踪所有 HTTP 3xx 重定向，获取最终音频下载直链
+        """
+        import urllib.request
+        import urllib.parse
+        import ssl
+        import socket
+        
+        current_url = url
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+                
+        opener = urllib.request.build_opener(
+            NoRedirectHandler, 
+            urllib.request.HTTPSHandler(context=ctx), 
+            urllib.request.ProxyHandler({})
+        )
+        
+        for i in range(max_redirects):
+            parsed = urllib.parse.urlparse(current_url)
+            host_name = parsed.netloc
+            if ":" in host_name:
+                host_name = host_name.split(":", 1)[0]
+                
+            # 如果是 Tencent CDN 或者是已知的最终音频域名，直接终止重定向追踪以规避后续握手异常
+            if "xmcdn.com" in host_name or "xyzcdn.net" in host_name:
+                break
+                
+            real_ip = self.resolve_host_via_doh(host_name)
+            if not real_ip:
+                break
+                
+            original_getaddrinfo = socket.getaddrinfo
+            
+            def custom_getaddrinfo(h, port, family=0, type=0, proto=0, flags=0):
+                if h == host_name:
+                    return original_getaddrinfo(real_ip, port, family, type, proto, flags | socket.AI_NUMERICHOST)
+                return original_getaddrinfo(h, port, family, type, proto, flags)
+                
+            socket.getaddrinfo = custom_getaddrinfo
+            
+            try:
+                req = urllib.request.Request(current_url, headers=headers)
+                with opener.open(req, timeout=5) as resp:
+                    code = resp.getcode()
+                    if code in (301, 302, 303, 307, 308):
+                        loc = resp.headers.get("Location")
+                        if loc:
+                            current_url = urllib.parse.urljoin(current_url, loc)
+                            continue
+                    break
+            except urllib.error.HTTPError as e:
+                code = e.getcode()
+                if code in (301, 302, 303, 307, 308):
+                    loc = e.headers.get("Location")
+                    if loc:
+                        current_url = urllib.parse.urljoin(current_url, loc)
+                        continue
+                break
+            except Exception:
+                break
+            finally:
+                socket.getaddrinfo = original_getaddrinfo
+                
+        return current_url
+
     def parse_metadata(self, url: str) -> dict:
         """
         仅抓取并解析链接元数据而不下载音频文件
@@ -173,7 +290,35 @@ class PodcastDownloader:
         """
         # 使用 curl.exe 绕过 Cloudflare TLS 校验与代理拦截，确保 100% 成功抓取 HTML
         print(f"📡 [LOG] 正在使用 curl.exe 绕过 Cloudflare 抓取小宇宙页面: {url}")
-        res = subprocess.run(["curl.exe", "-k", "-s", url], capture_output=True, text=True, encoding="utf-8")
+        
+        # 使用 DoH 绕过本地 Clash DNS 劫持与 SSL 拦截
+        resolve_ip = None
+        try:
+            doh_url = "https://dns.google/resolve?name=www.xiaoyuzhoufm.com"
+            with httpx.Client(trust_env=False, verify=False, timeout=5.0) as client:
+                r = client.get(doh_url)
+                if r.status_code == 200:
+                    ans = r.json().get("Answer", [])
+                    for a in ans:
+                        if a.get("type") == 1:
+                            resolve_ip = a.get("data")
+                            break
+            if resolve_ip:
+                print(f"🎯 [LOG] 通过 DoH 解析出小宇宙真实 IP: {resolve_ip}")
+        except Exception as e:
+            print(f"⚠️ [LOG] DoH 解析失败 (将尝试普通直连方式): {e}")
+
+        # 清理代理环境变量，防止 curl.exe 被代理劫持导致 SSL 握手失败 (如 Clash 35 错误)
+        clean_env = os.environ.copy()
+        for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+            clean_env.pop(key, None)
+            
+        cmd = ["curl.exe", "-k", "-s"]
+        if resolve_ip:
+            cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
+        cmd.append(url)
+        
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=clean_env)
         if res.returncode != 0:
             raise Exception(f"curl.exe 抓取页面失败，返回码: {res.returncode}")
         
@@ -302,11 +447,26 @@ class PodcastDownloader:
                 
             local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.{file_ext}")
             
+            # 增加本地缓存检测，如果文件已存在且大小正常，则直接秒级导入，绕过所有网络层
+            if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                print(f"🎯 [LOG] 检测到本地小宇宙音频已存在且大小正常，跳过下载: {local_filename}")
+                if progress_callback:
+                    progress_callback(100.0)
+                return local_filename, metadata
+
+            # 首先，我们在 Python 里使用 DoH 追踪所有的 3xx 重定向，获取最终的直链 URL！
+            final_audio_url = audio_url
+            try:
+                final_audio_url = self.resolve_redirects_via_doh(audio_url)
+                print(f"🎯 [LOG] 通过 DoH 追踪重定向后的最终音频直链: {final_audio_url}")
+            except Exception as e_red:
+                print(f"⚠️ [LOG] DoH 追踪重定向失败: {e_red}，将使用原链接")
+
             # 优先使用 Python httpx (禁用代理) 进行流式高速下载，实时回传进度以优化用户界面体验
-            print(f"📡 [LOG] 正在从直链直连下载音频 (httpx): {audio_url} -> {local_filename}")
+            print(f"📡 [LOG] 正在从直链直连下载音频 (httpx): {final_audio_url} -> {local_filename}")
             try:
                 with httpx.Client(headers=self.headers, verify=False, trust_env=False, timeout=120.0) as client:
-                    with client.stream("GET", audio_url) as r:
+                    with client.stream("GET", final_audio_url) as r:
                         if r.status_code != 200:
                             raise Exception(f"HTTP status code {r.status_code}")
                         total_bytes = int(r.headers.get("content-length", 0))
@@ -327,8 +487,36 @@ class PodcastDownloader:
                         os.remove(local_filename)
                     except Exception:
                         pass
-                # 兜底使用 curl.exe
-                res = subprocess.run(["curl.exe", "--noproxy", "*", "-k", "-L", "-s", "-o", local_filename, audio_url], capture_output=True)
+                # 兜底使用 curl.exe (清理代理环境变量防止被劫持导致 SSL 失败)
+                clean_env = os.environ.copy()
+                for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+                    clean_env.pop(key, None)
+
+                # 使用 final_audio_url 进行解析与下载
+                from urllib.parse import urlparse
+                final_audio_host = ""
+                final_audio_port = 443
+                try:
+                    parsed_final = urlparse(final_audio_url)
+                    final_audio_host = parsed_final.netloc
+                    final_audio_port = 80 if parsed_final.scheme == "http" else 443
+                except Exception:
+                    pass
+
+                # 用 DoH 解析最终主机的 IP
+                final_cdn_ip = None
+                if final_audio_host:
+                    try:
+                        final_cdn_ip = self.resolve_host_via_doh(final_audio_host)
+                    except Exception as de:
+                        print(f"⚠️ [LOG] 解析最终主机 DoH 失败: {de}")
+
+                cmd = ["curl.exe", "--ssl-no-revoke", "--noproxy", "*", "-k", "-L", "-s"]
+                if final_cdn_ip and final_audio_host:
+                    cmd.extend(["--resolve", f"{final_audio_host}:{final_audio_port}:{final_cdn_ip}"])
+                cmd.extend(["-o", local_filename, final_audio_url])
+                
+                res = subprocess.run(cmd, capture_output=True, env=clean_env)
                 if res.returncode != 0:
                     raise Exception(f"curl.exe 下载音频失败，返回码: {res.returncode}")
             
@@ -336,6 +524,14 @@ class PodcastDownloader:
                 progress_callback(100.0)
             return local_filename, metadata
         elif "bilibili.com" in url or "b23.tv" in url:
+            local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+            if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                print(f"🎯 [LOG] 检测到本地 Bilibili 音频文件已存在，跳过下载与提取: {local_filename}")
+                metadata = self.parse_metadata(url)
+                if progress_callback:
+                    progress_callback(100.0)
+                return local_filename, metadata
+
             print("🎬 [LOG] 检测到 Bilibili 链接，启动私有高性能下载引擎...")
             real_url = url
             if "b23.tv" in url:
@@ -460,6 +656,14 @@ class PodcastDownloader:
                 progress_callback(100.0)
             return local_filename, metadata
         else:
+            local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+            if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                print(f"🎯 [LOG] 检测到本地通用音频已存在，跳过 yt-dlp 下载: {local_filename}")
+                metadata = self.parse_metadata(url)
+                if progress_callback:
+                    progress_callback(100.0)
+                return local_filename, metadata
+
             # 使用 yt-dlp 下载通用播客（如 YouTube 等）
             print("🎬 [LOG] 识别为通用媒体链接，启动 yt-dlp 抓取...")
             safe_outtmpl = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.%(ext)s")

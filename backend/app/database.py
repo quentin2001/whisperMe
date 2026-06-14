@@ -194,8 +194,12 @@ class LocalDatabase:
             if "cards" not in data:
                 data["cards"] = []
             
-            # Remove any existing card with the same ID or same paragraph_id to avoid duplication
-            data["cards"] = [c for c in data["cards"] if c["id"] != card["id"] and c["paragraph_id"] != card["paragraph_id"]]
+            # 仅在段落ID存在时，剔除同段落的重复卡片，避免合成卡片因 paragraph_id 为空被误删
+            pid = card.get("paragraph_id")
+            data["cards"] = [
+                c for c in data["cards"] 
+                if c["id"] != card["id"] and (not pid or c.get("paragraph_id") != pid)
+            ]
             
             data["cards"].append(card)
             self._write_data(data)

@@ -115,8 +115,8 @@ class PodcastTranscriber:
             print(f"📡 [LOG] 正在使用在线 ASR 模式进行识别。目标 API: {online_base_url} | 模型: {online_model}")
             print(f"📦 [LOG] 音频总时长: {audio_duration:.2f} 秒")
 
-            # 2. 分片处理逻辑 (每片最大 2 分钟 = 120 秒，确保转录精度并防御时间线偏斜)
-            chunk_length = 120.0
+            # 2. 分片处理逻辑 (为了提升时间轴对齐精度，每分片设置为 60.0 秒)
+            chunk_length = 60.0
             num_chunks = math.ceil(audio_duration / chunk_length)
             
             for i in range(num_chunks):
@@ -238,20 +238,70 @@ class PodcastTranscriber:
                         continue
 
 
+                    # 按照声纹分割段（语音活动区间 VAD）对句子进行精准时间轴映射，剔除静音期，彻底解决台词偏斜与漂移
+                    chunk_start = start_offset
+                    chunk_end = start_offset + slice_duration
+                    
+                    active_segs = []
+                    for d in diarization_segments:
+                        # 寻找在当前分片范围内的交叉时间段
+                        s_max = max(d["start"], chunk_start)
+                        e_min = min(d["end"], chunk_end)
+                        if e_min > s_max + 0.1: # 至少重叠 100ms 视为有效说话区间
+                            active_segs.append((s_max, e_min))
+                            
+                    # 将紧邻的说话段（间隔小于 0.5s）或重叠段合并成连续的语音块
+                    active_segs.sort()
+                    merged_segs = []
+                    for seg in active_segs:
+                        if not merged_segs:
+                            merged_segs.append(seg)
+                        else:
+                            last_s, last_e = merged_segs[-1]
+                            curr_s, curr_e = seg
+                            if curr_s - last_e < 0.5: # 紧邻合并
+                                merged_segs[-1] = (last_s, max(last_e, curr_e))
+                            else:
+                                merged_segs.append(seg)
+                                
+                    if not merged_segs:
+                        # 声纹列表为空时退化到全分片映射以保持鲁棒兼容
+                        merged_segs = [(chunk_start, chunk_end)]
+                        
+                    total_speech_duration = sum(e - s for s, e in merged_segs)
+                    if total_speech_duration <= 0:
+                        total_speech_duration = 0.1
+                        
                     total_chars = sum(len(s) for s in sentences)
                     if total_chars == 0:
                         total_chars = 1
-
-                    current_chunk_time = 0.0
+                        
+                    current_speech_time = 0.0
+                    
+                    # 映射辅助函数：将相对的“语音时间轴”偏移转换为实际的“物理时间轴”时间戳
+                    def map_speech_to_real_time(speech_offset):
+                        temp_offset = speech_offset
+                        for s_start, s_end in merged_segs:
+                            seg_dur = s_end - s_start
+                            if temp_offset <= seg_dur:
+                                return s_start + temp_offset
+                            temp_offset -= seg_dur
+                        return merged_segs[-1][1]
+                        
                     for s in sentences:
                         char_len = len(s)
                         duration_ratio = char_len / total_chars
-                        s_duration = duration_ratio * slice_duration
-                        start = start_offset + current_chunk_time
-                        end = start_offset + current_chunk_time + s_duration
+                        s_speech_duration = duration_ratio * total_speech_duration
+                        
+                        start = map_speech_to_real_time(current_speech_time)
+                        end = map_speech_to_real_time(current_speech_time + s_speech_duration)
+                        
+                        # 单调性与物理边界约束
+                        start = max(chunk_start, min(start, chunk_end))
+                        end = max(start + 0.1, min(end, chunk_end))
                         
                         whisper_segments.append(WhisperSegmentDummy(start, end, s))
-                        current_chunk_time += s_duration
+                        current_speech_time += s_speech_duration
 
                 except Exception as chunk_ex:
                     if os.path.exists(chunk_mp3_path):

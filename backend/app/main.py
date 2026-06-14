@@ -1443,15 +1443,86 @@ def create_link(req: CreateLinkRequest):
     if not card_a or not card_b:
         raise HTTPException(status_code=404, detail="关联的卡片不存在")
         
-    link = {
-        "id": str(uuid.uuid4()),
+    # 调用大模型，将两张卡片和用户的合题灵感提炼为一张全新的【对撞合题卡片】
+    llm_prompt = f"""你是一个高级哲学与跨领域知识合成大师。
+    现在用户决定将以下两张知识观点卡片，结合他自己的个人融合灵感，融合成一张全新的【对撞合题灵感卡片】（Synthesis Card）。
+    
+    卡片 A 标题：{card_a.get('spark_title')}
+    卡片 A 原文内容："{card_a.get('quote')}"
+    
+    卡片 B 标题：{card_b.get('spark_title')}
+    卡片 B 原文内容："{card_b.get('quote')}"
+    
+    用户融合顿悟（my_synthesis）：
+    "{req.my_synthesis.strip()}"
+    
+    你的任务是：
+    1. 结合卡片 A、卡片 B 和用户的个人顿悟，融合成一个高度凝练、金句般深刻的全新【合题观点原文】（quote，不超过 120 字）。
+    2. 为这个碰撞出来的观点，起一个极具学术张力与思维美感的【对撞主题标题】（spark_title，不超过 20 字，格式必须为：“【合题】xxxx”，例如：“【合题】系统权力与精神牢笼的同质性”）。
+    3. 撰写一段【为什么重要 (why_it_matters)】的诠释，阐述这层跨界融会背后的认知红利与启发（why_it_matters，不超过 100 字）。
+    4. 必须输出 JSON 格式，且只包含三个字段: "spark_title" (字符串), "quote" (字符串), "why_it_matters" (字符串)。
+    5. 直接输出 JSON 字符串，不要包含 ```json 或 ```，不要有任何多余字符。"""
+
+    try:
+        response_str = call_llm(llm_prompt)
+        cleaned_str = response_str.strip()
+        if cleaned_str.startswith("```json"):
+            cleaned_str = cleaned_str[7:]
+        if cleaned_str.startswith("```"):
+            cleaned_str = cleaned_str[3:]
+        if cleaned_str.endswith("```"):
+            cleaned_str = cleaned_str[:-3]
+        cleaned_str = cleaned_str.strip()
+        
+        parsed = json.loads(cleaned_str)
+        s_title = parsed.get("spark_title", f"【合题】{card_a.get('spark_title')} & {card_b.get('spark_title')}")
+        s_quote = parsed.get("quote", req.my_synthesis.strip())
+        s_why = parsed.get("why_it_matters", f"将观点《{card_a.get('spark_title')}》与《{card_b.get('spark_title')}》跨界碰撞融合的脑洞结晶。")
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] Synthesize LLM call failed: {e}")
+        s_title = f"【合题】{card_a.get('spark_title')} & {card_b.get('spark_title')}"
+        s_quote = req.my_synthesis.strip()
+        s_why = f"跨越不同播客领域的脑力对撞成果。融合了：{card_a.get('spark_title')} 与 {card_b.get('spark_title')}。"
+
+    # 创建并保存合成的新卡片
+    s_card_id = f"s_card_{uuid.uuid4().hex[:12]}"
+    synthesized_card = {
+        "id": s_card_id,
+        "paragraph_id": f"synthesis-{uuid.uuid4().hex[:12]}",
+        "podcast_id": "collider",
+        "podcast_name": "💥 跨界灵感对撞",
+        "spark_title": s_title,
+        "quote": s_quote,
+        "why_it_matters": s_why,
+        "created_at": datetime.now().isoformat(),
+        "is_synthesis": True,
+        "parent_ids": [req.source_card_id, req.target_card_id],
+        "parent_titles": [card_a.get("spark_title"), card_b.get("spark_title")],
+        "efactor": 2.5,
+        "status": "stable"
+    }
+    db.create_card(synthesized_card)
+    
+    # 建立两条连线：Card A -> Synthesized Card，和 Card B -> Synthesized Card
+    link1 = {
+        "id": f"link_{uuid.uuid4().hex[:12]}",
         "source_card_id": req.source_card_id,
-        "target_card_id": req.target_card_id,
+        "target_card_id": s_card_id,
         "my_synthesis": req.my_synthesis.strip(),
         "created_at": datetime.now().isoformat()
     }
-    db.create_link(link)
-    return link
+    db.create_link(link1)
+    
+    link2 = {
+        "id": f"link_{uuid.uuid4().hex[:12]}",
+        "source_card_id": req.target_card_id,
+        "target_card_id": s_card_id,
+        "my_synthesis": req.my_synthesis.strip(),
+        "created_at": datetime.now().isoformat()
+    }
+    db.create_link(link2)
+    
+    return link1
 
 @app.get("/api/cards/collider")
 def get_collider():
@@ -1487,7 +1558,7 @@ def get_collider():
     
     prompt = f"""你是一个创意无限的跨界知识对撞与链接专家。你擅长在看似完全无关的两个观点中，发现它们底层的通感、共鸣或矛盾火花。
 
-下面是两个知识卡片观点：
+下面是两个知识观点卡片：
 卡片 A：
 - 标题：{card_a['spark_title']}
 - 原文：{card_a['quote']}
@@ -1498,10 +1569,14 @@ def get_collider():
 
 你的任务是：
 1. 找出这两个观点底层逻辑深处的呼应点、互补点或冲突性火花。
-2. 作为一个跨界对撞机，向用户提一个深刻的、极具启发性的对撞问题（不超过 60 字）。
-3. 提问语气类似：“主人，我发现这两个人在不同领域都在强调/探讨【...】。你觉得它们是一回事吗？” 或 “主人，观点A强调...，而观点B指出...。它们碰撞在一起，是否意味着【...】？”
-4. 必须以 JSON 格式输出，包含一个字段 "question"（字符串）。
-5. 直接输出 JSON 字符串，不要包含 ```json 或 ``` 格式块，不要有任何多余文字。"""
+2. 计算它们的【张力指数】（dissonance_index，介于 75 到 99 之间的整数，数值越高代表领域跨度越大，对撞效果越惊喜）。
+3. 编写一句【对撞理由】（match_reason，不超过 60 字，例如：“卡片A关于伊朗战争，卡片B关于个人灵气消失。但它们底层都在探讨权力系统对个体生命的压迫。”）。
+4. 作为一个跨界对撞机，向用户提一个深刻的、极具启发性的对撞提问（question，不超过 60 字，语气类似：“主人，我发现这两个人在不同领域都在强调/探讨【...】。你觉得它们是一回事吗？”）。
+5. 必须以 JSON 格式输出，包含以下字段：
+   - "dissonance_index": 整数
+   - "match_reason": 字符串
+   - "question": 字符串
+6. 直接输出 JSON 字符串，不要包含 ```json 或 ``` 格式块，不要有任何多余文字。"""
 
     try:
         response_str = call_llm(prompt)
@@ -1515,9 +1590,13 @@ def get_collider():
         cleaned_str = cleaned_str.strip()
         
         parsed = json.loads(cleaned_str)
+        dissonance_index = int(parsed.get("dissonance_index", random.randint(75, 98)))
+        match_reason = parsed.get("match_reason", "虽然一者讨论领域不同，但它们在思维模式上具有同构契合性。")
         question = parsed.get("question", "我发现这两个观点底层都在强调一些共同的事情。你觉得它们是一回事吗？")
     except Exception as e:
         print(f"⚠️ [LOG ERROR] Collider AI prompt failed: {e}")
+        dissonance_index = random.randint(78, 96)
+        match_reason = f"虽然一者关于【{card_a.get('spark_title')}】，另一者关于【{card_b.get('spark_title')}】，但底层思维方式惊人地相似。"
         question = f"主人，我发现【{card_a['spark_title']}】与【{card_b['spark_title']}】之间或许有独特的默契。你觉得它们有什么底层联系吗？"
 
     # Populate podcast name
@@ -1530,7 +1609,9 @@ def get_collider():
     return {
         "card_a": card_a,
         "card_b": card_b,
-        "question": question
+        "question": question,
+        "dissonance_index": dissonance_index,
+        "match_reason": match_reason
     }
 
 # 辅助读取配置
