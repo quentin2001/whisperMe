@@ -1133,6 +1133,142 @@ body {
   gap: 5px;
 }
 
+/* ==================== 🌟 奢华黄金 3D 老虎机样式 🌟 ==================== */
+
+/* 黄金外壳的3D金属光影叠加 */
+.gold-theme-cabinet::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 24px;
+  border: 2px solid rgba(255, 235, 122, 0.4);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.gold-theme-cabinet::after {
+  content: '';
+  position: absolute;
+  top: 24px;
+  bottom: 24px;
+  left: 8px;
+  right: 8px;
+  background-image: 
+    radial-gradient(circle at 4px 4px, #ffffff 15%, #d4af37 60%, #4a3b10 100%),
+    radial-gradient(circle at 4px 4px, #ffffff 15%, #d4af37 60%, #4a3b10 100%);
+  background-size: 8px 8px;
+  background-repeat: repeat-y;
+  background-position: left 0 top 0, right 0 top 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 黄金警报灯旋转闪烁动画 */
+@keyframes gold-siren-flash {
+  0% {
+    background: radial-gradient(circle at center, #ff8080 30%, #b30000 80%);
+    box-shadow: 0 0 10px #ff3333, inset 0 2px 4px rgba(255,255,255,0.4);
+  }
+  50% {
+    background: radial-gradient(circle at center, #ff9999 50%, #e60000 90%);
+    box-shadow: 0 0 30px #ff0000, 0 0 60px #ff3333, inset 0 2px 4px rgba(255,255,255,0.6);
+  }
+  100% {
+    background: radial-gradient(circle at center, #ff8080 30%, #b30000 80%);
+    box-shadow: 0 0 10px #ff3333, inset 0 2px 4px rgba(255,255,255,0.4);
+  }
+}
+
+.gold-siren.flashing {
+  animation: gold-siren-flash 0.3s infinite alternate;
+}
+
+/* 霓虹闪烁字效 */
+@keyframes pulse-neon {
+  0% {
+    color: #ef4444;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.6), 0 3px 6px #000;
+  }
+  100% {
+    color: #ff8080;
+    text-shadow: 0 0 25px rgba(239, 68, 68, 1), 0 0 40px rgba(239, 68, 68, 0.8), 0 3px 6px #000;
+  }
+}
+
+/* 黄金边框装饰灯交替闪烁 */
+@keyframes gold-bulb-blink-1 {
+  0%, 100% {
+    background: #ffd700;
+    box-shadow: 0 0 8px #ffd700;
+  }
+  50% {
+    background: #5e470f;
+    box-shadow: none;
+  }
+}
+@keyframes gold-bulb-blink-2 {
+  0%, 100% {
+    background: #5e470f;
+    box-shadow: none;
+  }
+  50% {
+    background: #ffd700;
+    box-shadow: 0 0 8px #ffd700;
+  }
+}
+
+.gold-frame-bulb.active {
+  animation: gold-bulb-blink-1 0.6s infinite step-end;
+}
+.gold-frame-bulb:not(.active) {
+  animation: gold-bulb-blink-2 0.6s infinite step-end;
+}
+
+/* 火焰燃烧边缘（卡片被燃烧/遗忘效果） */
+@keyframes gold-flame {
+  0% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.5), inset 0 0 15px rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.8), inset 0 0 20px rgba(249, 115, 22, 0.4);
+    border-color: #f97316;
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.5), inset 0 0 15px rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+  }
+}
+
+.flame-effect {
+  animation: gold-flame 1s infinite alternate;
+  border: 2px solid #ef4444 !important;
+}
+
+/* 按钮的金属凹槽阴影 */
+.gold-deck-btn {
+  position: relative;
+  outline: none;
+}
+.gold-deck-btn::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.gold-deck-btn:active {
+  box-shadow: inset 0 4px 8px rgba(0,0,0,0.8) !important;
+}
+
 
 
 

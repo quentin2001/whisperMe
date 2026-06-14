@@ -890,20 +890,68 @@ def delete_task(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
         
-    # 物理清除下载的 MP3 文件以释放硬盘
+    # 物理清除下载的 MP3 文件以释放硬盘，前提是该音频没有被其他任务共享
     audio_url = task.get("audio_url")
     if audio_url:
         filename = os.path.basename(audio_url)
-        local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
-        if os.path.exists(local_file_path):
-            try:
-                os.remove(local_file_path)
-                print(f"🗑️ [LOG] 任务删除 - 已物理清除音频文件: {local_file_path}")
-            except Exception as e:
-                print(f"⚠️ [LOG 警告] 无法删除物理音频: {e}")
+        
+        # 扫描是否有其他任务也在使用这个文件名
+        other_tasks = [t for t in db.get_all_tasks() if t.get("id") != task_id]
+        is_shared = False
+        for ot in other_tasks:
+            ot_audio = ot.get("audio_url")
+            if ot_audio and os.path.basename(ot_audio) == filename:
+                is_shared = True
+                break
+                
+        if is_shared:
+            print(f"ℹ️ [LOG] 任务删除 - 音频文件 {filename} 被其他任务共享，跳过物理删除。")
+        else:
+            local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+            if os.path.exists(local_file_path):
+                try:
+                    os.remove(local_file_path)
+                    print(f"🗑️ [LOG] 任务删除 - 已物理清除音频文件: {local_file_path}")
+                except Exception as e:
+                    print(f"⚠️ [LOG 警告] 无法删除物理音频: {e}")
 
     success = db.delete_task(task_id)
     return {"success": success}
+
+@app.post("/api/tasks/{task_id}/redownload")
+def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+        
+    audio_url = task.get("audio_url")
+    if not audio_url:
+        raise HTTPException(status_code=400, detail="任务没有关联的音频文件名")
+        
+    filename = os.path.basename(audio_url)
+    local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+    
+    if os.path.exists(local_file_path):
+        return {"success": True, "message": "音频文件已存在，无需重新下载"}
+        
+    # 启动后台任务进行下载修复
+    def do_redownload():
+        try:
+            print(f"📥 [LOG] 启动后台音频修复重新下载, 原始链接: {task['url']}")
+            local_path, metadata = downloader.download_url_audio(task['url'])
+            
+            # 如果下载后的文件名和数据库记录的不一致，则将其重命名
+            downloaded_filename = os.path.basename(local_path)
+            if downloaded_filename != filename:
+                downloaded_expected_path = os.path.join(SHORT_DOWNLOADS_DIR, downloaded_filename)
+                expected_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+                shutil.move(downloaded_expected_path, expected_path)
+            print(f"✅ [LOG] 音频文件修复重新下载成功: {filename}")
+        except Exception as e:
+            print(f"❌ [LOG] 音频文件修复重新下载失败: {e}")
+            
+    background_tasks.add_task(do_redownload)
+    return {"success": True, "message": "已在后台启动音频文件下载修复"}
 
 @app.post("/api/tasks/{task_id}/speaker/rename")
 def rename_speaker(task_id: str, req: RenameSpeakerRequest):

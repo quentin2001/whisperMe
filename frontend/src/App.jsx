@@ -1038,6 +1038,9 @@ export default function App() {
   const [forgottenCardIds, setForgottenCardIds] = useState(new Set());
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [linkingSourceCardId, setLinkingSourceCardId] = useState(null);
+  const [slotTheme, setSlotTheme] = useState('gold');
+  const [isAudioMissing, setIsAudioMissing] = useState(false);
+  const [isRedownloading, setIsRedownloading] = useState(false);
   
   const [activeCollider, setActiveCollider] = useState(null);
   const [colliderSynthesis, setColliderSynthesis] = useState('');
@@ -1401,6 +1404,8 @@ export default function App() {
 
   // 3. 当 activeTaskId 变化时加载详情
   useEffect(() => {
+    setIsAudioMissing(false);
+    setIsRedownloading(false);
     if (activeTaskId) {
       fetchTaskDetail(activeTaskId);
       // 开启专属的详情轮询，如果任务正在执行中
@@ -1912,6 +1917,53 @@ export default function App() {
       console.error("获取任务详情失败:", e);
     } finally {
       if (!isSilent) setDetailLoading(false);
+    }
+  };
+
+  const handleRestoreAudio = async (taskId) => {
+    if (isRedownloading) return;
+    setIsRedownloading(true);
+    showToast("正在后台重新下载并修复音频...");
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tasks/${taskId}/redownload`, {
+        method: 'POST'
+      });
+      if (res.status === 200) {
+        let checkCount = 0;
+        const checkInterval = setInterval(async () => {
+          checkCount++;
+          try {
+            const checkRes = await fetch(`${BACKEND_URL}/api/tasks/${taskId}`);
+            if (checkRes.status === 200) {
+              const data = await checkRes.json();
+              const audioRes = await fetch(`${BACKEND_URL}${data.audio_url}`, { method: 'HEAD' });
+              if (audioRes.status === 200) {
+                clearInterval(checkInterval);
+                setIsAudioMissing(false);
+                setIsRedownloading(false);
+                showToast("音频文件已修复，正在重新加载播放器！");
+                if (audioPlayerRef.current) {
+                  audioPlayerRef.current.load();
+                }
+              }
+            }
+          } catch (err) {
+            console.error(err);
+          }
+          if (checkCount > 40) {
+            clearInterval(checkInterval);
+            setIsRedownloading(false);
+            showToast("音频修复超时，请稍后刷新重试。");
+          }
+        }, 3000);
+      } else {
+        const errorData = await res.json();
+        showToast(`发起音频修复失败: ${errorData.detail || '未知错误'}`);
+        setIsRedownloading(false);
+      }
+    } catch (e) {
+      showToast("连接服务器失败，请检查网络！");
+      setIsRedownloading(false);
     }
   };
 
@@ -3045,6 +3097,8 @@ export default function App() {
                 triggerLeverPull={triggerLeverPull}
                 handleReviewCard={handleReviewCard}
                 handleSpinSlotMachine={handleSpinSlotMachine}
+                slotTheme={slotTheme}
+                setSlotTheme={setSlotTheme}
               />
             </div>
           )}
@@ -3098,6 +3152,52 @@ export default function App() {
                     🗣️ 发言人管理
                   </button>
                 </div>
+
+                {isAudioMissing && (
+                  <div style={{
+                    padding: '10px 20px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#f87171',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    flexShrink: 0,
+                    zIndex: 15
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>⚠️</span>
+                      <span>本地音频文件已丢失。</span>
+                    </div>
+                    <button 
+                      onClick={() => handleRestoreAudio(activeTask.id)}
+                      disabled={isRedownloading}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.25)',
+                        border: '1px solid #f87171',
+                        color: '#fff',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        cursor: isRedownloading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => { if(!isRedownloading) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)'; }}
+                      onMouseLeave={(e) => { if(!isRedownloading) e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'; }}
+                    >
+                      {isRedownloading ? (
+                        <>
+                          正在下载修复...
+                        </>
+                      ) : '[点击重新下载修复]'}
+                    </button>
+                  </div>
+                )}
 
                 {/* 发言人昵称管理悬浮卡片 (非全屏阻挡，局部绝对定位) */}
                 {showSpeakerModal && (
@@ -4711,6 +4811,7 @@ export default function App() {
               onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
               onDurationChange={(e) => setDuration(e.target.duration)}
               onCanPlay={(e) => { e.target.playbackRate = playbackRate; }}
+              onError={() => setIsAudioMissing(true)}
               style={{ display: 'none' }}
             />
 
