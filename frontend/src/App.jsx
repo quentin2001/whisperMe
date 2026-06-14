@@ -2439,7 +2439,11 @@ export default function App() {
               </div>
             ) : (
               <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                {activeTab === 'dashboard' ? t('my_podcast_lib') : t('sys_config_header')}
+                {activeTab === 'dashboard'
+                  ? t('my_podcast_lib')
+                  : activeTab === 'sandbox'
+                    ? '认知沙盒 (Cognitive Sandbox)'
+                    : t('sys_config_header')}
               </h2>
             )}
           </div>
@@ -2823,223 +2827,92 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', width: '100%', maxWidth: '1100px', margin: '0 auto', paddingBottom: '60px' }}>
               
               {/* ── 顶部组件：认知老虎机 ── */}
-              <div className="glass-panel" style={{ padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'hidden' }}>
-                <div 
-                  className="slot-cabinet" 
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                    position: 'relative',
-                    marginRight: '60px',
-                    overflow: 'visible'
-                  }}
-                >
-                  {/* Top Siren Dome Light */}
-                  <div className={`slot-siren ${isSpinning ? 'flashing' : ''}`} onClick={triggerLeverPull} />
+              <div 
+                className="slot-cabinet" 
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  position: 'relative',
+                  marginRight: '60px',
+                  overflow: 'visible',
+                  marginBottom: '30px'
+                }}
+              >
+                {/* Top Siren Dome Light */}
+                <div className={`slot-siren ${isSpinning ? 'flashing' : ''}`} onClick={triggerLeverPull} />
 
-                  {/* Neon Marquee Header */}
-                  <div className="slot-marquee">
-                    <h3 className="slot-marquee-title">💡 Insight Slot Machine 🎰</h3>
+                {/* Neon Marquee Header */}
+                <div className="slot-marquee">
+                  <h3 className="slot-marquee-title">💡 Insight Slot Machine 🎰</h3>
+                </div>
+
+                {/* Center Bezel and Reels Screen */}
+                <div style={{ 
+                  position: 'relative', 
+                  padding: '24px 20px', 
+                  background: 'rgba(5, 5, 8, 0.95)', 
+                  borderRadius: '16px', 
+                  border: '3px solid var(--border-color)', 
+                  boxShadow: '0 0 15px rgba(255, 215, 0, 0.1), inset 0 0 25px rgba(0, 0, 0, 0.95)' 
+                }}>
+                  {/* Blinking Bulbs around the bezel (top) */}
+                  <div style={{ position: 'absolute', top: '7px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
+                    {[...Array(11)].map((_, i) => (
+                      <div key={i} className={`slot-bulb ${i % 2 === 0 ? 'slot-bulb-odd' : 'slot-bulb-even'}`} />
+                    ))}
+                  </div>
+                  
+                  {/* Blinking Bulbs around the bezel (bottom) */}
+                  <div style={{ position: 'absolute', bottom: '7px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
+                    {[...Array(11)].map((_, i) => (
+                      <div key={i} className={`slot-bulb ${i % 2 === 1 ? 'slot-bulb-odd' : 'slot-bulb-even'}`} />
+                    ))}
                   </div>
 
-                  {/* Center Bezel and Reels Screen */}
-                  <div style={{ 
-                    position: 'relative', 
-                    padding: '24px 20px', 
-                    background: 'rgba(5, 5, 8, 0.95)', 
-                    borderRadius: '16px', 
-                    border: '3px solid var(--border-color)', 
-                    boxShadow: '0 0 15px rgba(255, 215, 0, 0.1), inset 0 0 25px rgba(0, 0, 0, 0.95)' 
+                  {/* 3 reels screen container */}
+                  <div className="reel-container" style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '16px',
+                    padding: '12px',
+                    minHeight: '240px',
+                    position: 'relative'
                   }}>
-                    {/* Blinking Bulbs around the bezel (top) */}
-                    <div style={{ position: 'absolute', top: '7px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
-                      {[...Array(11)].map((_, i) => (
-                        <div key={i} className={`slot-bulb ${i % 2 === 0 ? 'slot-bulb-odd' : 'slot-bulb-even'}`} />
-                      ))}
-                    </div>
-                    
-                    {/* Blinking Bulbs around the bezel (bottom) */}
-                    <div style={{ position: 'absolute', bottom: '7px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
-                      {[...Array(11)].map((_, i) => (
-                        <div key={i} className={`slot-bulb ${i % 2 === 1 ? 'slot-bulb-odd' : 'slot-bulb-even'}`} />
-                      ))}
-                    </div>
+                    {/* Red Payline Line - Absolute positioned inline to not affect grid flow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      height: '2px',
+                      background: 'rgba(239, 68, 68, 0.65)',
+                      boxShadow: '0 0 6px rgba(239, 68, 68, 0.8)',
+                      zIndex: 8,
+                      pointerEvents: 'none'
+                    }} />
 
-                    {/* 3 reels screen container */}
-                    <div className="reel-container" style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '16px',
-                      padding: '12px',
-                      minHeight: '240px',
-                      position: 'relative'
-                    }}>
-                      {/* Red Payline Line */}
-                      <div className="reel-payline" />
+                    {/* Semi-reflective glass overlay - Absolute positioned inline to not affect grid flow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 30%, transparent 50%, rgba(0,0,0,0.1) 80%, rgba(0,0,0,0.3) 100%)',
+                      pointerEvents: 'none',
+                      zIndex: 7,
+                      borderRadius: '8px'
+                    }} />
 
-                      {/* Semi-reflective glass overlay */}
-                      <div className="reel-glass-reflection" />
+                    {[0, 1, 2].map((idx) => {
+                      const isResolved = spinReelsResolved[idx];
+                      const card = dueCards[idx];
+                      const isReviewed = card && reviewedCardIds.has(card.id);
+                      const isForgotten = card && forgottenCardIds.has(card.id);
 
-                      {[0, 1, 2].map((idx) => {
-                        const isResolved = spinReelsResolved[idx];
-                        const card = dueCards[idx];
-                        const isReviewed = card && reviewedCardIds.has(card.id);
-                        const isForgotten = card && forgottenCardIds.has(card.id);
-
-                        // 1. 如果正在旋转，或者是未决状态（正在等待该滚轮停下）
-                        if (isSpinning && !isResolved) {
-                          return (
-                            <div 
-                              key={idx} 
-                              className="paper-reel-strip" 
-                              style={{ 
-                                height: '240px', 
-                                borderRadius: '12px',
-                                overflow: 'hidden',
-                                position: 'relative',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              {/* 滚动的仿真纸带 */}
-                              <div className="reel-spinning-strip" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '24px',
-                                alignItems: 'center',
-                                filter: 'blur(3px)'
-                              }}>
-                                <div style={{ fontSize: '36px' }}>🧠</div>
-                                <div style={{ fontSize: '36px' }}>💡</div>
-                                <div style={{ fontSize: '36px' }}>✨</div>
-                                <div style={{ fontSize: '36px' }}>🧭</div>
-                                <div style={{ fontSize: '36px' }}>🎰</div>
-                                <div style={{ fontSize: '36px' }}>💎</div>
-                                <div style={{ fontSize: '36px' }}>🍀</div>
-                                <div style={{ fontSize: '36px' }}>🍒</div>
-                                <div style={{ fontSize: '36px' }}>🧠</div>
-                                <div style={{ fontSize: '36px' }}>💡</div>
-                                <div style={{ fontSize: '36px' }}>✨</div>
-                                <div style={{ fontSize: '36px' }}>🧭</div>
-                                <div style={{ fontSize: '36px' }}>🎰</div>
-                                <div style={{ fontSize: '36px' }}>💎</div>
-                                <div style={{ fontSize: '36px' }}>🍀</div>
-                                <div style={{ fontSize: '36px' }}>🍒</div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // 2. 如果已停止且该位置存在卡片
-                        if (isResolved && card) {
-                          return (
-                            <div 
-                              key={idx} 
-                              className={`paper-reel-strip reel-stop-bounce ${isForgotten ? 'flame-effect' : ''}`} 
-                              style={{ 
-                                height: '240px', 
-                                borderRadius: '12px',
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                justifyContent: 'space-between',
-                                padding: '16px',
-                                color: '#1e1e2f',
-                                opacity: isReviewed && !isForgotten ? 0.6 : 1,
-                                transform: isReviewed && !isForgotten ? 'scale(0.97)' : 'scale(1)',
-                                transition: 'opacity 0.4s, transform 0.4s',
-                                position: 'relative'
-                              }}
-                            >
-                              {/* 封面、来源和标题 */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {card.podcast_image_url ? (
-                                    <img src={card.podcast_image_url} alt="cover" style={{ width: '18px', height: '18px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #ddd' }} />
-                                  ) : (
-                                    <span style={{ fontSize: '14px' }}>🎙️</span>
-                                  )}
-                                  <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.podcast_name}</span>
-                                </div>
-                                <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#111', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.spark_title}</h4>
-                                <p style={{ 
-                                  fontSize: '11px', 
-                                  color: '#444', 
-                                  margin: 0,
-                                  lineHeight: '1.4',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: '4',
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  fontStyle: 'italic',
-                                  borderLeft: '2px solid var(--primary)',
-                                  paddingLeft: '6px'
-                                }}>
-                                  "{card.quote}"
-                                </p>
-                              </div>
-
-                              {/* 命运滑块或操作Badge */}
-                              <div>
-                                {!isReviewed ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#777', fontWeight: '600' }}>
-                                      <span>👈 我已驯服</span>
-                                      <span>忘了 👉</span>
-                                    </div>
-                                    <input 
-                                      type="range"
-                                      min="-100"
-                                      max="100"
-                                      defaultValue="0"
-                                      className="glass-slider"
-                                      style={{ width: '100%', cursor: 'ew-resize', accentColor: 'var(--primary)' }}
-                                      onMouseUp={(e) => {
-                                        const val = parseInt(e.target.value);
-                                        if (val <= -70) {
-                                          handleReviewCard(card.id, 'left');
-                                        } else if (val >= 70) {
-                                          handleReviewCard(card.id, 'right');
-                                        } else {
-                                          e.target.value = 0;
-                                        }
-                                      }}
-                                      onTouchEnd={(e) => {
-                                        const val = parseInt(e.target.value);
-                                        if (val <= -70) {
-                                          handleReviewCard(card.id, 'left');
-                                        } else if (val >= 70) {
-                                          handleReviewCard(card.id, 'right');
-                                        } else {
-                                          e.target.value = 0;
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'center', 
-                                    alignItems: 'center', 
-                                    padding: '5px 8px', 
-                                    borderRadius: '6px',
-                                    background: isForgotten ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                                    color: isForgotten ? '#ef4444' : '#10b981',
-                                    fontSize: '10px',
-                                    fontWeight: '800',
-                                    marginTop: '10px',
-                                    border: isForgotten ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                                  }}>
-                                    {isForgotten ? '🔥 遗忘，稍后复习' : '✅ 驯服，推迟下次唤醒'}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // 3. 初始或空状态 (Idle)
+                      // 1. 如果正在旋转，或者是未决状态（正在等待该滚轮停下）
+                      if (isSpinning && !isResolved) {
                         return (
                           <div 
                             key={idx} 
@@ -3047,129 +2920,289 @@ export default function App() {
                             style={{ 
                               height: '240px', 
                               borderRadius: '12px',
-                              display: 'flex', 
-                              flexDirection: 'column',
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              color: '#999',
-                              borderStyle: 'dashed',
-                              borderWidth: '2px',
-                              borderColor: '#bbb'
+                              overflow: 'hidden',
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                           >
-                            <span style={{ fontSize: '36px', opacity: 0.25, fontWeight: '900', color: '#000' }}>?</span>
-                            <span style={{ fontSize: '10px', marginTop: '8px', fontWeight: 'bold' }}>卡牌槽 {idx + 1} 就绪</span>
+                            {/* 滚动的仿真纸带 */}
+                            <div className="reel-spinning-strip" style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '24px',
+                              alignItems: 'center',
+                              filter: 'blur(3px)'
+                            }}>
+                              <div style={{ fontSize: '36px' }}>🧠</div>
+                              <div style={{ fontSize: '36px' }}>💡</div>
+                              <div style={{ fontSize: '36px' }}>✨</div>
+                              <div style={{ fontSize: '36px' }}>🧭</div>
+                              <div style={{ fontSize: '36px' }}>🎰</div>
+                              <div style={{ fontSize: '36px' }}>💎</div>
+                              <div style={{ fontSize: '36px' }}>🍀</div>
+                              <div style={{ fontSize: '36px' }}>🍒</div>
+                              <div style={{ fontSize: '36px' }}>🧠</div>
+                              <div style={{ fontSize: '36px' }}>💡</div>
+                              <div style={{ fontSize: '36px' }}>✨</div>
+                              <div style={{ fontSize: '36px' }}>🧭</div>
+                              <div style={{ fontSize: '36px' }}>🎰</div>
+                              <div style={{ fontSize: '36px' }}>💎</div>
+                              <div style={{ fontSize: '36px' }}>🍀</div>
+                              <div style={{ fontSize: '36px' }}>🍒</div>
+                            </div>
                           </div>
                         );
-                      })}
-                    </div>
+                      }
+
+                      // 2. 如果已停止且该位置存在卡片
+                      if (isResolved && card) {
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`paper-reel-strip reel-stop-bounce ${isForgotten ? 'flame-effect' : ''}`} 
+                            style={{ 
+                              height: '240px', 
+                              borderRadius: '12px',
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              justifyContent: 'space-between',
+                              padding: '16px',
+                              background: '#ffffff', // Force white paper background
+                              color: '#111111', // Force dark readable text
+                              borderLeft: '1px solid #ddd',
+                              borderRight: '1px solid #ddd',
+                              borderTop: '2px solid #ccc',
+                              borderBottom: '2px solid #ccc',
+                              opacity: isReviewed && !isForgotten ? 0.65 : 1,
+                              transform: isReviewed && !isForgotten ? 'scale(0.97)' : 'scale(1)',
+                              transition: 'opacity 0.4s, transform 0.4s',
+                              position: 'relative',
+                              boxShadow: 'inset 0 10px 10px -5px rgba(0,0,0,0.15), inset 0 -10px 10px -5px rgba(0,0,0,0.15)'
+                            }}
+                          >
+                            {/* 封面、来源和标题 */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {card.podcast_image_url ? (
+                                  <img src={card.podcast_image_url} alt="cover" style={{ width: '18px', height: '18px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #ccc' }} />
+                                ) : (
+                                  <span style={{ fontSize: '14px' }}>🎙️</span>
+                                )}
+                                <span style={{ fontSize: '10px', color: '#555555', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.podcast_name}</span>
+                              </div>
+                              <h4 style={{ fontSize: '12px', fontWeight: '800', color: '#111111', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.spark_title}</h4>
+                              <p style={{ 
+                                fontSize: '11px', 
+                                color: '#333333', 
+                                margin: 0,
+                                lineHeight: '1.4',
+                                display: '-webkit-box',
+                                WebkitLineClamp: '4',
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                fontStyle: 'italic',
+                                borderLeft: '2.5px solid #d4af37', // Gold paper edge accent
+                                paddingLeft: '6px'
+                              }}>
+                                "{card.quote}"
+                              </p>
+                            </div>
+
+                            {/* 命运滑块或操作Badge */}
+                            <div>
+                              {!isReviewed ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#666666', fontWeight: '700' }}>
+                                    <span>👈 我已驯服</span>
+                                    <span>忘了 👉</span>
+                                  </div>
+                                  <input 
+                                    type="range"
+                                    min="-100"
+                                    max="100"
+                                    defaultValue="0"
+                                    className="glass-slider"
+                                    style={{ width: '100%', cursor: 'ew-resize', accentColor: '#d4af37' }}
+                                    onMouseUp={(e) => {
+                                      const val = parseInt(e.target.value);
+                                      if (val <= -70) {
+                                        handleReviewCard(card.id, 'left');
+                                      } else if (val >= 70) {
+                                        handleReviewCard(card.id, 'right');
+                                      } else {
+                                        e.target.value = 0;
+                                      }
+                                    }}
+                                    onTouchEnd={(e) => {
+                                      const val = parseInt(e.target.value);
+                                      if (val <= -70) {
+                                        handleReviewCard(card.id, 'left');
+                                      } else if (val >= 70) {
+                                        handleReviewCard(card.id, 'right');
+                                      } else {
+                                        e.target.value = 0;
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'center', 
+                                  alignItems: 'center', 
+                                  padding: '5px 8px', 
+                                  borderRadius: '6px',
+                                  background: isForgotten ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                  color: isForgotten ? '#dc2626' : '#059669',
+                                  fontSize: '10px',
+                                  fontWeight: '800',
+                                  marginTop: '10px',
+                                  border: isForgotten ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)',
+                                }}>
+                                  {isForgotten ? '🔥 遗忘，稍后复习' : '✅ 驯服，推迟下次唤醒'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 3. 初始或空状态 (Idle)
+                      return (
+                        <div 
+                          key={idx} 
+                          className="paper-reel-strip" 
+                          style={{ 
+                            height: '240px', 
+                            borderRadius: '12px',
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            color: '#999',
+                            borderStyle: 'dashed',
+                            borderWidth: '2px',
+                            borderColor: '#bbb'
+                          }}
+                        >
+                          <span style={{ fontSize: '36px', opacity: 0.25, fontWeight: '900', color: '#000' }}>?</span>
+                          <span style={{ fontSize: '10px', marginTop: '8px', fontWeight: 'bold' }}>卡牌槽 {idx + 1} 就绪</span>
+                        </div>
+                      );
+                    })}
                   </div>
+                </div>
 
-                  {/* Control Deck with 3D Glossy Buttons and Coin Slot */}
-                  <div className="slot-deck">
-                    <button 
-                      onClick={triggerLeverPull}
-                      disabled={isSpinning}
-                      className="slot-btn-glossy"
-                      style={{ outline: 'none' }}
-                    >
-                      <span style={{ fontSize: '16px' }}>🎰</span>
-                      <span style={{ fontSize: '9px', marginTop: '2px' }}>{isSpinning ? 'SPIN...' : 'SPIN'}</span>
-                    </button>
+                {/* Vintage Gold Plaque Nameplate */}
+                <div className="slot-plaque">
+                  🎰 MIND BANDIT 🎰
+                </div>
 
-                    <div className="coin-slot" title="COGNITIVE COIN SLOT">
-                      <span className="coin-slot-label">1 play</span>
-                    </div>
-
-                    <button 
-                      onClick={handleSpinSlotMachine}
-                      disabled={isSpinning}
-                      className="slot-btn-glossy btn-blue"
-                      style={{ outline: 'none' }}
-                    >
-                      <span style={{ fontSize: '16px' }}>🔄</span>
-                      <span style={{ fontSize: '9px', marginTop: '2px' }}>AUTO</span>
-                    </button>
-                  </div>
-
-                  {/* Payout Coin Tray at base with stacked physical golden coins */}
-                  <div className="slot-tray">
-                    <div className="slot-tray-label">Payout Tray</div>
-                    <div className="coin-pile">
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                      <div className="gold-coin" />
-                    </div>
-                  </div>
-
-                  {/* Right: The Physical 3D Lever (Sticks out of the cabinet side) */}
-                  <div 
+                {/* Control Deck with 3D Glossy Buttons and Coin Slot */}
+                <div className="slot-deck">
+                  <button 
                     onClick={triggerLeverPull}
-                    style={{
-                      width: '60px',
-                      height: '220px',
-                      position: 'absolute',
-                      right: '-52px',
-                      top: '110px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      cursor: isSpinning ? 'not-allowed' : 'pointer',
-                      userSelect: 'none',
-                      zIndex: 10
-                    }}
+                    disabled={isSpinning}
+                    className="slot-btn-glossy"
+                    style={{ outline: 'none' }}
                   >
-                    {/* Side Mount Chrome Bracket */}
+                    <span style={{ fontSize: '16px' }}>🎰</span>
+                    <span style={{ fontSize: '9px', marginTop: '2px' }}>{isSpinning ? 'SPIN...' : 'SPIN'}</span>
+                  </button>
+
+                  <div className="coin-slot" title="COGNITIVE COIN SLOT">
+                    <span className="coin-slot-label">1 play</span>
+                  </div>
+
+                  <button 
+                    onClick={handleSpinSlotMachine}
+                    disabled={isSpinning}
+                    className="slot-btn-glossy btn-blue"
+                    style={{ outline: 'none' }}
+                  >
+                    <span style={{ fontSize: '16px' }}>🔄</span>
+                    <span style={{ fontSize: '9px', marginTop: '2px' }}>AUTO</span>
+                  </button>
+                </div>
+
+                {/* Payout Coin Tray at base with stacked physical golden coins */}
+                <div className="slot-tray">
+                  <div className="slot-tray-label">Payout Tray</div>
+                  <div className="coin-pile">
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                    <div className="gold-coin" />
+                  </div>
+                </div>
+
+                {/* Right: The Physical 3D Lever (Sticks out of the cabinet side) */}
+                <div 
+                  onClick={triggerLeverPull}
+                  style={{
+                    width: '60px',
+                    height: '220px',
+                    position: 'absolute',
+                    right: '-52px',
+                    top: '110px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    cursor: isSpinning ? 'not-allowed' : 'pointer',
+                    userSelect: 'none',
+                    zIndex: 10
+                  }}
+                >
+                  {/* Side Mount Chrome Bracket */}
+                  <div style={{
+                    width: '24px',
+                    height: '40px',
+                    background: 'linear-gradient(90deg, #333 0%, #aaa 50%, #222 100%)',
+                    border: '2px solid #555',
+                    borderRadius: '4px',
+                    position: 'absolute',
+                    bottom: '20px',
+                    left: '18px',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.6)'
+                  }} />
+                  
+                  {/* Lever Rod (The Metal Pole) */}
+                  <div style={{
+                    width: '8px',
+                    height: '110px',
+                    background: 'linear-gradient(90deg, #888 0%, #fff 50%, #555 100%)',
+                    borderRadius: '4px',
+                    position: 'absolute',
+                    bottom: '40px',
+                    left: '26px',
+                    transformOrigin: 'bottom center',
+                    transform: leverActive ? 'rotateX(75deg) scaleY(0.4) translateY(45px)' : 'rotateX(0deg) scaleY(1) translateY(0)',
+                    transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                    zIndex: 2,
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                  }}>
+                    {/* Red Glossy Ball Handle */}
                     <div style={{
-                      width: '24px',
-                      height: '40px',
-                      background: 'linear-gradient(90deg, #333 0%, #aaa 50%, #222 100%)',
-                      border: '2px solid #555',
-                      borderRadius: '4px',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 10px 10px, #ff4d4d, #990000 60%, #4a0000 100%)',
                       position: 'absolute',
-                      bottom: '20px',
-                      left: '18px',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.6)'
+                      top: '-26px',
+                      left: '-12px',
+                      boxShadow: isSpinning ? '0 0 14px #ff4d4d' : '0 6px 12px rgba(0,0,0,0.4)',
+                      border: '1px solid rgba(255,255,255,0.2)'
                     }} />
-                    
-                    {/* Lever Rod (The Metal Pole) */}
-                    <div style={{
-                      width: '8px',
-                      height: '110px',
-                      background: 'linear-gradient(90deg, #888 0%, #fff 50%, #555 100%)',
-                      borderRadius: '4px',
-                      position: 'absolute',
-                      bottom: '40px',
-                      left: '26px',
-                      transformOrigin: 'bottom center',
-                      transform: leverActive ? 'rotateX(75deg) scaleY(0.4) translateY(45px)' : 'rotateX(0deg) scaleY(1) translateY(0)',
-                      transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-                      zIndex: 2,
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-                    }}>
-                      {/* Red Glossy Ball Handle */}
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'radial-gradient(circle at 10px 10px, #ff4d4d, #990000 60%, #4a0000 100%)',
-                        position: 'absolute',
-                        top: '-26px',
-                        left: '-12px',
-                        boxShadow: isSpinning ? '0 0 14px #ff4d4d' : '0 6px 12px rgba(0,0,0,0.4)',
-                        border: '1px solid rgba(255,255,255,0.2)'
-                      }} />
-                    </div>
                   </div>
                 </div>
               </div>
-
               {/* ── 下部组件：网状时间轴画布 ── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

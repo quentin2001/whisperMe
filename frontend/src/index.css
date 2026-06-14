@@ -1003,6 +1003,47 @@ body {
   animation: reel-bounce 0.6s cubic-bezier(0.25, 0.65, 0.5, 1) forwards;
 }
 
+/* 3D 侧边金铆钉装饰 */
+.slot-cabinet::after {
+  content: '';
+  position: absolute;
+  top: 24px;
+  bottom: 24px;
+  left: 8px;
+  right: 8px;
+  background-image: 
+    radial-gradient(circle at 4px 4px, #ffe5a3 20%, #c5a059 60%, #5c4305 100%),
+    radial-gradient(circle at 4px 4px, #ffe5a3 20%, #c5a059 60%, #5c4305 100%);
+  background-size: 8px 8px;
+  background-repeat: repeat-y;
+  background-position: left 0 top 0, right 0 top 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 铜质复古金招牌/铭牌 */
+.slot-plaque {
+  background: linear-gradient(135deg, #ffd700 0%, #b8860b 50%, #ffd700 100%);
+  border: 2px solid #8b6508;
+  border-radius: 4px;
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.65);
+  color: #27160c;
+  font-family: 'Impact', 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-align: center;
+  padding: 4px 20px;
+  margin: 6px auto;
+  letter-spacing: 3px;
+  width: fit-content;
+  text-transform: uppercase;
+  z-index: 2;
+  position: relative;
+}
+
 
 
 
