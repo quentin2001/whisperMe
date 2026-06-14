@@ -656,20 +656,20 @@ body {
 
 /* 老虎机仿物理机箱 */
 .slot-cabinet {
-  background: #1a1c23;
-  border: 8px double #d4af37; /* 双轨纯金色金属外框 */
+  background: #12131a;
+  border: 10px double #d1d5db; /* 双轨电镀镀铬金属外框 */
   border-radius: 28px;
   padding: 24px 28px;
   box-shadow: 
-    0 30px 70px rgba(0, 0, 0, 0.9),
-    inset 0 4px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -6px 12px rgba(0, 0, 0, 0.75),
-    0 0 35px rgba(212, 175, 55, 0.2);
+    0 35px 75px rgba(0, 0, 0, 0.95),
+    inset 0 4px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(255, 255, 255, 0.1);
   position: relative;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* 侧边木纹饰板 3D 视觉深度 */
+/* 侧边黑色磨砂钢深饰板 3D 视觉深度 */
 .slot-cabinet::before {
   content: '';
   position: absolute;
@@ -677,10 +677,61 @@ body {
   bottom: 12px;
   left: -14px;
   right: -14px;
-  background: linear-gradient(90deg, #5c2f16 0%, #291105 25%, transparent 25%, transparent 75%, #291105 75%, #5c2f16 100%);
+  background: linear-gradient(90deg, #334155 0%, #0f172a 25%, transparent 25%, transparent 75%, #0f172a 75%, #334155 100%);
   z-index: -1;
   border-radius: 14px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7);
+}
+
+/* 顶部半圆拱门板 JUMBO SLOT 风格 */
+.slot-header-arch {
+  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+  border: 6px solid #d1d5db; /* 镀铬拱门边框 */
+  border-bottom: none;
+  border-radius: 140px 140px 0 0;
+  height: 110px;
+  width: calc(100% + 12px);
+  margin-left: -6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: inset 0 6px 12px rgba(255, 255, 255, 0.1), 0 -4px 10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.slot-arch-title {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 26px;
+  color: #ffd700; /* 纯金色 */
+  text-shadow: 
+    -2.5px -2.5px 0 #000,  
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0 0 12px rgba(255, 215, 0, 0.6);
+  letter-spacing: 2px;
+  transform: scaleY(1.35);
+  text-transform: uppercase;
+  z-index: 2;
+  margin: 15px 0 0 0;
+}
+
+.slot-arch-subtitle {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 18px;
+  color: #ffffff; /* 镀银色 */
+  text-shadow: 
+    -2px -2px 0 #000,  
+     2px -2px 0 #000,
+    -2px  2px 0 #000,
+     2px  2px 0 #000;
+  letter-spacing: 1.5px;
+  transform: scaleY(1.2);
+  text-transform: uppercase;
+  z-index: 2;
+  margin: -2px 0 0 0;
 }
 
 /* 顶部警灯/警报器 */
@@ -689,12 +740,12 @@ body {
   top: -38px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60px;
+  width: 50px;
   height: 38px;
   background: radial-gradient(circle at 50% 25%, #ff4d4d 20%, #b30000 60%, #660000 100%);
-  border: 3.5px solid #d1d5db; /* 铬合金金属底座 */
+  border: 4px solid #d1d5db; /* 镀铬底座 */
   border-bottom: none;
-  border-radius: 30px 30px 0 0;
+  border-radius: 25px 25px 0 0;
   box-shadow: 
     inset 0 4px 8px rgba(255, 255, 255, 0.5),
     0 -3px 15px rgba(255, 77, 77, 0.4);
@@ -737,47 +788,58 @@ body {
   }
 }
 
-/* 霓虹招牌 */
-.slot-marquee {
-  background: linear-gradient(180deg, #18152b 0%, #080612 100%);
-  border: 3.5px solid #ffd700;
-  border-radius: 12px 12px 6px 6px;
-  padding: 12px 16px;
-  text-align: center;
-  box-shadow: 
-    inset 0 0 15px rgba(255, 215, 0, 0.35),
-    0 5px 15px rgba(0, 0, 0, 0.6);
-  position: relative;
-  overflow: hidden;
+/* 顶部仿真奖励规则配率板 (Paytable) */
+.slot-paytable-board {
+  background: #000000;
+  border: 3.5px solid #d1d5db; /* 镀铬金属细边 */
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1.6fr;
+  gap: 10px;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.08);
 }
 
-.slot-marquee::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.12), transparent 75%);
-  pointer-events: none;
+.paytable-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
 }
 
-.slot-marquee-title {
-  font-family: 'Impact', 'Outfit', sans-serif;
-  font-size: 20px;
+.paytable-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 8px;
   font-weight: bold;
-  letter-spacing: 4px;
-  color: #fff;
-  text-transform: uppercase;
-  text-shadow: 
-    0 0 6px #fff,
-    0 0 12px #ffd700,
-    0 0 22px #ff8800,
-    0 0 45px #ff3300;
-  margin: 0;
-  animation: text-glow-pulse 1.5s infinite alternate ease-in-out;
+  color: #ffffff;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 2px;
 }
 
-@keyframes text-glow-pulse {
-  0% { filter: brightness(1) contrast(1); }
-  100% { filter: brightness(1.2) contrast(1.1); text-shadow: 0 0 8px #fff, 0 0 15px #ffd700, 0 0 30px #ffaa00, 0 0 60px #ff3300; }
+.paytable-icons {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.paytable-payout {
+  color: #f59e0b; /* 黄金配率文字 */
+  font-family: 'Impact', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+}
+
+.paytable-coins-graphic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px dashed rgba(255, 255, 255, 0.2);
+  border-right: 1px dashed rgba(255, 255, 255, 0.2);
+  padding: 0 4px;
 }
 
 /* 按钮控制台/操作台面 */
@@ -1003,7 +1065,7 @@ body {
   animation: reel-bounce 0.6s cubic-bezier(0.25, 0.65, 0.5, 1) forwards;
 }
 
-/* 3D 侧边金铆钉装饰 */
+/* 3D 侧边镀铬银铆钉装饰 */
 .slot-cabinet::after {
   content: '';
   position: absolute;
@@ -1012,8 +1074,8 @@ body {
   left: 8px;
   right: 8px;
   background-image: 
-    radial-gradient(circle at 4px 4px, #ffe5a3 20%, #c5a059 60%, #5c4305 100%),
-    radial-gradient(circle at 4px 4px, #ffe5a3 20%, #c5a059 60%, #5c4305 100%);
+    radial-gradient(circle at 4px 4px, #ffffff 20%, #a1a1aa 60%, #3f3f46 100%),
+    radial-gradient(circle at 4px 4px, #ffffff 20%, #a1a1aa 60%, #3f3f46 100%);
   background-size: 8px 8px;
   background-repeat: repeat-y;
   background-position: left 0 top 0, right 0 top 0;
@@ -1021,27 +1083,52 @@ body {
   z-index: 10;
 }
 
-/* 铜质复古金招牌/铭牌 */
-.slot-plaque {
-  background: linear-gradient(135deg, #ffd700 0%, #b8860b 50%, #ffd700 100%);
-  border: 2px solid #8b6508;
-  border-radius: 4px;
-  box-shadow: 
-    inset 0 1px 2px rgba(255, 255, 255, 0.6),
-    0 4px 8px rgba(0, 0, 0, 0.65);
-  color: #27160c;
-  font-family: 'Impact', 'Outfit', sans-serif;
-  font-size: 14px;
-  font-weight: 900;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+/* 底部黑色豪华奖励规则牌 (Lower Prize Board) */
+.slot-lower-panel {
+  background: #000000;
+  border: 4px solid #d1d5db; /* 铬合金金属外框 */
+  border-radius: 10px;
+  padding: 12px 16px;
   text-align: center;
-  padding: 4px 20px;
-  margin: 6px auto;
-  letter-spacing: 3px;
-  width: fit-content;
-  text-transform: uppercase;
+  box-shadow: 
+    inset 0 0 15px rgba(255, 255, 255, 0.08),
+    0 6px 12px rgba(0, 0, 0, 0.6);
+  margin-top: 6px;
   z-index: 2;
   position: relative;
+}
+
+.slot-lower-title {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 19px;
+  color: #ffd700; /* 金黄色 */
+  text-shadow: 
+    -2px -2px 0 #000,  
+     2px -2px 0 #000,
+    -2px  2px 0 #000,
+     2px  2px 0 #000,
+     0 0 10px rgba(255, 215, 0, 0.4);
+  letter-spacing: 2px;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  transform: scaleY(1.1);
+}
+
+.slot-lower-combos {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+}
+
+.slot-lower-box {
+  border: 2px solid #ffd700; /* 金线框 */
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 
