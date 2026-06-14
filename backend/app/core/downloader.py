@@ -294,15 +294,7 @@ class PodcastDownloader:
         # 使用 DoH 绕过本地 Clash DNS 劫持与 SSL 拦截
         resolve_ip = None
         try:
-            doh_url = "https://dns.google/resolve?name=www.xiaoyuzhoufm.com"
-            with httpx.Client(trust_env=False, verify=False, timeout=5.0) as client:
-                r = client.get(doh_url)
-                if r.status_code == 200:
-                    ans = r.json().get("Answer", [])
-                    for a in ans:
-                        if a.get("type") == 1:
-                            resolve_ip = a.get("data")
-                            break
+            resolve_ip = self.resolve_host_via_doh("www.xiaoyuzhoufm.com")
             if resolve_ip:
                 print(f"🎯 [LOG] 通过 DoH 解析出小宇宙真实 IP: {resolve_ip}")
         except Exception as e:
