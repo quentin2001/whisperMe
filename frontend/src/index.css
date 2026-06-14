@@ -550,6 +550,8 @@ body {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   border-radius: var(--radius-md);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .flip-card-back {
