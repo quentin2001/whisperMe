@@ -114,15 +114,28 @@ class PodcastSummarizer:
         }
 
         try:
-            with httpx.Client(timeout=600.0, trust_env=False) as client:
-                response = client.post(api_url, json=payload, headers=headers)
-                if response.status_code != 200:
-                    raise Exception(f"大模型接口请求失败，状态码: {response.status_code}，详情: {response.text}")
+            response = None
+            # 1. 优先使用系统代理
+            try:
+                with httpx.Client(timeout=600.0, trust_env=True) as client:
+                    response = client.post(api_url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    print("🟢 [LOG] 通过代理模式成功生成总结报告！")
+            except Exception as e_proxy:
+                print(f"⚠️ [LOG] 大模型总结接口代理请求失败: {e_proxy}。正在尝试直连模式...")
+                
+            # 2. 直连模式兜底
+            if response is None or response.status_code != 200:
+                with httpx.Client(timeout=600.0, trust_env=False) as client:
+                    response = client.post(api_url, json=payload, headers=headers)
+                    if response.status_code != 200:
+                        raise Exception(f"大模型接口请求失败，状态码: {response.status_code}，详情: {response.text}")
+                    print("🟢 [LOG] 通过直连模式成功生成总结报告！")
 
-                result = response.json()
-                summary_md = result.get("choices", [{}])[0].get("message", {}).get("content", "未能获得 LLM 总结的有效内容").strip()
-                print("🟢 [LOG] 大模型总结报告生成顺利完成！")
-                return summary_md
+            result = response.json()
+            summary_md = result.get("choices", [{}])[0].get("message", {}).get("content", "未能获得 LLM 总结的有效内容").strip()
+            print("🟢 [LOG] 大模型总结报告生成顺利完成！")
+            return summary_md
 
         except httpx.ConnectError:
             err_msg = f"""⚠️ **本地大模型生成总结失败**

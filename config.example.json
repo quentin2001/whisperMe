@@ -12,6 +12,7 @@
   "smtp_sender": "YOUR_EMAIL@qq.com",
   "notification_email": "YOUR_EMAIL@qq.com",
   "enable_win_notification": true,
+  "enable_email_notification": false,
   "asr_mode": "local",
   "online_api_key": "YOUR_ONLINE_ASR_API_KEY",
   "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",

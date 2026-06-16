@@ -17,6 +17,8 @@
 * **👤 智能分轨**：基于 PyAnnote 自动进行声纹分段并结合 Shownotes 命名发言人。
 * **🛡️ 显存熔断**：FIFO 后台任务排队，显存不足自动降级至 CPU 运行，杜绝 OOM。
 * **🧠 认知沙盒**：一键沉淀段落、Anki 闪光卡片自动生成、艾宾浩斯复习与 AI 跨界碰撞。
+* **🌐 四语言 UI**：界面支持 简体中文 / 繁體中文 / English / 日本語 实时切换。
+* **🎨 主题引擎**：浅色/深色/跟随系统，内置多套预设配色，支持自定义色彩。
 
 ---
 
@@ -66,4 +68,13 @@ npm run dev
 - `ollama_url` / `ollama_model`: 本地 LLM 配置
 - `asr_mode` / `summary_mode`: `local` (离线模型) 或 `online` (在线 API)
 - `smtp_username` / `smtp_password`: SMTP 邮件提醒配置
+- `enable_email_notification`: 邮件通知开关（默认 `false`）
+- `enable_win_notification`: Windows 桌面气泡通知开关（默认 `true`）
+
+---
+
+### 📚 详细文档
+
+- [系统架构设计](docs/architecture.md) — 目录结构、API 清单、数据流、设计决策
+- [变更日志](docs/changelog.md) — 按会话分组的详细功能/修复记录
 

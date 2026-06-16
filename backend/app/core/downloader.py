@@ -88,6 +88,34 @@ class PodcastDownloader:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
+    def safe_httpx_request(self, method: str, url: str, headers=None, follow_redirects=False, timeout=15.0, **kwargs):
+        """
+        安全的 HTTPX 请求包装器，优先使用系统代理，失败后自动切换为直连模式
+        """
+        # 1. 尝试使用代理 (trust_env=True)
+        try:
+            with httpx.Client(headers=headers, trust_env=True, follow_redirects=follow_redirects, timeout=timeout, **kwargs) as client:
+                if method.upper() == "GET":
+                    resp = client.get(url)
+                elif method.upper() == "POST":
+                    resp = client.post(url)
+                elif method.upper() == "HEAD":
+                    resp = client.head(url)
+                if resp.status_code < 400:
+                    return resp
+                resp.raise_for_status()
+        except Exception as e:
+            print(f"⚠️ [LOG] safe_httpx_request 代理模式({method} {url})失败: {e}。切换直连模式...")
+            
+        # 2. 尝试直连 (trust_env=False)
+        with httpx.Client(headers=headers, trust_env=False, follow_redirects=follow_redirects, timeout=timeout, **kwargs) as client:
+            if method.upper() == "GET":
+                return client.get(url)
+            elif method.upper() == "POST":
+                return client.post(url)
+            elif method.upper() == "HEAD":
+                return client.head(url)
+
     def resolve_host_via_doh(self, host: str) -> str:
         """
         通过 DoH 查询主机的真实 A 记录 IP
@@ -124,6 +152,15 @@ class PodcastDownloader:
                 for ans in res_data.get("Answer", []):
                     if ans.get("type") == 1:
                         return ans.get("data")
+        except Exception:
+            pass
+            
+        # 兜底：如果 DoH 失败了，尝试使用普通系统 DNS 解析获取 IP
+        try:
+            import socket
+            ips = socket.getaddrinfo(host, None)
+            if ips:
+                return ips[0][4][0]
         except Exception:
             pass
             
@@ -218,9 +255,8 @@ class PodcastDownloader:
             real_url = url
             if "b23.tv" in url:
                 try:
-                    with httpx.Client(trust_env=False, follow_redirects=True) as client:
-                        resp = client.head(url, timeout=5.0)
-                        real_url = str(resp.url)
+                    resp = self.safe_httpx_request("HEAD", url, follow_redirects=True, timeout=5.0)
+                    real_url = str(resp.url)
                 except Exception as e:
                     print(f"⚠️ [LOG] 还原 Bilibili 短链接失败: {e}")
             
@@ -235,10 +271,9 @@ class PodcastDownloader:
                 "Referer": "https://m.bilibili.com/"
             }
             
-            with httpx.Client(trust_env=False) as client:
-                r = client.get(mobile_url, headers=mobile_headers, timeout=15.0)
-                if r.status_code != 200:
-                    raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
+            r = self.safe_httpx_request("GET", mobile_url, headers=mobile_headers, timeout=15.0)
+            if r.status_code != 200:
+                raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
                 
                 html = r.text
                 state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
@@ -288,33 +323,117 @@ class PodcastDownloader:
         """
         抓取并解析小宇宙播客单集页面
         """
-        # 使用 curl.exe 绕过 Cloudflare TLS 校验与代理拦截，确保 100% 成功抓取 HTML
-        print(f"📡 [LOG] 正在使用 curl.exe 绕过 Cloudflare 抓取小宇宙页面: {url}")
+        print(f"📡 [LOG] 开始解析小宇宙页面: {url}")
         
-        # 使用 DoH 绕过本地 Clash DNS 劫持与 SSL 拦截
-        resolve_ip = None
+        # 如果是播客节目主页（/podcast/），自动转换为最新单集的 URL 进行解析
+        if "/podcast/" in url:
+            print("🎙️ [LOG] 识别为小宇宙播客节目主页，正在自动获取最新单集...")
+            html_home = None
+            try:
+                with httpx.Client(headers=self.headers, follow_redirects=True, trust_env=True, timeout=15.0) as client:
+                    r = client.get(url)
+                    if r.status_code == 200:
+                        html_home = r.text
+            except Exception:
+                pass
+            if not html_home:
+                try:
+                    with httpx.Client(headers=self.headers, follow_redirects=True, trust_env=False, timeout=15.0) as client:
+                        r = client.get(url)
+                        if r.status_code == 200:
+                            html_home = r.text
+                except Exception:
+                    pass
+            if not html_home:
+                try:
+                    cmd = ["curl.exe", "-k", "-L", "-s", url]
+                    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=15)
+                    if res.returncode == 0 and res.stdout.strip():
+                        html_home = res.stdout
+                except Exception:
+                    pass
+            if not html_home:
+                try:
+                    resolve_ip = self.resolve_host_via_doh("www.xiaoyuzhoufm.com")
+                    clean_env = os.environ.copy()
+                    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+                        clean_env.pop(key, None)
+                    cmd = ["curl.exe", "-k", "-L", "-s", "--noproxy", "*"]
+                    if resolve_ip:
+                        cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
+                    cmd.append(url)
+                    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=clean_env, timeout=15)
+                    if res.returncode == 0 and res.stdout.strip():
+                        html_home = res.stdout
+                except Exception:
+                    pass
+            if html_home:
+                episodes = re.findall(r'/episode/([a-zA-Z0-9]+)', html_home)
+                if episodes:
+                    unique_episodes = list(dict.fromkeys(episodes))
+                    latest_ep_id = unique_episodes[0]
+                    url = f"https://www.xiaoyuzhoufm.com/episode/{latest_ep_id}"
+                    print(f"🎯 [LOG] 成功获取最新单集链接: {url}")
+                else:
+                    raise Exception("未能在播客节目主页中找到任何单集链接")
+            else:
+                raise Exception("无法抓取播客节目主页，请检查网络设置")
+                
+        html = None
+        
+        # 策略 1: 尝试用 Python httpx (使用系统代理)
         try:
-            resolve_ip = self.resolve_host_via_doh("www.xiaoyuzhoufm.com")
-            if resolve_ip:
-                print(f"🎯 [LOG] 通过 DoH 解析出小宇宙真实 IP: {resolve_ip}")
+            with httpx.Client(headers=self.headers, follow_redirects=True, trust_env=True, timeout=15.0) as client:
+                r = client.get(url)
+                if r.status_code == 200:
+                    html = r.text
+                    print("🟢 [LOG] 成功通过 httpx (使用代理) 获取页面")
         except Exception as e:
-            print(f"⚠️ [LOG] DoH 解析失败 (将尝试普通直连方式): {e}")
-
-        # 清理代理环境变量，防止 curl.exe 被代理劫持导致 SSL 握手失败 (如 Clash 35 错误)
-        clean_env = os.environ.copy()
-        for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
-            clean_env.pop(key, None)
+            print(f"⚠️ [LOG] httpx (使用代理) 失败: {e}")
             
-        cmd = ["curl.exe", "-k", "-s"]
-        if resolve_ip:
-            cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
-        cmd.append(url)
-        
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=clean_env)
-        if res.returncode != 0:
-            raise Exception(f"curl.exe 抓取页面失败，返回码: {res.returncode}")
-        
-        html = res.stdout
+        # 策略 2: 尝试用 Python httpx (直连，禁用代理)
+        if not html:
+            try:
+                with httpx.Client(headers=self.headers, follow_redirects=True, trust_env=False, timeout=15.0) as client:
+                    r = client.get(url)
+                    if r.status_code == 200:
+                        html = r.text
+                        print("🟢 [LOG] 成功通过 httpx (直连) 获取页面")
+            except Exception as e:
+                print(f"⚠️ [LOG] httpx (直连) 失败: {e}")
+                
+        # 策略 3: 尝试用 curl.exe (使用系统默认环境变量，包含代理)
+        if not html:
+            try:
+                cmd = ["curl.exe", "-k", "-L", "-s", url]
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=15)
+                if res.returncode == 0 and res.stdout.strip():
+                    html = res.stdout
+                    print("🟢 [LOG] 成功通过 curl.exe (使用代理) 获取页面")
+            except Exception as e:
+                print(f"⚠️ [LOG] curl.exe (使用代理) 失败: {e}")
+                
+        # 策略 4: 尝试用 curl.exe (完全直连，清理代理环境变量 + DoH 解析绑 IP)
+        if not html:
+            try:
+                resolve_ip = self.resolve_host_via_doh("www.xiaoyuzhoufm.com")
+                clean_env = os.environ.copy()
+                for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+                    clean_env.pop(key, None)
+                cmd = ["curl.exe", "-k", "-L", "-s", "--noproxy", "*"]
+                if resolve_ip:
+                    cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
+                cmd.append(url)
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=clean_env, timeout=15)
+                if res.returncode == 0 and res.stdout.strip():
+                    html = res.stdout
+                    print("🟢 [LOG] 成功通过 curl.exe (直连 DoH) 获取页面")
+            except Exception as e:
+                print(f"⚠️ [LOG] curl.exe (直连 DoH) 失败: {e}")
+
+        if not html:
+            raise Exception("所有网页抓取策略均失败，无法获取小宇宙单集页面内容，请检查网络设置或稍后再试。")
+            
         soup = BeautifulSoup(html, 'html.parser')
         next_data_tag = soup.find('script', id='__NEXT_DATA__')
         if not next_data_tag:
@@ -454,10 +573,13 @@ class PodcastDownloader:
             except Exception as e_red:
                 print(f"⚠️ [LOG] DoH 追踪重定向失败: {e_red}，将使用原链接")
 
-            # 优先使用 Python httpx (禁用代理) 进行流式高速下载，实时回传进度以优化用户界面体验
-            print(f"📡 [LOG] 正在从直链直连下载音频 (httpx): {final_audio_url} -> {local_filename}")
+            # 优先使用 Python httpx 下载
+            download_success = False
+            
+            # 策略 1: httpx (使用系统默认代理)
+            print(f"📡 [LOG] 尝试通过 httpx (使用代理) 下载音频: {final_audio_url} -> {local_filename}")
             try:
-                with httpx.Client(headers=self.headers, verify=False, trust_env=False, timeout=120.0) as client:
+                with httpx.Client(headers=self.headers, verify=False, trust_env=True, timeout=120.0) as client:
                     with client.stream("GET", final_audio_url) as r:
                         if r.status_code != 200:
                             raise Exception(f"HTTP status code {r.status_code}")
@@ -470,47 +592,100 @@ class PodcastDownloader:
                                 if progress_callback and total_bytes > 0:
                                     percent = (downloaded_bytes / total_bytes) * 100.0
                                     progress_callback(percent)
-                print(f"🟢 [LOG] 音频下载完成 (httpx) -> {local_filename}")
-            except Exception as e:
-                print(f"⚠️ [LOG 警告] httpx 下载失败: {e}，正在切换为 curl.exe 进行兜底下载...")
-                # 物理清除可能损坏的未完成文件
+                print(f"🟢 [LOG] 音频下载完成 (httpx 代理模式) -> {local_filename}")
+                download_success = True
+            except Exception as e_proxy:
+                print(f"⚠️ [LOG] httpx (使用代理) 下载失败: {e_proxy}。正在切换为 httpx (直连模式) 下载...")
                 if os.path.exists(local_filename):
                     try:
                         os.remove(local_filename)
                     except Exception:
                         pass
-                # 兜底使用 curl.exe (清理代理环境变量防止被劫持导致 SSL 失败)
-                clean_env = os.environ.copy()
-                for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
-                    clean_env.pop(key, None)
-
-                # 使用 final_audio_url 进行解析与下载
-                from urllib.parse import urlparse
-                final_audio_host = ""
-                final_audio_port = 443
+                        
+            # 策略 2: httpx (直连，禁用代理)
+            if not download_success:
+                print(f"📡 [LOG] 尝试通过 httpx (直连) 下载音频: {final_audio_url} -> {local_filename}")
                 try:
-                    parsed_final = urlparse(final_audio_url)
-                    final_audio_host = parsed_final.netloc
-                    final_audio_port = 80 if parsed_final.scheme == "http" else 443
-                except Exception:
-                    pass
-
-                # 用 DoH 解析最终主机的 IP
-                final_cdn_ip = None
-                if final_audio_host:
+                    with httpx.Client(headers=self.headers, verify=False, trust_env=False, timeout=120.0) as client:
+                        with client.stream("GET", final_audio_url) as r:
+                            if r.status_code != 200:
+                                raise Exception(f"HTTP status code {r.status_code}")
+                            total_bytes = int(r.headers.get("content-length", 0))
+                            downloaded_bytes = 0
+                            with open(local_filename, "wb") as f:
+                                for chunk in r.iter_bytes(chunk_size=1024*1024):
+                                    f.write(chunk)
+                                    downloaded_bytes += len(chunk)
+                                    if progress_callback and total_bytes > 0:
+                                        percent = (downloaded_bytes / total_bytes) * 100.0
+                                        progress_callback(percent)
+                    print(f"🟢 [LOG] 音频下载完成 (httpx 直连模式) -> {local_filename}")
+                    download_success = True
+                except Exception as e_direct:
+                    print(f"⚠️ [LOG] httpx (直连) 下载失败: {e_direct}。正在准备切换为 curl.exe 兜底下载...")
+                    if os.path.exists(local_filename):
+                        try:
+                            os.remove(local_filename)
+                        except Exception:
+                            pass
+                            
+            # 策略 3: curl.exe (使用系统默认环境变量，包含代理)
+            if not download_success:
+                print(f"📡 [LOG] 尝试通过 curl.exe (使用代理) 下载音频: {final_audio_url} -> {local_filename}")
+                try:
+                    cmd = ["curl.exe", "--ssl-no-revoke", "-k", "-L", "-s", "-o", local_filename, final_audio_url]
+                    res = subprocess.run(cmd, capture_output=True)
+                    if res.returncode == 0 and os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                        print(f"🟢 [LOG] 音频下载完成 (curl.exe 代理模式) -> {local_filename}")
+                        download_success = True
+                    else:
+                        raise Exception(f"curl.exe exit code {res.returncode}")
+                except Exception as e_curl_proxy:
+                    print(f"⚠️ [LOG] curl.exe (使用代理) 下载失败: {e_curl_proxy}。正在准备切换为 curl.exe (直连 DoH) 兜底...")
+                    if os.path.exists(local_filename):
+                        try:
+                            os.remove(local_filename)
+                        except Exception:
+                            pass
+                            
+            # 策略 4: curl.exe (完全直连，清理代理环境变量 + DoH 解析绑 IP)
+            if not download_success:
+                print(f"📡 [LOG] 尝试通过 curl.exe (直连 DoH) 下载音频: {final_audio_url} -> {local_filename}")
+                try:
+                    clean_env = os.environ.copy()
+                    for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+                        clean_env.pop(key, None)
+                    from urllib.parse import urlparse
+                    final_audio_host = ""
+                    final_audio_port = 443
                     try:
+                        parsed_final = urlparse(final_audio_url)
+                        final_audio_host = parsed_final.netloc
+                        final_audio_port = 80 if parsed_final.scheme == "http" else 443
+                    except Exception:
+                        pass
+                    final_cdn_ip = None
+                    if final_audio_host:
                         final_cdn_ip = self.resolve_host_via_doh(final_audio_host)
-                    except Exception as de:
-                        print(f"⚠️ [LOG] 解析最终主机 DoH 失败: {de}")
-
-                cmd = ["curl.exe", "--ssl-no-revoke", "--noproxy", "*", "-k", "-L", "-s"]
-                if final_cdn_ip and final_audio_host:
-                    cmd.extend(["--resolve", f"{final_audio_host}:{final_audio_port}:{final_cdn_ip}"])
-                cmd.extend(["-o", local_filename, final_audio_url])
-                
-                res = subprocess.run(cmd, capture_output=True, env=clean_env)
-                if res.returncode != 0:
-                    raise Exception(f"curl.exe 下载音频失败，返回码: {res.returncode}")
+                    cmd = ["curl.exe", "--ssl-no-revoke", "--noproxy", "*", "-k", "-L", "-s"]
+                    if final_cdn_ip and final_audio_host:
+                        cmd.extend(["--resolve", f"{final_audio_host}:{final_audio_port}:{final_cdn_ip}"])
+                    cmd.extend(["-o", local_filename, final_audio_url])
+                    res = subprocess.run(cmd, capture_output=True, env=clean_env)
+                    if res.returncode != 0 or not os.path.exists(local_filename) or os.path.getsize(local_filename) <= 1024*1024:
+                        raise Exception(f"curl.exe exit code {res.returncode}")
+                    print(f"🟢 [LOG] 音频下载完成 (curl.exe 直连 DoH) -> {local_filename}")
+                    download_success = True
+                except Exception as e_curl_direct:
+                    print(f"❌ [LOG] curl.exe (直连 DoH) 下载失败: {e_curl_direct}")
+                    if os.path.exists(local_filename):
+                        try:
+                            os.remove(local_filename)
+                        except Exception:
+                            pass
+                            
+            if not download_success:
+                raise Exception("所有音频下载策略均已失败，请检查网络连接")
             
             if progress_callback:
                 progress_callback(100.0)
@@ -528,9 +703,8 @@ class PodcastDownloader:
             real_url = url
             if "b23.tv" in url:
                 try:
-                    with httpx.Client(trust_env=False, follow_redirects=True) as client:
-                        resp = client.head(url, timeout=5.0)
-                        real_url = str(resp.url)
+                    resp = self.safe_httpx_request("HEAD", url, follow_redirects=True, timeout=5.0)
+                    real_url = str(resp.url)
                 except Exception as e:
                     print(f"⚠️ [LOG] 还原 Bilibili 短链接失败: {e}")
             
@@ -546,37 +720,36 @@ class PodcastDownloader:
             }
             
             print(f"🟢 [LOG] 抓取移动端页面: {mobile_url}")
-            with httpx.Client(trust_env=False) as client:
-                r = client.get(mobile_url, headers=mobile_headers, timeout=15.0)
-                if r.status_code != 200:
-                    raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
-                
-                html = r.text
-                state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
-                if not state_match:
-                    raise Exception("未能从 Bilibili 移动端网页中解析 window.__INITIAL_STATE__")
-                
-                state = json.loads(state_match.group(1))
-                view_info = state.get("video", {}).get("viewInfo", {})
-                aid = view_info.get("aid")
-                cid = view_info.get("cid")
-                title = view_info.get("title", "未知 Bilibili 视频")
-                desc = view_info.get("desc", "")
-                uploader = view_info.get("owner", {}).get("name", "B站UP主")
-                
-                if not aid or not cid:
-                    raise Exception("解析 Bilibili 视频 aid 或 cid 失败")
-                
-                playurl_api = f"https://api.bilibili.com/x/player/playurl?avid={aid}&cid={cid}&qn=16&type=&otype=json&platform=html5&high_quality=1"
-                print(f"🟢 [LOG] 请求 Playurl API...")
-                api_headers = {
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15",
-                    "Referer": f"https://www.bilibili.com/video/{bvid}/"
-                }
-                
-                r_api = client.get(playurl_api, headers=api_headers, timeout=10.0)
-                if r_api.status_code != 200:
-                    raise Exception(f"Playurl API 请求失败: HTTP {r_api.status_code}")
+            r = self.safe_httpx_request("GET", mobile_url, headers=mobile_headers, timeout=15.0)
+            if r.status_code != 200:
+                raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
+            
+            html = r.text
+            state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
+            if not state_match:
+                raise Exception("未能从 Bilibili 移动端网页中解析 window.__INITIAL_STATE__")
+            
+            state = json.loads(state_match.group(1))
+            view_info = state.get("video", {}).get("viewInfo", {})
+            aid = view_info.get("aid")
+            cid = view_info.get("cid")
+            title = view_info.get("title", "未知 Bilibili 视频")
+            desc = view_info.get("desc", "")
+            uploader = view_info.get("owner", {}).get("name", "B站UP主")
+            
+            if not aid or not cid:
+                raise Exception("解析 Bilibili 视频 aid 或 cid 失败")
+            
+            playurl_api = f"https://api.bilibili.com/x/player/playurl?avid={aid}&cid={cid}&qn=16&type=&otype=json&platform=html5&high_quality=1"
+            print(f"🟢 [LOG] 请求 Playurl API...")
+            api_headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15",
+                "Referer": f"https://www.bilibili.com/video/{bvid}/"
+            }
+            
+            r_api = self.safe_httpx_request("GET", playurl_api, headers=api_headers, timeout=10.0)
+            if r_api.status_code != 200:
+                raise Exception(f"Playurl API 请求失败: HTTP {r_api.status_code}")
                 
                 api_data = r_api.json()
                 if api_data.get("code") != 0:
@@ -598,16 +771,54 @@ class PodcastDownloader:
                 downloaded = 0
                 total_bytes = durl[0].get("size", 0)
                 
-                with open(temp_mp4, "wb") as f:
-                    with client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
-                        if response.status_code != 200:
-                            raise Exception(f"视频流下载请求失败: HTTP {response.status_code}")
-                        for chunk in response.iter_bytes(chunk_size=16384):
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            if progress_callback and total_bytes > 0:
-                                percent = (downloaded / total_bytes) * 90.0
-                                progress_callback(percent)
+                download_stream_success = False
+                
+                # 尝试用系统代理下载媒体流 (trust_env=True)
+                try:
+                    with open(temp_mp4, "wb") as f:
+                        with httpx.Client(trust_env=True) as stream_client:
+                            with stream_client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
+                                if response.status_code != 200:
+                                    raise Exception(f"HTTP status code {response.status_code}")
+                                for chunk in response.iter_bytes(chunk_size=16384):
+                                    f.write(chunk)
+                                    downloaded += len(chunk)
+                                    if progress_callback and total_bytes > 0:
+                                        percent = (downloaded / total_bytes) * 90.0
+                                        progress_callback(percent)
+                    download_stream_success = True
+                except Exception as e_stream_proxy:
+                    print(f"⚠️ [LOG] Bilibili 媒体流代理下载失败: {e_stream_proxy}。尝试直连下载...")
+                    downloaded = 0
+                    if os.path.exists(temp_mp4):
+                        try:
+                            os.remove(temp_mp4)
+                        except Exception:
+                            pass
+
+                # 尝试直连下载媒体流 (trust_env=False)
+                if not download_stream_success:
+                    try:
+                        with open(temp_mp4, "wb") as f:
+                            with httpx.Client(trust_env=False) as stream_client:
+                                with stream_client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
+                                    if response.status_code != 200:
+                                        raise Exception(f"HTTP status code {response.status_code}")
+                                    for chunk in response.iter_bytes(chunk_size=16384):
+                                        f.write(chunk)
+                                        downloaded += len(chunk)
+                                        if progress_callback and total_bytes > 0:
+                                            percent = (downloaded / total_bytes) * 90.0
+                                            progress_callback(percent)
+                        download_stream_success = True
+                    except Exception as e_stream_direct:
+                        print(f"❌ [LOG] Bilibili 媒体流直连下载失败: {e_stream_direct}")
+                        if os.path.exists(temp_mp4):
+                            try:
+                                os.remove(temp_mp4)
+                            except Exception:
+                                pass
+                        raise e_stream_direct
                                 
             local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
             print(f"🟢 [LOG] 提取音频 -> {local_filename}")

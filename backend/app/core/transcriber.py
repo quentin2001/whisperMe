@@ -172,10 +172,6 @@ class PodcastTranscriber:
                                 "role": "user",
                                 "content": [
                                     {
-                                        "type": "text",
-                                        "text": "请将这段音频非常精准地转录为汉字，并保留语气，请完整地逐字转录所有说话内容，绝对不要进行任何总结、大纲概括或省略。"
-                                    },
-                                    {
                                         "type": "input_audio",
                                         "input_audio": {
                                             "data": audio_base_64,
@@ -188,8 +184,22 @@ class PodcastTranscriber:
                     }
 
                     print(f"⏳ [LOG] 正在发送分片 {i+1}/{num_chunks} 请求到 {url} 并等待转录结果...")
-                    with httpx.Client(timeout=400.0, trust_env=False) as client:
-                        response = client.post(url, headers=headers, json=payload)
+                    response = None
+                    # 1. 优先使用系统默认代理连接
+                    try:
+                        with httpx.Client(timeout=400.0, trust_env=True) as client:
+                            response = client.post(url, headers=headers, json=payload)
+                            if response.status_code == 200:
+                                print(f"🟢 [LOG] 分片 {i+1} 通过代理请求成功！")
+                    except Exception as e_proxy:
+                        print(f"⚠️ [LOG] ASR 分片 {i+1} 代理请求失败: {e_proxy}。正在尝试直连模式...")
+                        
+                    # 2. 直连模式兜底
+                    if response is None or response.status_code != 200:
+                        with httpx.Client(timeout=400.0, trust_env=False) as client:
+                            response = client.post(url, headers=headers, json=payload)
+                            if response.status_code == 200:
+                                print(f"🟢 [LOG] 分片 {i+1} 通过直连请求成功！")
                         
                     if response.status_code != 200:
                         raise Exception(f"在线 ASR API 调用失败，状态码: {response.status_code}。详情: {response.text}")
@@ -672,6 +682,17 @@ class PodcastTranscriber:
             "temperature": 0.1
         }
         
+        response = None
+        # 1. 优先使用系统代理
+        try:
+            with httpx.Client(timeout=120.0, trust_env=True) as client:
+                response = client.post(api_url, json=payload, headers=headers)
+                if response.status_code == 200:
+                    return response.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e_proxy:
+            print(f"⚠️ [LOG] LLM 语义缝合接口代理请求失败: {e_proxy}。尝试直连...")
+            
+        # 2. 直连兜底
         with httpx.Client(timeout=120.0, trust_env=False) as client:
             response = client.post(api_url, json=payload, headers=headers)
             if response.status_code != 200:
