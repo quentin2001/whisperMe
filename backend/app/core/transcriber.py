@@ -2,6 +2,10 @@ import os
 import sys
 import torch
 import subprocess
+import socket
+from urllib.parse import urlparse
+from contextlib import contextmanager
+import httpx
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
 from app.config import (
@@ -10,6 +14,85 @@ from app.config import (
     get_short_path_name,
     FFMPEG_PATH
 )
+
+def resolve_host_via_doh(host: str) -> str:
+    if not host:
+        return None
+    
+    # 硬编码的常用域名静态 IP 兜底，防止 Clash DNS 劫持和 DoH 本身也被拦截导致的双重失效
+    STATIC_IP_MAPS = {
+        "token-plan-sgp.xiaomimimo.com": "8.222.147.102"
+    }
+    
+    # 尝试 DoH 解析
+    doh_urls = [
+        "https://dns.alidns.com/resolve",
+        "https://doh.pub/dns-query"
+    ]
+    for doh_base in doh_urls:
+        try:
+            params = {"name": host, "type": "1"}
+            with httpx.Client(trust_env=False, timeout=5.0) as client:
+                resp = client.get(doh_base, params=params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    answers = data.get("Answer", [])
+                    for ans in answers:
+                        if ans.get("type") == 1:
+                            ip = ans.get("data")
+                            if ip and not ip.startswith("198.18."):
+                                return ip
+        except Exception:
+            pass
+            
+    # 尝试系统 DNS 解析
+    try:
+        ips = socket.getaddrinfo(host, None)
+        if ips:
+            ip = ips[0][4][0]
+            if ip and not ip.startswith("198.18."):
+                return ip
+    except Exception:
+        pass
+        
+    # 如果解析失败或者是 Clash 劫持的 fake-IP (198.18.*.*)，则使用静态 IP 兜底
+    if host in STATIC_IP_MAPS:
+        print(f"⚠️ [LOG] {host} 解析失败或被 Clash DNS 劫持，使用静态 IP 兜底: {STATIC_IP_MAPS[host]}")
+        return STATIC_IP_MAPS[host]
+        
+    return None
+
+@contextmanager
+def doh_dns_bypass(url: str):
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname
+        port = parsed.port or (80 if parsed.scheme == "http" else 443)
+    except Exception:
+        host = None
+        port = None
+
+    if not host:
+        yield
+        return
+
+    real_ip = resolve_host_via_doh(host)
+    if real_ip and real_ip != "198.18.0.46":
+        print(f"🎯 [LOG] DoH 拦截 DNS 成功 -> 将域名 {host} 直接映射至公网 IP {real_ip} 进行直连")
+        original_getaddrinfo = socket.getaddrinfo
+        def custom_getaddrinfo(h, p, family=0, type=0, proto=0, flags=0):
+            if h == host:
+                target_port = p or port
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (real_ip, target_port))]
+            return original_getaddrinfo(h, p, family, type, proto, flags)
+        
+        socket.getaddrinfo = custom_getaddrinfo
+        try:
+            yield
+        finally:
+            socket.getaddrinfo = original_getaddrinfo
+    else:
+        yield
 
 
 class WhisperSegmentDummy:
@@ -194,15 +277,21 @@ class PodcastTranscriber:
                     except Exception as e_proxy:
                         print(f"⚠️ [LOG] ASR 分片 {i+1} 代理请求失败: {e_proxy}。正在尝试直连模式...")
                         
-                    # 2. 直连模式兜底
+                    # 2. 直连模式兜底 (结合 DoH 绕过 Clash 劫持)
                     if response is None or response.status_code != 200:
-                        with httpx.Client(timeout=400.0, trust_env=False) as client:
-                            response = client.post(url, headers=headers, json=payload)
-                            if response.status_code == 200:
-                                print(f"🟢 [LOG] 分片 {i+1} 通过直连请求成功！")
+                        try:
+                            with doh_dns_bypass(url):
+                                with httpx.Client(timeout=400.0, trust_env=False) as client:
+                                    response = client.post(url, headers=headers, json=payload)
+                                    if response.status_code == 200:
+                                        print(f"🟢 [LOG] 分片 {i+1} 通过直连(DoH DNS 绕过)请求成功！")
+                        except Exception as e_doh:
+                            print(f"❌ [LOG] ASR 分片 {i+1} 直连(DoH DNS 绕过)请求失败: {e_doh}")
                         
-                    if response.status_code != 200:
-                        raise Exception(f"在线 ASR API 调用失败，状态码: {response.status_code}。详情: {response.text}")
+                    if response is None or response.status_code != 200:
+                        detail_msg = response.text if response is not None else "无响应"
+                        status_code = response.status_code if response is not None else "未知"
+                        raise Exception(f"在线 ASR API 调用失败，状态码: {status_code}。详情: {detail_msg}")
                         
                     resp_data = response.json()
                     full_text = resp_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
@@ -692,12 +781,22 @@ class PodcastTranscriber:
         except Exception as e_proxy:
             print(f"⚠️ [LOG] LLM 语义缝合接口代理请求失败: {e_proxy}。尝试直连...")
             
-        # 2. 直连兜底
-        with httpx.Client(timeout=120.0, trust_env=False) as client:
-            response = client.post(api_url, json=payload, headers=headers)
-            if response.status_code != 200:
-                raise Exception(f"LLM API error (code {response.status_code}): {response.text}")
-            result = response.json()
-            return result["choices"][0]["message"]["content"].strip()
+        # 2. 直连兜底 (结合 DoH 绕过)
+        try:
+            with doh_dns_bypass(api_url):
+                with httpx.Client(timeout=120.0, trust_env=False) as client:
+                    response = client.post(api_url, json=payload, headers=headers)
+                    if response.status_code == 200:
+                        result = response.json()
+                        return result["choices"][0]["message"]["content"].strip()
+        except Exception as e_doh:
+            print(f"❌ [LOG] LLM 语义缝合直连(DoH DNS 绕过)请求失败: {e_doh}")
+            
+        if response is None or response.status_code != 200:
+            detail_msg = response.text if response is not None else "无响应"
+            status_code = response.status_code if response is not None else "未知"
+            raise Exception(f"LLM API error (code {status_code}): {detail_msg}")
+        result = response.json()
+        return result["choices"][0]["message"]["content"].strip()
 
 
