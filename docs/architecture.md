@@ -1,6 +1,6 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-16 · Session `4eeb3257`
+> 最后更新：2026-06-17 · Session `5cbe0e2c`
 
 ---
 
@@ -155,9 +155,12 @@ graph LR
     S --> N[notifier]
 ```
 
-- **downloader.py**：支持小宇宙 FM 和 Bilibili 两个源，使用 `httpx` + `yt-dlp` + `FFmpeg` 进行音频提取
-- **transcriber.py**：双模式转录 — 本地 `faster-whisper` (GPU/CPU) / 在线 `MiMo ASR` API；集成 `pyannote.audio` 进行声纹分段与说话人识别
-- **summarizer.py**：双模式总结 — 本地 `Ollama/LM Studio` / 在线 `OpenAI 兼容 API`
+- **downloader.py**：支持小宇宙 FM 和 Bilibili 两个源，使用 `httpx` + `yt-dlp` + `FFmpeg` 进行音频提取。
+  - **小宇宙播客主页自动识别**：输入 `/podcast/` 节目链接时，后台能够自动通过多套抓取策略请求并解析获取最新单集的 URL。
+  - **4 级自适应网页抓取**：按顺序回溯尝试 `httpx (有代理)` -> `httpx (无代理直连)` -> `curl (有代理)` -> `curl (直连 + DoH 解析域名绑定)`，有效穿透本地代理软件的各种黑洞/异常配置状态。
+- **transcriber.py**：双模式转录 — 本地 `faster-whisper` (GPU/CPU) / 在线 `MiMo ASR` API；集成 `pyannote.audio` 进行声纹分段与说话人识别。
+  - **DoH DNS Bypass 直连注入**：包含 `doh_dns_bypass` 环境变量上下文管理器，在 Clash TUN/Fake-IP 劫持导致 SSL 连接 EOF 报错时，通过 AliDNS/Doh.pub 查询公网真实 IP 并临时注入 `socket.getaddrinfo`，配合静态 IP 兜底，保障在线 ASR API 100% 连通。
+- **summarizer.py**：双模式总结 — 本地 `Ollama/LM Studio` / 在线 `OpenAI 兼容 API`。同样集成了 `doh_dns_bypass` 直连备用逻辑，用于绕过有缺陷的代理服务直接请求在线 LLM API。
 - **notifier.py**：支持 Windows 桌面气泡推送和 SMTP 邮件通知（可独立开关）
 - **queue_manager.py**：FIFO 后台任务排队，显存不足时自动降级至 CPU
 
@@ -267,6 +270,7 @@ sequenceDiagram
 | 单文件 SPA (App.jsx) | 减少组件间通信复杂度，适合快速迭代的个人项目 |
 | FIFO 任务队列 | 避免多任务并发时显存竞争，保证稳定性 |
 | 双模式 ASR/LLM | 支持纯离线和云端 API 两种模式，灵活适配不同场景 |
+| DoH & 4级自适应抓取 | 规避本地 Clash TUN/Fake-IP 导致的 DNS 劫持与 SSL 连接阻线，实现 100% 网络自愈 |
 
 ---
 
