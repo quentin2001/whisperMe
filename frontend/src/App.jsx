@@ -399,6 +399,58 @@ function ShownotesRenderer({ text, onTimeJump }) {
   );
 }
 
+function CommentRenderer({ text, onTimeJump }) {
+  if (!text) return null;
+  const timeRegex = /(?:([0-9]{1,2}):)?([0-9]{1,2}):([0-9]{2})/g;
+  
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = timeRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    const timeStr = match[0];
+    const hrs = match[1] ? parseInt(match[1], 10) : 0;
+    const mins = parseInt(match[2], 10);
+    const secs = parseInt(match[3], 10);
+    const totalSeconds = hrs * 3600 + mins * 60 + secs;
+    
+    parts.push(
+      <button 
+        key={`time-${match.index}`}
+        className="time-badge" 
+        onClick={(e) => { e.stopPropagation(); onTimeJump(totalSeconds); }}
+        style={{
+          background: 'rgba(122, 162, 247, 0.1)',
+          color: 'var(--primary)',
+          border: '1px solid rgba(122, 162, 247, 0.2)',
+          borderRadius: '4px',
+          padding: '2px 6px',
+          fontSize: '12px',
+          margin: '0 4px',
+          cursor: 'pointer',
+          fontFamily: 'monospace'
+        }}
+        title={`跳转到 ${timeStr}`}
+      >
+        <span style={{ fontSize: '10px', marginRight: '3px' }}>⏱️</span>
+        {timeStr}
+      </button>
+    );
+    
+    lastIndex = timeRegex.lastIndex;
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return <>{parts}</>;
+}
+
 const PRESETS = {
   light: {
     'Default Light': { background: '#FDF6E3', foreground: '#586E75', primary: '#268BD2', accent: '#CB4B16' },
@@ -1118,17 +1170,18 @@ export default function App() {
     notification_email: '',
     enable_win_notification: true,
     enable_email_notification: false,
-    asr_mode: 'local',
+    asr_mode: 'online',
     online_api_key: '',
     online_base_url: 'https://token-plan-sgp.xiaomimimo.com/v1',
     online_model: 'mimo-v2.5-asr',
-    summary_mode: 'local',
+    summary_mode: 'online',
     online_summary_api_key: '',
     online_summary_base_url: 'https://api.openai.com/v1',
-    online_summary_model: 'gpt-4o-mini'
+    online_summary_model: 'gpt-4o-mini',
+    custom_storage_dir: ''
   });
 
-  const [asrMode, setAsrMode] = useState('local'); // 'local' | 'online'
+  const [asrMode, setAsrMode] = useState('online'); // 'local' | 'online'
 
   // Prompt 编辑状态
   const [promptData, setPromptData] = useState({
@@ -2274,33 +2327,93 @@ export default function App() {
       audioPlayerRef.current.currentTime = seconds;
       audioPlayerRef.current.play().catch(err => console.log("播放被浏览器拦截", err));
     }
+    
+    // 智能定位：当点击外部时间戳时，左侧剧本流自动滚动至对应段落并居中
+    if (activeTask && activeTask.paragraphs && activeTask.paragraphs.length > 0) {
+      let targetPara = activeTask.paragraphs.find(p => seconds >= p.start_time && seconds <= p.end_time);
+      if (!targetPara) {
+        // 如果点击的时间点正好落在静音间隙，则寻找时间最接近的段落
+        targetPara = activeTask.paragraphs.reduce((prev, curr) => {
+          return (Math.abs(curr.start_time - seconds) < Math.abs(prev.start_time - seconds) ? curr : prev);
+        });
+      }
+      if (targetPara) {
+        // 使用 setTimeout 确保 DOM 状态稳定
+        setTimeout(() => {
+          const el = document.getElementById(targetPara.id);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // 添加闪烁高亮效果提醒用户
+            el.classList.add('glow-highlight');
+            setTimeout(() => {
+              el.classList.remove('glow-highlight');
+            }, 2000);
+          }
+        }, 100);
+      }
+    }
   };
 
-  // 沉淀段落为卡片
+  // 沉淀段落为卡片 (乐观更新)
   const handleSedimentParagraph = async (paragraphId, podcastId) => {
+    let isSedimented = false;
+    if (activeTask && activeTask.paragraphs) {
+      const p = activeTask.paragraphs.find(p => p.id === paragraphId);
+      if (p) isSedimented = p.sedimented;
+    }
+
+    // 1. 乐观更新：立刻在前端改变状态，实现真正的“零延迟”点击体验
+    if (activeTask && activeTask.paragraphs) {
+      const optimisticParas = activeTask.paragraphs.map(p => 
+        p.id === paragraphId ? { ...p, sedimented: !isSedimented } : p
+      );
+      setActiveTask({ ...activeTask, paragraphs: optimisticParas });
+    }
+
+    // 2. 后台静默发起真正的网络请求
     try {
-      const res = await fetch(`${BACKEND_URL}/api/cards/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paragraph_id: paragraphId, podcast_id: podcastId })
-      });
-      if (res.status === 200) {
-        // 更新本地段落已沉淀状态
-        if (activeTask && activeTask.paragraphs) {
-          const updatedParas = activeTask.paragraphs.map(p => {
-            if (p.id === paragraphId) {
-              return { ...p, sedimented: true };
-            }
-            return p;
-          });
-          setActiveTask({ ...activeTask, paragraphs: updatedParas });
+      if (isSedimented) {
+        // 取消沉淀
+        const res = await fetch(`${BACKEND_URL}/api/cards/paragraph/${paragraphId}`, {
+          method: 'DELETE'
+        });
+        if (res.status !== 200) {
+          // 失败回退状态
+          if (activeTask && activeTask.paragraphs) {
+            const rollbackParas = activeTask.paragraphs.map(p => 
+              p.id === paragraphId ? { ...p, sedimented: true } : p
+            );
+            setActiveTask({ ...activeTask, paragraphs: rollbackParas });
+          }
+          showToast("❌ 取消沉淀失败，请重试");
         }
-        showToast("✨ 成功将该段落沉淀为知识闪光卡片！");
       } else {
-        showToast("❌ 沉淀卡片失败，请重试");
+        // 沉淀
+        const res = await fetch(`${BACKEND_URL}/api/cards/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paragraph_id: paragraphId, podcast_id: podcastId })
+        });
+        if (res.status !== 200) {
+          // 失败回退状态
+          if (activeTask && activeTask.paragraphs) {
+            const rollbackParas = activeTask.paragraphs.map(p => 
+              p.id === paragraphId ? { ...p, sedimented: false } : p
+            );
+            setActiveTask({ ...activeTask, paragraphs: rollbackParas });
+          }
+          showToast("❌ 沉淀卡片失败，请重试");
+        }
       }
     } catch (err) {
       console.error(err);
+      // 失败回退状态
+      if (activeTask && activeTask.paragraphs) {
+        const rollbackParas = activeTask.paragraphs.map(p => 
+          p.id === paragraphId ? { ...p, sedimented: isSedimented } : p
+        );
+        setActiveTask({ ...activeTask, paragraphs: rollbackParas });
+      }
       showToast("❌ 无法连接到后端服务");
     }
   };
@@ -2410,127 +2523,106 @@ export default function App() {
           </div>
         </div>
 
-        {/* 性能监控栏 */}
+        {/* 微型仪表盘 (Micro-Dashboard) */}
         <div style={{ 
-          fontSize: '11px', 
-          color: 'var(--text-muted)', 
-          padding: '14px 8px 0 8px', 
+          padding: '12px 10px', 
           borderTop: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px'
+          gap: '10px'
         }}>
-          {/* CPU & RAM */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>{t('cpu')}:</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>{t('ram')}:</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-              {perfData ? `${perfData.ram.used}G / ${perfData.ram.total}G` : '--'}
-            </span>
+          {/* CPU & RAM & Disk - 紧凑网格 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+            
+            {/* CPU & Queue 一行两列 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {/* CPU */}
+              <div style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>CPU</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
+                </div>
+                <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden', marginTop: '6px' }}>
+                  <div style={{ width: `${perfData?.cpu || 0}%`, height: '100%', background: (perfData?.cpu > 80) ? 'var(--error)' : 'var(--primary)' }}></div>
+                </div>
+              </div>
+
+              {/* Queue */}
+              <div style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{t('queue_tasks')}</span>
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: perfData?.queue?.size > 0 ? 'var(--primary)' : 'var(--text-muted)', marginTop: '2px' }}>
+                  {perfData?.queue ? perfData.queue.size : '--'}
+                </div>
+              </div>
+            </div>
+
+            {/* RAM (全宽) */}
+            <div style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>RAM</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{perfData?.ram?.percent || 0}%</span>
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginTop: '2px' }}>
+                {perfData ? `${perfData.ram.used}G / ${perfData.ram.total}G` : '--'}
+              </div>
+              {perfData?.ram && (
+                <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden', marginTop: '4px' }}>
+                  <div style={{ width: `${perfData.ram.percent}%`, height: '100%', background: perfData.ram.percent > 85 ? 'var(--error)' : 'linear-gradient(90deg, #3b82f6, #60a5fa)' }}></div>
+                </div>
+              )}
+            </div>
+
+            {/* Disk (全宽) */}
+            {perfData?.disk && (
+              <div style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Disk</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{perfData.disk.percent}%</span>
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#10b981', marginTop: '2px' }}>
+                  {perfData.disk.used}G / {perfData.disk.total}G
+                </div>
+                <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden', marginTop: '4px' }}>
+                  <div style={{ width: `${perfData.disk.percent}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #059669)' }}></div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* GPU 性能指标 */}
-          {perfData?.vram?.has_gpu ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: '0.8' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '10px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '140px' }} title={perfData.vram.gpu_name}>
+          {/* GPU - 只在有 GPU 时渲染，高度压缩 */}
+          {perfData?.vram?.has_gpu && (
+            <div style={{ background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '120px' }} title={perfData.vram.gpu_name}>
                   {perfData.vram.gpu_name}
                 </span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: '600' }}>
-                  {perfData.vram.gpu_temp}°C
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{perfData.vram.gpu_temp}°C | {perfData.vram.gpu_util}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>VRAM</span>
+                <span style={{ fontSize: '10px', color: perfData.vram.percent > 85 ? 'var(--error)' : 'var(--text-primary)', fontWeight: '600' }}>
+                  {(perfData.vram.used / 1024).toFixed(1)}G / {(perfData.vram.total / 1024).toFixed(1)}G
                 </span>
               </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{t('gpu_load')}:</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{perfData.vram.gpu_util}%</span>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{t('vram')}:</span>
-                  <span style={{ 
-                    color: perfData.vram.percent > 85 ? 'var(--error)' : (perfData.vram.percent > 60 ? 'var(--warning)' : 'var(--text-primary)'),
-                    fontWeight: '600' 
-                  }}>
-                    {(perfData.vram.used / 1024).toFixed(1)}G / {(perfData.vram.total / 1024).toFixed(1)}G
-                  </span>
-                </div>
-                <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden' }}>
-                  <div style={{ 
-                    width: `${perfData.vram.percent}%`, 
-                    height: '100%', 
-                    background: perfData.vram.percent > 85 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--accent))' 
-                  }}></div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--error)' }}>
-              <span>{t('gpu_cpu')}:</span>
-              <span>{t('gpu_cpu_off')}</span>
-            </div>
-          )}
-
-          {/* 存储空间 (Disk) */}
-          {perfData?.disk && (
-            <div style={{ marginTop: '2px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{t('disk')}:</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-                  {perfData.disk.used}G / {perfData.disk.total}G
-                </span>
-              </div>
-              <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden' }}>
-                <div style={{ 
-                  width: `${perfData.disk.percent}%`, 
-                  height: '100%', 
-                  background: 'linear-gradient(90deg, #10b981, #059669)' 
-                }}></div>
+              <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '1.5px', overflow: 'hidden', marginTop: '4px' }}>
+                <div style={{ width: `${perfData.vram.percent}%`, height: '100%', background: perfData.vram.percent > 85 ? 'var(--error)' : 'linear-gradient(90deg, var(--primary), var(--accent))' }}></div>
               </div>
             </div>
           )}
 
-          {/* 队列状况 */}
-          {perfData?.queue && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '2px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>{t('queue_tasks')}:</span>
-              <span style={{ 
-                color: perfData.queue.size > 0 ? 'var(--primary)' : 'var(--text-muted)', 
-                fontWeight: '700' 
-              }}>
-                {perfData.queue.size} {language.startsWith('zh') ? '个' : 'tasks'}
-              </span>
+          {/* 模式 Badges */}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ flex: 1, padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', textAlign: 'center', fontSize: '11px', fontWeight: '500', color: asrMode === 'local' ? 'var(--primary)' : 'var(--accent)' }}>
+              {asrMode === 'local' ? `💻 ASR` : `🌐 ASR`}
             </div>
-          )}
-
-          {/* 语音转录 (ASR) 状态 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '4px' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>{t('asr_engine')}:</span>
-            <span style={{ 
-              color: asrMode === 'local' ? 'var(--primary)' : 'var(--accent)', 
-              fontWeight: '700' 
-            }}>
-              {asrMode === 'local' ? `💻 ${t('local_trans')}` : `🌐 ${t('online_trans')}`}
-            </span>
+            {perfData?.llm_status && (
+              <div style={{ flex: 1, padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', textAlign: 'center', fontSize: '11px', fontWeight: '500', color: perfData.llm_status === 'connected' ? '#10b981' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)') }}>
+                {perfData.llm_status === 'connected' ? `🧠 LLM` : (perfData.llm_status === 'online_mode' ? `☁️ LLM` : `❌ LLM`)}
+              </div>
+            )}
           </div>
-
-          {/* AI 总结 (LLM) 状态 */}
-          {perfData?.llm_status && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px', marginTop: '4px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>{t('llm_engine')}:</span>
-              <span style={{ 
-                color: perfData.llm_status === 'connected' ? 'var(--success)' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)'), 
-                fontWeight: '700' 
-              }}>
-                {perfData.llm_status === 'connected' ? t('connected') : (perfData.llm_status === 'online_mode' ? t('online_mode') : t('offline'))}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -2582,111 +2674,7 @@ export default function App() {
           {/* 右侧快速任务新建栏 */}
           {activeTab === 'dashboard' && (
             <form onSubmit={handleCreateTask} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {/* 转录 (ASR) 切换 */}
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>{t('transcribe_asr')}:</span>
-              <div style={{ 
-                display: 'inline-flex', 
-                background: 'rgba(0, 0, 0, 0.25)', 
-                border: '1px solid var(--border-color)', 
-                borderRadius: '8px',
-                padding: '3px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => handleToggleAsrMode('local')}
-                  style={{
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: asrMode === 'local' ? '600' : '400',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: asrMode === 'local' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                    color: asrMode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  title="使用本地 Faster-Whisper 进行语音转录与分轨"
-                >
-                  {t('local')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleAsrMode('online')}
-                  style={{
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: asrMode === 'online' ? '600' : '400',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: asrMode === 'online' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                    color: asrMode === 'online' ? 'var(--accent)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  title="使用在线 OpenASR 兼容接口转录"
-                >
-                  {t('online')}
-                </button>
-              </div>
 
-              {/* 总结 (LLM) 快捷切换 */}
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500', marginLeft: '6px' }}>{t('summary_llm')}:</span>
-              <div style={{ 
-                display: 'inline-flex', 
-                background: 'rgba(0, 0, 0, 0.25)', 
-                border: '1px solid var(--border-color)', 
-                borderRadius: '8px',
-                padding: '3px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSummaryMode('local')}
-                  style={{
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: configData.summary_mode === 'local' ? '600' : '400',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: configData.summary_mode === 'local' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                    color: configData.summary_mode === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  title={perfData?.llm_status === 'connected' ? '本地大模型已联通 (Ollama/LM Studio)' : '本地大模型未开启，请检查本地 11434 端口'}
-                >
-                  {t('local')} {perfData?.llm_status === 'connected' ? '🟢' : '🔴'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSummaryMode('online')}
-                  style={{
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: configData.summary_mode === 'online' ? '600' : '400',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: configData.summary_mode === 'online' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                    color: configData.summary_mode === 'online' ? 'var(--accent)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  title="使用云端 API (如 OpenAI/DeepSeek 兼容密钥) 总结"
-                >
-                  {t('online')} ☁️
-                </button>
-              </div>
 
               <input 
                 type="text" 
@@ -3470,6 +3458,12 @@ export default function App() {
                                 <span className="speaker-badge" style={{ background: 'var(--border-hover)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
                                   {speakerName}
                                 </span>
+                                {hoveredParagraphId === para.id && (
+                                  <span className="fade-in" style={{ fontSize: '12px', color: 'var(--primary)', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    <span style={{ marginLeft: '4px', fontSize: '11px', fontWeight: '500' }}>点击从头播放此段落</span>
+                                  </span>
+                                )}
                               </div>
                               <span className="time-stamp" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                                 {(() => {
@@ -3488,13 +3482,8 @@ export default function App() {
                                   return (
                                     <span 
                                       key={sIdx}
-                                      onClick={(e) => {
-                                        e.stopPropagation(); // Avoid triggering parent div onClick
-                                        handleTimeJump(sentence.start);
-                                      }}
                                       className={`sentence-span ${isPlayingSentence ? 'active-sentence' : ''}`}
                                       style={{
-                                        cursor: 'pointer',
                                         padding: '1px 3px',
                                         borderRadius: '4px',
                                         background: isPlayingSentence ? 'rgba(122, 162, 247, 0.22)' : 'transparent',
@@ -3503,7 +3492,6 @@ export default function App() {
                                         marginRight: '4px',
                                         display: 'inline',
                                       }}
-                                      title={`跳转播放 [${Math.floor(sentence.start)}s]`}
                                     >
                                       {sentence.text}
                                     </span>
@@ -3536,10 +3524,9 @@ export default function App() {
                                 zIndex: 10,
                                 color: para.sedimented ? 'var(--warning)' : 'var(--text-muted)'
                               }}
-                              title={para.sedimented ? "已沉淀到知识沙盒" : "一键沉淀到知识沙盒"}
                             >
                               {para.sedimented ? (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--warning)" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="star-anim"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--warning)" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                               ) : (
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                               )}
@@ -3810,9 +3797,9 @@ export default function App() {
                                     <Icons.ThumbsUp /> {comment.likes}
                                   </span>
                                 </div>
-                                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', paddingLeft: '32px' }}>
-                                  {comment.content}
-                                </p>
+                                <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', paddingLeft: '32px' }}>
+                                  <CommentRenderer text={comment.content} onTimeJump={handleTimeJump} />
+                                </div>
                               </div>
                             );
                           })
@@ -4418,8 +4405,20 @@ export default function App() {
                     {/* Pre-dependencies Card */}
                     <div className="settings-card">
                       <div className="settings-row-info">
-                        <h3 className="settings-card-title">🛠️ 转录与声纹前置依赖 (Base dependencies)</h3>
-                        <p className="settings-card-subtitle">系统运行必须的底层依赖工具及 HuggingFace 授权令牌</p>
+                        <h3 className="settings-card-title">🛠️ 存储与前置依赖 (Storage & Dependencies)</h3>
+                        <p className="settings-card-subtitle">配置外挂存储路径以及底层运行库参数</p>
+                      </div>
+
+                      <div className="settings-field" style={{ marginBottom: '16px' }}>
+                        <label className="settings-field-label">📁 外挂存储目录 (可选)</label>
+                        <input 
+                          type="text" 
+                          placeholder="例如: D:\WhisperData (默认存放在系统根目录)"
+                          value={configData.custom_storage_dir || ''} 
+                          onChange={(e) => updateConfigField('custom_storage_dir', e.target.value)}
+                          className="glass-input" 
+                        />
+                        <p className="settings-field-desc">留空则默认使用项目内部文件夹。设置后，所有下载的音频与转录数据将存放于此，方便打包发布系统本身。</p>
                       </div>
 
                       <div className="settings-grid">

@@ -6,8 +6,6 @@ import socket
 from urllib.parse import urlparse
 from contextlib import contextmanager
 import httpx
-from faster_whisper import WhisperModel
-from pyannote.audio import Pipeline
 from app.config import (
     SHORT_LOCAL_WHISPER_MODEL_PATH, 
     HF_TOKEN, 
@@ -104,9 +102,16 @@ class WhisperSegmentDummy:
 
 class PodcastTranscriber:
     def __init__(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # 懒加载设备检测，彻底脱离对 torch 的全局依赖
+        self.device = "cpu"
+        try:
+            # 使用原生的命令行探测是否有 NVIDIA 显卡
+            subprocess.check_output("nvidia-smi", shell=True, stderr=subprocess.STDOUT)
+            self.device = "cuda"
+        except Exception:
+            pass
         self.compute_type = "float16" if self.device == "cuda" else "float32"
-        print(f"🖥️ [LOG] 初始化转录引擎 - 运行设备: {self.device.upper()} | 运算精度: {self.compute_type}")
+        print(f"🖥️ [LOG] 初始化转录引擎 - 默认运行设备: {self.device.upper()} | 运算精度: {self.compute_type}")
 
     def run_diarization(self, wav_path: str) -> list[dict]:
         """
@@ -121,6 +126,8 @@ class PodcastTranscriber:
             return []
 
         try:
+            import torch
+            from pyannote.audio import Pipeline
             # 动态可用显存监控，实现硬件级别的热熔断 CPU 降级机制
             device_to_use = self.device
             if device_to_use == "cuda":
@@ -416,6 +423,8 @@ class PodcastTranscriber:
         else:
             # 本地转录模式
             short_wav_path = get_short_path_name(os.path.abspath(wav_path))
+            import torch
+            from faster_whisper import WhisperModel
             
             # 动态显存监控与资源控制
             device_to_use = self.device
@@ -451,7 +460,6 @@ class PodcastTranscriber:
             )
             whisper_segments = list(whisper_segments_raw)
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
-            import re
             def clean_txt(text):
                 return re.sub(r'[^\w\s]', '', text).strip()
             
@@ -701,14 +709,15 @@ class PodcastTranscriber:
                     batch = paragraphs[i:i+batch_size]
                     
                     # Prepare input JSON
-                    llm_input = [{"index": idx, "raw_content": p["content"]} for idx, p in enumerate(batch)]
+                    llm_input = [{"index": idx, "speaker": p["speaker"], "raw_content": p["content"]} for idx, p in enumerate(batch)]
                     
                     prompt = f"""你是一个专业的速记文本整理助手。
-下面是一份播客转录的初步拼接段落列表（以 JSON 数组形式给出，每个元素包含 index 和 raw_content）。
+下面是一份播客转录的初步拼接段落列表（以 JSON 数组形式给出，每个元素包含 index、speaker 和 raw_content）。
 请在【绝对不改变、不添加、不删减任何原字词】的前提下，对每个段落进行“语义缝合”：
 1. 仅理顺标点符号，将口语中的语气词或停顿转换为合适的标点（如逗号、句号、问号、叹号）。
 2. 确保绝对不改变任何原文的字词顺序或内容，不添加解释性文字，也不要合并不同的 index 段落。
-3. 输出格式必须为标准的 JSON 数组，每个元素包含 index（数字）和 sewn_content（缝合后的段落内容文本）字段，与输入的 index 一一对应。
+3. 【关键】如果发现原 speaker 为 'UNKNOWN_SPEAKER'，请根据上下文语境（如问答、陈述、语气风格），推断出最合适的讲话人角色（例如：主持人、嘉宾A、嘉宾B 等），如果无法推断，请保留原样。
+4. 输出格式必须为标准的 JSON 数组，每个元素包含 index（数字）、speaker（字符串）和 sewn_content（缝合后的段落内容文本）字段，与输入的 index 一一对应。
 
 输入：
 {json.dumps(llm_input, ensure_ascii=False, indent=2)}
@@ -733,9 +742,12 @@ class PodcastTranscriber:
                         for item in sewn_results:
                             idx = item.get("index")
                             content = item.get("sewn_content")
+                            inferred_speaker = item.get("speaker")
                             if idx is not None and 0 <= idx < len(batch) and content:
                                 batch[idx]["content"] = content
-                        print(f"✅ [LOG] 批量语义缝合成功 (段落 {i} 到 {i+len(batch)})")
+                                if inferred_speaker:
+                                    batch[idx]["speaker"] = inferred_speaker
+                        print(f"✅ [LOG] 批量语义缝合与角色推理成功 (段落 {i} 到 {i+len(batch)})")
                     except Exception as parse_err:
                         print(f"⚠️ [LOG] 解析 LLM 语义缝合输出失败: {parse_err}，此批次将保留原始规则拼接内容。")
                         print(f"原始输出: {sewn_json_str[:300]}...")

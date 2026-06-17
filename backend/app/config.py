@@ -57,16 +57,17 @@ def load_config():
         "notification_email": "",
         "enable_win_notification": True,
         "enable_email_notification": False,
-        "asr_mode": "local",
+        "asr_mode": "online",
         "online_api_key": "",
         "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
         "online_model": "mimo-v2.5-asr",
-        "summary_mode": "local",
+        "summary_mode": "online",
         "online_summary_api_key": "",
         "online_summary_base_url": "https://api.openai.com/v1",
         "online_summary_model": "gpt-4o-mini",
         "enable_llm_semantic_sewing": False,
-        "webhook_url": ""
+        "webhook_url": "",
+        "custom_storage_dir": ""
     }
 
     if not CONFIG_FILE_PATH.exists():
@@ -113,16 +114,23 @@ if cudnn_bin_path.exists():
     os.environ["PATH"] = str(cudnn_bin_path) + os.pathsep + os.environ["PATH"]
 
 # ==================== 🛡️ 钢铁防御层 3：构建本地沙盒和 HF 镜像 ====================
-DOWNLOADS_DIR = PROJECT_DIR / "downloads"
-TRANSCRIPTS_DIR = PROJECT_DIR / "transcripts"
-TEMP_SANDBOX_DIR = PROJECT_DIR / "temp_sandbox"
-HF_CACHE_DIR = PROJECT_DIR / "hf_cache_models"
+# 支持外挂存储路径
+CUSTOM_STORAGE_DIR = config.get("custom_storage_dir", "").strip()
+if CUSTOM_STORAGE_DIR and Path(CUSTOM_STORAGE_DIR).exists():
+    storage_base = Path(CUSTOM_STORAGE_DIR)
+else:
+    storage_base = PROJECT_DIR
+
+DOWNLOADS_DIR = storage_base / "downloads"
+TRANSCRIPTS_DIR = storage_base / "transcripts"
+TEMP_SANDBOX_DIR = storage_base / "temp_sandbox"
+HF_CACHE_DIR = storage_base / "hf_cache_models"
 
 # 确保文件夹存在
-DOWNLOADS_DIR.mkdir(exist_ok=True)
-TRANSCRIPTS_DIR.mkdir(exist_ok=True)
-TEMP_SANDBOX_DIR.mkdir(exist_ok=True)
-HF_CACHE_DIR.mkdir(exist_ok=True)
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+TEMP_SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+HF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # 物理转换为 8.3 短路径
 SHORT_TEMP_DIR = get_short_path_name(TEMP_SANDBOX_DIR)
@@ -180,7 +188,7 @@ HF_TOKEN = config.get("hf_token", "").strip()
 OLLAMA_URL = config.get("ollama_url", "http://localhost:11434")
 OLLAMA_MODEL = config.get("ollama_model", "qwen2.5:7b-instruct")
 
-SUMMARY_MODE = config.get("summary_mode", "local")
+SUMMARY_MODE = config.get("summary_mode", "online")
 ONLINE_SUMMARY_API_KEY = config.get("online_summary_api_key", "").strip()
 ONLINE_SUMMARY_BASE_URL = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
 ONLINE_SUMMARY_MODEL = config.get("online_summary_model", "gpt-4o-mini").strip()
@@ -189,3 +197,4 @@ ONLINE_SUMMARY_MODEL = config.get("online_summary_model", "gpt-4o-mini").strip()
 SHORT_LOCAL_WHISPER_MODEL_PATH = get_short_path_name(LOCAL_WHISPER_MODEL_PATH)
 SHORT_DOWNLOADS_DIR = get_short_path_name(DOWNLOADS_DIR)
 SHORT_TRANSCRIPTS_DIR = get_short_path_name(TRANSCRIPTS_DIR)
+STORAGE_BASE = storage_base

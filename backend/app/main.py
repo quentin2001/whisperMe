@@ -37,10 +37,148 @@ app.mount("/audio", StaticFiles(directory=str(SHORT_DOWNLOADS_DIR)), name="audio
 downloader = PodcastDownloader()
 transcriber = PodcastTranscriber()
 summarizer = PodcastSummarizer()
+import time
+import threading
+
 notifier = PodcastNotifier()
+SYSTEM_PERF_CACHE = {}
+
+def background_perf_monitor():
+    """后台独立线程，定时抓取系统硬件信息，彻底解耦 API 响应"""
+    import subprocess
+    import shutil
+    global SYSTEM_PERF_CACHE
+    
+    while True:
+        try:
+            perf_data = {
+                "cpu": 0.0,
+                "ram": {"total": 0.0, "used": 0.0, "percent": 0.0},
+                "vram": {"has_gpu": False},
+                "disk": {"total": 0.0, "used": 0.0, "percent": 0.0},
+                "queue": {"size": 0},
+                "llm_status": "online_mode"
+            }
+            
+            # 1. CPU
+            try:
+                import psutil
+                perf_data["cpu"] = float(psutil.cpu_percent(interval=None))
+            except Exception:
+                try:
+                    cpu_out = subprocess.check_output("wmic cpu get LoadPercentage /Value", shell=True).decode("utf-8", errors="ignore")
+                    for line in cpu_out.splitlines():
+                        if "LoadPercentage=" in line:
+                            perf_data["cpu"] = float(line.split("=")[1].strip())
+                except Exception:
+                    pass
+                    
+            # 2. RAM
+            try:
+                import psutil
+                mem = psutil.virtual_memory()
+                perf_data["ram"] = {
+                    "total": round(mem.total / (1024 ** 3), 1),
+                    "used": round(mem.used / (1024 ** 3), 1),
+                    "percent": mem.percent
+                }
+            except Exception:
+                try:
+                    ram_out = subprocess.check_output("wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /Value", shell=True).decode("utf-8", errors="ignore")
+                    free_kb = total_kb = 0
+                    for line in ram_out.splitlines():
+                        if "FreePhysicalMemory=" in line: free_kb = float(line.split("=")[1].strip())
+                        elif "TotalVisibleMemorySize=" in line: total_kb = float(line.split("=")[1].strip())
+                    if total_kb > 0:
+                        used_kb = total_kb - free_kb
+                        perf_data["ram"] = {
+                            "total": round(total_kb / (1024 * 1024), 1),
+                            "used": round(used_kb / (1024 * 1024), 1),
+                            "percent": round((used_kb / total_kb) * 100, 1)
+                        }
+                except Exception:
+                    pass
+
+            # 3. GPU (使用原生的 nvidia-smi 替代 torch.cuda.is_available)
+            try:
+                # 首先测试 nvidia-smi 命令是否存在
+                subprocess.check_output("nvidia-smi -L", shell=True, stderr=subprocess.STDOUT)
+                has_gpu = True
+            except Exception:
+                has_gpu = False
+
+            if has_gpu:
+                try:
+                    vram_out = subprocess.check_output("nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore")
+                    parts = vram_out.strip().split(",")
+                    if len(parts) >= 3:
+                        t_mb = float(parts[0].strip())
+                        u_mb = float(parts[1].strip())
+                        perf_data["vram"].update({
+                            "has_gpu": True,
+                            "total": t_mb,
+                            "used": u_mb,
+                            "percent": round((u_mb / t_mb) * 100, 1)
+                        })
+                    
+                    name_out = subprocess.check_output("nvidia-smi --query-gpu=name --format=csv,noheader", shell=True).decode("utf-8", errors="ignore").strip()
+                    if name_out: perf_data["vram"]["gpu_name"] = name_out
+                    
+                    util_out = subprocess.check_output("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore").strip()
+                    if util_out: perf_data["vram"]["gpu_util"] = float(util_out)
+                    
+                    temp_out = subprocess.check_output("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore").strip()
+                    if temp_out: perf_data["vram"]["gpu_temp"] = float(temp_out)
+                except Exception:
+                    pass
+                    
+            # 4. Disk
+            try:
+                from app.config import STORAGE_BASE
+                total, used, free = shutil.disk_usage(str(STORAGE_BASE))
+                perf_data["disk"] = {
+                    "total": round(total / (1024**3), 1),
+                    "used": round(used / (1024**3), 1),
+                    "percent": round((used / total) * 100, 1)
+                }
+            except Exception:
+                pass
+                
+            # 5. Queue
+            try:
+                qs = queue_manager.task_queue.qsize()
+                if queue_manager.get_current_task_id() is not None:
+                    qs += 1
+                perf_data["queue"]["size"] = qs
+            except Exception:
+                pass
+                
+            # 6. LLM Status
+            try:
+                from app.config import config
+                if config.get("summary_mode", "local") == "local":
+                    import socket, urllib.parse
+                    parsed = urllib.parse.urlparse(config.get("ollama_url", "http://localhost:11434").strip())
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.3)
+                    s.connect((parsed.hostname or "localhost", parsed.port or 11434))
+                    s.close()
+                    perf_data["llm_status"] = "connected"
+            except Exception:
+                perf_data["llm_status"] = "offline"
+
+            SYSTEM_PERF_CACHE = perf_data
+        except Exception as e:
+            print(f"⚠️ [PERF] 后台性能监控发生异常: {e}")
+        
+        # 睡眠 4 秒后继续下一次抓取，完全独立于接口请求频率
+        time.sleep(4)
 
 @app.on_event("startup")
 def startup_event():
+    # 0. 启动后台独立性能监控线程
+    threading.Thread(target=background_perf_monitor, daemon=True).start()
+    print("✅ [STARTUP] 独立后台性能监控哨兵已上线！")
     # 1. 启动队列管理器并绑定管道处理器
     queue_manager.start(run_podcast_pipeline)
     
@@ -607,12 +745,14 @@ def run_podcast_pipeline(task_id: str, url: str):
                 pass
         # 释放 GPU 显存与内存缓存
         try:
-            import torch
+            import sys
             import gc
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                print("🧹 [CLEANUP] 已成功释放 PyTorch CUDA 显存缓存")
+            if 'torch' in sys.modules:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    print("🧹 [CLEANUP] 已成功释放 PyTorch CUDA 显存缓存")
         except Exception as ram_ex:
             print(f"⚠️ [CLEANUP] 释放内存时出错: {ram_ex}")
 
@@ -676,6 +816,11 @@ def get_task_details(task_id: str):
         
     return sanitize_floats(task)
 
+@app.get("/api/performance")
+def get_performance():
+    # 彻底解耦：直接 0.1 毫秒内返回全局内存缓存，不再卡住线程池！
+    return SYSTEM_PERF_CACHE
+
 @app.post("/api/tasks")
 def create_task(req: CreateTaskRequest):
     task_id = str(uuid.uuid4())
@@ -728,161 +873,6 @@ def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
     # 5. 放入全局单例队列管理器进行排队串行处理
     queue_manager.add_task(task_id, local_path)
     return {"task_id": task_id, "status": "pending"}
-
-@app.get("/api/performance")
-def get_performance():
-    import subprocess
-    import torch
-    from app.config import PROJECT_DIR
-    
-    cpu_percent = 0.0
-    ram_total_gb = 0.0
-    ram_used_gb = 0.0
-    ram_percent = 0.0
-    
-    vram_total_mb = 0.0
-    vram_used_mb = 0.0
-    vram_percent = 0.0
-    gpu_name = "NVIDIA GPU"
-    gpu_util = 0.0
-    gpu_temp = 0.0
-    
-    # 1. 查询 CPU 占用率
-    try:
-        cpu_out = subprocess.check_output("wmic cpu get LoadPercentage /Value", shell=True).decode("utf-8", errors="ignore")
-        for line in cpu_out.splitlines():
-            if "LoadPercentage=" in line:
-                cpu_percent = float(line.split("=")[1].strip())
-    except Exception:
-        pass
-        
-    # 2. 查询系统内存 RAM
-    try:
-        ram_out = subprocess.check_output("wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /Value", shell=True).decode("utf-8", errors="ignore")
-        free_kb = 0
-        total_kb = 0
-        for line in ram_out.splitlines():
-            if "FreePhysicalMemory=" in line:
-                free_kb = float(line.split("=")[1].strip())
-            elif "TotalVisibleMemorySize=" in line:
-                total_kb = float(line.split("=")[1].strip())
-        if total_kb > 0:
-            ram_total_gb = round(total_kb / (1024 * 1024), 1)
-            used_kb = total_kb - free_kb
-            ram_used_gb = round(used_kb / (1024 * 1024), 1)
-            ram_percent = round((used_kb / total_kb) * 100, 1)
-    except Exception:
-        pass
-
-    # 3. 查询显卡及显存 VRAM 详细信息
-    has_gpu = torch.cuda.is_available()
-    if has_gpu:
-        try:
-            # 3.1 查显存
-            vram_out = subprocess.check_output(
-                "nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader,nounits", 
-                shell=True
-            ).decode("utf-8", errors="ignore")
-            parts = vram_out.strip().split(",")
-            if len(parts) >= 3:
-                vram_total_mb = float(parts[0].strip())
-                vram_used_mb = float(parts[1].strip())
-                vram_percent = round((vram_used_mb / vram_total_mb) * 100, 1)
-                
-            # 3.2 查 GPU 物理名称 (动态匹配用户显卡，拒绝硬编码)
-            gpu_name_out = subprocess.check_output(
-                "nvidia-smi --query-gpu=name --format=csv,noheader", 
-                shell=True
-            ).decode("utf-8", errors="ignore").strip()
-            if gpu_name_out:
-                gpu_name = gpu_name_out
-                
-            # 3.3 查 GPU 核心计算负载
-            gpu_util_out = subprocess.check_output(
-                "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits", 
-                shell=True
-            ).decode("utf-8", errors="ignore").strip()
-            if gpu_util_out:
-                gpu_util = float(gpu_util_out)
-                
-            # 3.4 查 GPU 核心温度
-            gpu_temp_out = subprocess.check_output(
-                "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits", 
-                shell=True
-            ).decode("utf-8", errors="ignore").strip()
-            if gpu_temp_out:
-                gpu_temp = float(gpu_temp_out)
-        except Exception:
-            pass
-
-    # 4. 查询磁盘存储空间 (项目所在分区)
-    disk_total_gb = 0.0
-    disk_used_gb = 0.0
-    disk_percent = 0.0
-    try:
-        total, used, free = shutil.disk_usage(str(PROJECT_DIR))
-        disk_total_gb = round(total / (1024**3), 1)
-        disk_used_gb = round(used / (1024**3), 1)
-        disk_percent = round((used / total) * 100, 1)
-    except Exception:
-        pass
-
-    # 5. 查询任务排队状况
-    queue_size = 0
-    try:
-        queue_size = queue_manager.task_queue.qsize()
-        if queue_manager.get_current_task_id() is not None:
-            queue_size += 1
-    except Exception:
-        pass
-
-    # 6. 检测本地大模型接口连接状况 (仅在用户选择本地模式时检测)
-    llm_status = "online_mode"
-    try:
-        from app.config import config
-        summary_mode = config.get("summary_mode", "local")
-        if summary_mode == "local":
-            import socket
-            import urllib.parse
-            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-            parsed = urllib.parse.urlparse(ollama_url)
-            host = parsed.hostname or "localhost"
-            port = parsed.port or 11434
-            
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(0.3) # 限制 300ms 快速超时，不阻塞 API
-            s.connect((host, port))
-            s.close()
-            llm_status = "connected"
-    except Exception:
-        llm_status = "offline"
-
-    return {
-        "cpu": cpu_percent,
-        "ram": {
-            "total": ram_total_gb,
-            "used": ram_used_gb,
-            "percent": ram_percent
-        },
-        "vram": {
-            "total": vram_total_mb,
-            "used": vram_used_mb,
-            "percent": vram_percent,
-            "has_gpu": has_gpu,
-            "gpu_name": gpu_name,
-            "gpu_util": gpu_util,
-            "gpu_temp": gpu_temp
-        },
-        "disk": {
-            "total": disk_total_gb,
-            "used": disk_used_gb,
-            "percent": disk_percent
-        },
-        "queue": {
-            "size": queue_size
-        },
-        "llm_status": llm_status
-    }
 
 @app.delete("/api/tasks/{task_id}")
 def delete_task(task_id: str):
@@ -1277,6 +1267,24 @@ def create_card(req: CreateCardRequest):
     
     db.create_card(card)
     return card
+
+@app.delete("/api/cards/paragraph/{paragraph_id}")
+def delete_card_by_paragraph(paragraph_id: str):
+    cards = db.get_all_cards()
+    card_to_delete = None
+    for c in cards:
+        if c.get("paragraph_id") == paragraph_id:
+            card_to_delete = c
+            break
+            
+    if not card_to_delete:
+        raise HTTPException(status_code=404, detail="未找到该段落对应的卡片")
+        
+    success = db.delete_card(card_to_delete["id"])
+    if not success:
+        raise HTTPException(status_code=500, detail="删除卡片失败")
+        
+    return {"status": "ok", "deleted_card_id": card_to_delete["id"]}
 
 @app.get("/api/cards")
 def get_cards():

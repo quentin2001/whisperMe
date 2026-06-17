@@ -50,3 +50,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.swp
+
+# 10. Logs and Backups
+logs/
+*.bak
+*.db
