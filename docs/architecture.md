@@ -19,8 +19,8 @@ graph TB
 
     subgraph Backend ["⚙️ Backend (FastAPI + Uvicorn)"]
         E[main.py — API 路由 & 业务逻辑]
-        F[config.py — 全局配置加载 / 环境焊接]
-        G[database.py — JSON 文件数据库]
+        F[config.py — 全局配置加载 / 环境焊接 / 外部路径挂载]
+        G[database.py — SQLite 关系数据库]
         H[core/downloader.py — 播客下载器]
         I[core/transcriber.py — 语音转录器]
         J[core/summarizer.py — LLM 总结器]
@@ -31,11 +31,11 @@ graph TB
 
     subgraph Storage ["💾 本地存储"]
         N[config.json — 全局配置文件]
-        O[tasks_db.json — 任务数据库]
+        O[whisperMe.db — SQLite 数据库]
         P[speaker_fingerprints.json — 声纹指纹库]
         Q[prompt.json — AI 总结 Prompt 模板]
         R[downloads/ — 原始音频文件]
-        S[transcripts/ — 转录结果 JSON]
+        S[transcripts/ — 转录结果 JSON (外部存储/临时)]
     end
 
     A -->|HTTP REST| E
@@ -63,7 +63,8 @@ whisperMe/
 ├── prompt.json                # AI 总结 Prompt 模板
 ├── logo.svg                   # 品牌 Logo
 ├── speaker_fingerprints.json  # 声纹指纹存储
-├── tasks_db.json              # 任务持久化数据库
+├── whisperMe.db               # SQLite 关系数据库（主数据源，默认位于 STORAGE_BASE）
+├── tasks_db.json.bak          # 自动迁移后的 JSON 备份文件
 │
 ├── backend/
 │   ├── run.py                 # 后端入口（uvicorn 启动器）
@@ -166,11 +167,12 @@ graph LR
 
 ### 3.4 database.py — 数据持久化
 
-使用 JSON 文件 (`tasks_db.json`) 作为轻量数据库，无需外部数据库服务。支持：
-- 任务 CRUD
-- Anki 闪光卡片存储与复习记录
-- 知识链接关系管理
-- 线程安全的读写锁
+使用 SQLite 关系型数据库 (`whisperMe.db`) 作为持久化存储层，提供高效的数据读写和关系查询。其核心设计包括：
+- **自动向后兼容与无损迁移**：系统启动时，若检测到旧的 `tasks_db.json` 文件存在，会自动读取所有历史任务、段落、卡片及链接数据，无损写入 SQLite 数据库各表，随后将原文件备份为 `tasks_db.json.bak`。
+- **4 张核心表结构**：包含 `tasks`、`paragraphs`、`cards` 和 `links` 表。
+- **复杂字段自动序列化**：对 ASR 文本、说话人映射、下载元数据等复杂嵌套 JSON 数据，在写入数据库时自动序列化为 JSON 字符串，读取时自动反序列化为 Python 字典/列表。
+- **线程安全的数据库锁**：由于本地运行时存在 API 并发请求与后台任务队列的写冲突，内部设计了全局线程排它锁 (`threading.Lock`)。
+- **挂载外部路径**：配合系统设置，`whisperMe.db` 和下载的音频文件均可在外置指定的存储基准目录 (`storage_base`) 下存储，极其适合单独打包成绿色小应用。
 
 ---
 
@@ -263,7 +265,7 @@ sequenceDiagram
 
 | 决策 | 理由 |
 |------|------|
-| JSON 文件数据库 | 轻量部署，无需 SQLite/PostgreSQL，适合个人本地使用 |
+| SQLite 关系数据库 | 无需复杂部署（单文件 db 驱动），从根本上解决海量播客与卡片下 JSON 大文件读写导致的 I/O 卡顿，并实现多线程安全锁定与无损向下迁移 |
 | 8.3 短路径转换 | 规避 Windows 中文用户名导致的 C++ 底层库路径报错 |
 | HuggingFace 镜像自动切换 | 国内用户无需配置代理即可下载 PyAnnote 模型 |
 | 显存熔断降级 | GPU 内存不足时自动切换至 CPU 模式，避免 OOM 崩溃 |
