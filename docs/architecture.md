@@ -1,6 +1,6 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-17 · Session `5cbe0e2c`
+> 最后更新：2026-06-17 · Session `693458b4`
 
 ---
 
@@ -65,6 +65,9 @@ whisperMe/
 ├── speaker_fingerprints.json  # 声纹指纹存储
 ├── whisperMe.db               # SQLite 关系数据库（主数据源，默认位于 STORAGE_BASE）
 ├── tasks_db.json.bak          # 自动迁移后的 JSON 备份文件
+├── start_project.py           # 一键启动并记录日志的后台管理脚本
+├── 一键启动.bat                # Windows 环境双击一键启动入口
+├── logs/                      # 前后端标准流重定向持久化日志
 │
 ├── backend/
 │   ├── run.py                 # 后端入口（uvicorn 启动器）
@@ -161,6 +164,7 @@ graph LR
   - **4 级自适应网页抓取**：按顺序回溯尝试 `httpx (有代理)` -> `httpx (无代理直连)` -> `curl (有代理)` -> `curl (直连 + DoH 解析域名绑定)`，有效穿透本地代理软件的各种黑洞/异常配置状态。
 - **transcriber.py**：双模式转录 — 本地 `faster-whisper` (GPU/CPU) / 在线 `MiMo ASR` API；集成 `pyannote.audio` 进行声纹分段与说话人识别。
   - **DoH DNS Bypass 直连注入**：包含 `doh_dns_bypass` 环境变量上下文管理器，在 Clash TUN/Fake-IP 劫持导致 SSL 连接 EOF 报错时，通过 AliDNS/Doh.pub 查询公网真实 IP 并临时注入 `socket.getaddrinfo`，配合静态 IP 兜底，保障在线 ASR API 100% 连通。
+  - **LLM 说话人推断兜底**：当声纹识别未能匹配到明确角色而产生 `UNKNOWN_SPEAKER` 时，在段落重组阶段通过大模型读取上下文对话语义，推断并补齐相应的说话人角色。
 - **summarizer.py**：双模式总结 — 本地 `Ollama/LM Studio` / 在线 `OpenAI 兼容 API`。同样集成了 `doh_dns_bypass` 直连备用逻辑，用于绕过有缺陷的代理服务直接请求在线 LLM API。
 - **notifier.py**：支持 Windows 桌面气泡推送和 SMTP 邮件通知（可独立开关）
 - **queue_manager.py**：FIFO 后台任务排队，显存不足时自动降级至 CPU
