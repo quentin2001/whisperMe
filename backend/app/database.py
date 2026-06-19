@@ -54,7 +54,8 @@ class LocalDatabase:
                 transcript TEXT,
                 summary TEXT,
                 speaker_mappings TEXT,
-                speaker_embeddings TEXT
+                speaker_embeddings TEXT,
+                audio_url TEXT
             )''')
             # paragraphs table
             c.execute('''CREATE TABLE IF NOT EXISTS paragraphs (
@@ -130,6 +131,18 @@ class LocalDatabase:
                 except Exception as e:
                     print(f"❌ [MIGRATION] 迁移失败: {e}")
                     self.conn.rollback()
+            
+            # 增量升级：检查是否缺失 audio_url 列
+            c.execute("PRAGMA table_info(tasks)")
+            columns = [col["name"] for col in c.fetchall()]
+            if "audio_url" not in columns:
+                try:
+                    c.execute("ALTER TABLE tasks ADD COLUMN audio_url TEXT")
+                    self.conn.commit()
+                    print("✅ [MIGRATION] 成功为 tasks 表增加 audio_url 列")
+                except Exception as e:
+                    print(f"❌ [MIGRATION] 增加 audio_url 列失败: {e}")
+                    self.conn.rollback()
 
     def _insert_task_internal(self, c, t: dict):
         metadata = json.dumps(t.get("metadata", {}), ensure_ascii=False)
@@ -139,13 +152,13 @@ class LocalDatabase:
         c.execute('''INSERT OR REPLACE INTO tasks 
             (id, url, asr_mode, summary_mode, title, podcast_name, status, progress, 
             error_message, created_at, image_url, obsidian_synced, restoring, restore_progress, 
-            metadata, transcript, summary, speaker_mappings, speaker_embeddings)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+            metadata, transcript, summary, speaker_mappings, speaker_embeddings, audio_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
             (t.get("id"), t.get("url"), t.get("asr_mode", "local"), t.get("summary_mode", "local"),
              t.get("title"), t.get("podcast_name"), t.get("status"), t.get("progress"),
              t.get("error_message"), t.get("created_at"), t.get("image_url"), 
              bool(t.get("obsidian_synced")), bool(t.get("restoring")), t.get("restore_progress", 0),
-             metadata, transcript, t.get("summary", ""), speaker_mappings, speaker_embeddings))
+             metadata, transcript, t.get("summary", ""), speaker_mappings, speaker_embeddings, t.get("audio_url", "")))
 
     def _insert_paragraph_internal(self, c, p: dict):
         sentences = json.dumps(p.get("sentences", []), ensure_ascii=False)
@@ -177,7 +190,7 @@ class LocalDatabase:
             # 不取 transcript、speaker_embeddings 等大字段以保证列表渲染极速
             c.execute('''SELECT id, url, asr_mode, summary_mode, title, podcast_name, status, 
                          progress, created_at, error_message, obsidian_synced, image_url, 
-                         restoring, restore_progress, metadata 
+                         restoring, restore_progress, audio_url, metadata 
                          FROM tasks ORDER BY created_at DESC''')
             rows = c.fetchall()
             tasks_list = []

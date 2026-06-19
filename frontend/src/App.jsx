@@ -23,7 +23,8 @@ const Icons = {
   PausePlayer: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"></rect><rect x="15" y="4" width="4" height="16" rx="1"></rect></svg>,
   Volume: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>,
   Mute: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>,
-  Sandbox: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+  Sandbox: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
+  ExternalLink: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
 };
 
 // ==================== 📝 自研高性能 Markdown 渲染器 ====================
@@ -1920,8 +1921,14 @@ export default function App() {
   const fetchTasks = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/tasks`);
-      const data = await res.json();
-      setTasks(data);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setTasks(data);
+        } else {
+          console.error("/api/tasks did not return an array:", data);
+        }
+      }
     } catch (e) {
       console.error("无法获取任务列表:", e);
     }
@@ -2671,6 +2678,21 @@ export default function App() {
             )}
           </div>
           
+          {/* 详情页右侧：跳转原链接 */}
+          {activeTab === 'detail' && activeTask?.url && (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button 
+                className="btn-ghost" 
+                style={{ padding: '8px 16px', gap: '8px', fontSize: '13px', fontWeight: '500' }}
+                onClick={() => window.open(activeTask.url, '_blank', 'noopener,noreferrer')}
+                title="在新标签页中打开原始链接"
+              >
+                <Icons.ExternalLink />
+                访问原文
+              </button>
+            </div>
+          )}
+
           {/* 右侧快速任务新建栏 */}
           {activeTab === 'dashboard' && (
             <form onSubmit={handleCreateTask} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

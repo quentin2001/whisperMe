@@ -71,11 +71,16 @@ def doh_dns_bypass(url: str):
     if real_ip and real_ip != "198.18.0.46":
         print(f"🎯 [LOG] DoH 拦截 DNS 成功 -> 将域名 {host} 直接映射至公网 IP {real_ip} 进行直连")
         original_getaddrinfo = socket.getaddrinfo
-        def custom_getaddrinfo(h, p, family=0, type=0, proto=0, flags=0):
+        def custom_getaddrinfo(*args, **kwargs):
+            h = args[0] if args else kwargs.get("host")
             if h == host:
-                target_port = p or port
+                p = args[1] if len(args) > 1 else kwargs.get("port")
+                target_port = p
+                if target_port is None: target_port = port
+                try: target_port = int(target_port)
+                except ValueError: target_port = port
                 return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (real_ip, target_port))]
-            return original_getaddrinfo(h, p, family, type, proto, flags)
+            return original_getaddrinfo(*args, **kwargs)
         
         socket.getaddrinfo = custom_getaddrinfo
         try:

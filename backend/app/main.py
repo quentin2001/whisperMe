@@ -41,7 +41,15 @@ import time
 import threading
 
 notifier = PodcastNotifier()
-SYSTEM_PERF_CACHE = {}
+# 系统全局状态
+SYSTEM_PERF_CACHE = {
+    "cpu": 0.0,
+    "ram": {"total": 0.0, "used": 0.0, "percent": 0.0},
+    "vram": {"has_gpu": False},
+    "disk": {"total": 0.0, "used": 0.0, "percent": 0.0},
+    "queue": {"size": 0},
+    "llm_status": "offline"
+}
 
 def background_perf_monitor():
     """后台独立线程，定时抓取系统硬件信息，彻底解耦 API 响应"""
@@ -184,34 +192,34 @@ def startup_event():
     
     # 2. 自动恢复数据库中因服务重启而中断的未完成/排队任务，并重入队列
     try:
-        data = db._read_data()
-        modified = False
+        tasks = db.get_all_tasks()
         requeued_count = 0
-        for t in data.get("tasks", []):
+        for t in tasks:
             status = t.get("status")
             if status not in ["completed", "failed"]:
-                t["status"] = "pending"
-                t["progress"] = 0.0
-                t["error_message"] = None
-                modified = True
+                db.update_task(
+                    t["id"],
+                    status="pending",
+                    progress=0.0,
+                    error_message=None
+                )
                 
                 # 重回队列
                 queue_manager.add_task(t["id"], t["url"])
                 requeued_count += 1
                 print(f"🔄 [STARTUP] 检测到未完成任务，已自动重新入队: {t.get('title') or t.get('id')} | URL: {t.get('url')}")
-        if modified:
-            db._write_data(data)
-            print(f"✅ [STARTUP] 成功恢复并重新排队 {requeued_count} 个未完成任务。")
+        print(f"✅ [STARTUP] 成功恢复并重新排队 {requeued_count} 个未完成任务。")
     except Exception as e:
         print(f"❌ [STARTUP] 恢复未完成任务失败: {e}")
 
     # 3. 运行历史任务语气助词发言人自动标记迁移
     try:
-        data = db._read_data()
-        modified = False
+        tasks = db.get_all_tasks()
         interjection_chars = set("嗯对啊哦吧呢呀啦哈哼嗨呗嘛呃喔呦哎对好的噢唏嚯啥呀么）—（,，.。?？!！谢拜行了")
-        for t in data.get("tasks", []):
-            transcript = t.get("transcript", [])
+        for t in tasks:
+            full_t = db.get_task(t["id"])
+            if not full_t: continue
+            transcript = full_t.get("transcript", [])
             if not transcript:
                 continue
             
@@ -223,20 +231,17 @@ def startup_event():
                 text = seg.get("text", "").strip()
                 speaker_texts[sp] = speaker_texts.get(sp, "") + text
                 
-            mappings = t.get("speaker_mappings", {})
+            mappings = full_t.get("speaker_mappings", {})
             task_modified = False
             for sp, full_text in speaker_texts.items():
                 if sp in mappings and mappings[sp] and mappings[sp] != sp:
                     continue
-                cleaned = "".join([c for c in full_text if c.isalnum()])
-                if not cleaned:
-                    mappings[sp] = "未识别语气词"
+                
+                pure_text = "".join([c for c in full_text if c.strip()])
+                if pure_text == "" or set(pure_text).issubset(interjection_chars):
+                    mappings[sp] = "语气词发言人"
                     task_modified = True
-                    continue
-                all_chars_interjection = all(c in interjection_chars for c in cleaned)
-                if len(cleaned) <= 8 and all_chars_interjection:
-                    mappings[sp] = "未识别语气词"
-                    task_modified = True
+                    
             if task_modified:
                 t["speaker_mappings"] = mappings
                 modified = True
@@ -280,6 +285,7 @@ class UpdateConfigRequest(BaseModel):
     online_summary_model: str = "gpt-4o-mini"
     enable_llm_semantic_sewing: bool = False
     webhook_url: str = ""
+    custom_storage_dir: str = ""
 
 
 # --- 智能声纹特征与大模型命名推理引擎 ---
@@ -660,6 +666,49 @@ def run_podcast_pipeline(task_id: str, url: str):
             print("⏳ [LOG] 正在提取发言人声纹特征向量...")
             speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
             db.update_task(task_id, speaker_embeddings=speaker_embeddings)
+            
+            # 如果聚类修正合并了 SPEAKER，需要同步更新已有的 transcript 和段落
+            # diar_data 已被 extract_speaker_embeddings 原地修改，这里用它来检测合并
+            diar_speakers = set(seg["speaker"] for seg in diar_data)
+            transcript_speakers = set(seg.get("speaker") for seg in merged_transcript)
+            merged_away = transcript_speakers - diar_speakers  # 在 transcript 中存在但 diar 中已被合并的 speaker
+            if merged_away:
+                # 构建反向映射：被合并的 speaker -> 对应的 diar_data 中最近时间段的 speaker
+                reverse_map = {}
+                for old_sp in merged_away:
+                    # 找这个 speaker 在 transcript 中的第一条记录的时间
+                    for seg in merged_transcript:
+                        if seg.get("speaker") == old_sp:
+                            seg_center = (seg.get("start", 0) + seg.get("end", 0)) / 2
+                            # 在 diar_data 中找包含此时间点的 speaker
+                            for d in diar_data:
+                                if d["start"] <= seg_center <= d["end"]:
+                                    reverse_map[old_sp] = d["speaker"]
+                                    break
+                            break
+                
+                if reverse_map:
+                    print(f"🔄 [LOG] 正在同步聚类修正到转录文本: {reverse_map}")
+                    for seg in merged_transcript:
+                        if seg.get("speaker") in reverse_map:
+                            seg["speaker"] = reverse_map[seg["speaker"]]
+                    db.update_task(task_id, transcript=merged_transcript)
+                    
+                    # 同步更新段落
+                    try:
+                        paragraphs = db.get_paragraphs_by_podcast(task_id)
+                        if paragraphs:
+                            updated = False
+                            for p in paragraphs:
+                                if p.get("speaker") in reverse_map:
+                                    p["speaker"] = reverse_map[p["speaker"]]
+                                    updated = True
+                            if updated:
+                                db.delete_paragraphs_by_podcast(task_id)
+                                db.add_paragraphs(paragraphs)
+                                print(f"✅ [LOG] 段落 speaker 标签已同步更新")
+                    except Exception as para_ex:
+                        print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
             
             # 运行智能改名流水线
             auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)

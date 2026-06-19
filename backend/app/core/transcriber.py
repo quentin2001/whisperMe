@@ -78,11 +78,16 @@ def doh_dns_bypass(url: str):
     if real_ip and real_ip != "198.18.0.46":
         print(f"🎯 [LOG] DoH 拦截 DNS 成功 -> 将域名 {host} 直接映射至公网 IP {real_ip} 进行直连")
         original_getaddrinfo = socket.getaddrinfo
-        def custom_getaddrinfo(h, p, family=0, type=0, proto=0, flags=0):
+        def custom_getaddrinfo(*args, **kwargs):
+            h = args[0] if args else kwargs.get("host")
             if h == host:
-                target_port = p or port
+                p = args[1] if len(args) > 1 else kwargs.get("port")
+                target_port = p
+                if target_port is None: target_port = port
+                try: target_port = int(target_port)
+                except ValueError: target_port = port
                 return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (real_ip, target_port))]
-            return original_getaddrinfo(h, p, family, type, proto, flags)
+            return original_getaddrinfo(*args, **kwargs)
         
         socket.getaddrinfo = custom_getaddrinfo
         try:
@@ -541,7 +546,9 @@ class PodcastTranscriber:
 
     def extract_speaker_embeddings(self, wav_path: str, diarization_segments: list[dict]) -> dict[str, list[float]]:
         """
-        Extract representative 512-dimensional voice embeddings for each unique speaker
+        Extract representative 512-dimensional voice embeddings for each unique speaker.
+        Uses multi-segment average pooling for robustness, then performs intra-episode
+        clustering correction to merge speakers that are likely the same person.
         """
         if not diarization_segments or not HF_TOKEN or len(HF_TOKEN) < 30:
             return {}
@@ -578,35 +585,92 @@ class PodcastTranscriber:
                 # Sort segments by duration descending
                 sp_segs = sorted(sp_segs, key=lambda s: s["end"] - s["start"], reverse=True)
                 
-                # We extract embedding from the longest segment (minimum 1.5 seconds)
-                best_seg = None
+                # ====== 多段均值池化策略 ======
+                # 筛选出 3-5 段清晰、时长适中（1.5s-10s）的片段，分别提取 Embedding 后取平均
+                candidate_segs = []
                 for seg in sp_segs:
                     duration = seg["end"] - seg["start"]
                     if duration >= 1.5:
-                        best_seg = seg
+                        candidate_segs.append(seg)
+                    if len(candidate_segs) >= 5:
                         break
-                else:
-                    best_seg = sp_segs[0]  # fallback to longest segment even if short
                 
-                start = best_seg["start"]
-                end = best_seg["end"]
-                # Limit duration to max 15 seconds to keep it fast
-                if end - start > 15.0:
-                    end = start + 15.0
-                    
-                print(f"⏳ [LOG] 正在提取 {speaker} 的声纹特征 (时间轴: {start:.2f}s - {end:.2f}s)...")
-                emb = inference.crop(wav_path, Segment(start, end))
+                # 如果没有 >= 1.5s 的段，fallback 到最长的那个
+                if not candidate_segs:
+                    candidate_segs = [sp_segs[0]]
                 
-                # Convert embedding numpy array to list of floats
-                if isinstance(emb, np.ndarray):
-                    emb = np.nan_to_num(emb)
-                    # Normalize vector
-                    norm = np.linalg.norm(emb)
-                    if norm > 0:
-                        emb = emb / norm
-                    speaker_embeddings[speaker] = emb.tolist()
+                embeddings_list = []
+                for seg in candidate_segs:
+                    start = seg["start"]
+                    end = seg["end"]
+                    # 将每段限制为最长 10 秒，避免噪声区间过长
+                    if end - start > 10.0:
+                        end = start + 10.0
                     
+                    try:
+                        emb = inference.crop(wav_path, Segment(start, end))
+                        if isinstance(emb, np.ndarray):
+                            emb = np.nan_to_num(emb)
+                            norm = np.linalg.norm(emb)
+                            if norm > 0:
+                                embeddings_list.append(emb / norm)
+                    except Exception as seg_ex:
+                        print(f"⚠️ [LOG] 提取 {speaker} 片段 ({start:.2f}s-{end:.2f}s) 声纹失败: {seg_ex}")
+                        continue
+                
+                if not embeddings_list:
+                    print(f"⚠️ [LOG] {speaker} 无法提取任何有效声纹片段，跳过")
+                    continue
+                
+                # Average Pooling: 取所有片段 Embedding 的平均值，再 L2 归一化
+                avg_emb = np.mean(embeddings_list, axis=0)
+                norm = np.linalg.norm(avg_emb)
+                if norm > 0:
+                    avg_emb = avg_emb / norm
+                
+                speaker_embeddings[speaker] = avg_emb.tolist()
+                print(f"✅ [LOG] {speaker} 声纹特征提取完成 (使用 {len(embeddings_list)} 段均值池化)")
+            
             print(f"🟢 [LOG] 成功完成 {len(speaker_embeddings)} 个发言人的声纹特征提取！")
+            
+            # ====== 单集内声纹聚类修正 ======
+            # 如果两个 SPEAKER 的余弦相似度 >= 0.92，认为是同一人被误切分，自动合并
+            if len(speaker_embeddings) >= 2:
+                merge_map = {}  # {被合并的 SPEAKER: 合并目标 SPEAKER}
+                sp_ids = sorted(speaker_embeddings.keys())
+                
+                for i in range(len(sp_ids)):
+                    if sp_ids[i] in merge_map:
+                        continue  # 已被合并，跳过
+                    for j in range(i + 1, len(sp_ids)):
+                        if sp_ids[j] in merge_map:
+                            continue
+                        
+                        emb_i = np.array(speaker_embeddings[sp_ids[i]])
+                        emb_j = np.array(speaker_embeddings[sp_ids[j]])
+                        
+                        norm_i = np.linalg.norm(emb_i)
+                        norm_j = np.linalg.norm(emb_j)
+                        if norm_i > 0 and norm_j > 0:
+                            sim = np.dot(emb_i, emb_j) / (norm_i * norm_j)
+                            if sim >= 0.92:
+                                merge_map[sp_ids[j]] = sp_ids[i]
+                                print(f"🔗 [LOG] 声纹聚类修正: {sp_ids[j]} 与 {sp_ids[i]} 高度相似 (cos={sim:.4f})，合并为 {sp_ids[i]}")
+                
+                if merge_map:
+                    # 更新 diarization_segments 中的 speaker 标签（原地修改）
+                    for seg in diarization_segments:
+                        old_sp = seg.get("speaker")
+                        if old_sp in merge_map:
+                            seg["speaker"] = merge_map[old_sp]
+                    
+                    # 从 embeddings 中移除被合并的 speaker
+                    for merged_sp in merge_map:
+                        if merged_sp in speaker_embeddings:
+                            del speaker_embeddings[merged_sp]
+                    
+                    print(f"🎯 [LOG] 聚类修正完成，合并了 {len(merge_map)} 个重复发言人，当前剩余 {len(speaker_embeddings)} 个独立发言人")
+            
             return speaker_embeddings
 
         except Exception as e:
