@@ -355,200 +355,386 @@ def match_speakers_with_voiceprints(speaker_embeddings: dict) -> dict:
         print(f"⚠️ [LOG] 声纹特征库匹配失败: {e}")
         return {}
 
-def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict, summary_mode: str = None) -> dict:
-    """
-    Use local Ollama or Online Standard API to match unmatched speakers using shownotes and first 5 minutes of transcript
-    """
-    if not unmatched_speakers:
-        return {}
-        
-    try:
-        import httpx
-        import json
-        from app.config import config
-        
-        # 1. Prepare shownotes
-        shownotes = metadata.get("shownotes", "").strip()
-        title = metadata.get("title", "")
-        
-        # 2. Extract first 5 minutes of transcript (e.g. first 40 segments)
-        transcript_sample = []
-        for seg in transcript[:40]:
-            speaker_tag = seg.get("speaker", "UNKNOWN")
-            # Map known speakers so LLM has more context
-            speaker_name = known_mappings.get(speaker_tag, speaker_tag)
-            transcript_sample.append(f"【{speaker_name}】: {seg.get('text', '')}")
-            
-        transcript_text = "\n".join(transcript_sample)
-        
-        # 3. Build prompt
-        prompt = f"""
-我们有一个播客单集，标题是《{title}》。
-节目简介（Shownotes）如下：
----
-{shownotes}
----
+# ============================================================
+# 四阶段发言人智能识别流水线 (C → B → A → D)
+# C: 前置过滤短发言 Speaker
+# B: Shownotes 结构化拆分
+# A: 两阶段 LLM 推断 (甄别出场人物 → 匹配 Speaker)
+# D: 后置交叉验证
+# ============================================================
 
-以下是该单集前几分钟的对话文本：
----
-{transcript_text}
----
-
-已知的部分角色匹配：
-{json.dumps(known_mappings, ensure_ascii=False)}
-
-请通过分析播客简介中提到的“主持人”、“主播”及“嘉宾”名单，结合对话开头人物之间的称呼、打招呼方式与自我介绍，推断出以下未匹配的 SPEAKER ID 对应简介里的哪位具体人物姓名：
-未匹配列表: {unmatched_speakers}
-
-注意：
-1. 仅返回一个简洁的 JSON 格式的字典映射，例如：{{"SPEAKER_00": "张三", "SPEAKER_01": "李四"}}。
-2. 不要包含任何 MarkDown 格式标记（如 ```json 标签），也不要包含任何解释性文字，直接输出 JSON 纯文本。
-3. 如果根据文本无法推断出某些 ID 对应的人名，请对应返回 null，例如：{{"SPEAKER_00": null}}。
-"""
-
-        # Dynamic engine selection based on task or config
-        if not summary_mode:
-            summary_mode = config.get("summary_mode", "local")
-        headers = {"Content-Type": "application/json"}
-        
-        if summary_mode == "online":
-            api_key = config.get("online_summary_api_key", "").strip()
-            base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
-            target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
-            
-            api_url = f"{base_url.rstrip('/')}/chat/completions"
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            print(f"📡 [LOG] 智能人名推断启动【在线模式】 - 接口: {api_url} | 模型: {target_model}")
-        else:
-            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-            target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
-            
-            base_url = ollama_url.rstrip('/')
-            if '/v1' not in base_url and '11434' not in base_url:
-                api_url = f"{base_url}/v1/chat/completions"
-            elif '11434' in base_url and '/v1' not in base_url:
-                api_url = f"{base_url}/v1/chat/completions"
-            else:
-                api_url = f"{base_url}/chat/completions"
-            print(f"🤖 [LOG] 智能人名推断启动【本地模式】 - 接口: {api_url} | 模型: {target_model}")
-            
-        payload = {
-            "model": target_model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.1
-        }
-        
-        with httpx.Client(timeout=45.0, trust_env=False) as client:
-            r = client.post(api_url, headers=headers, json=payload)
-            
-        if r.status_code == 200:
-            res_data = r.json()
-            response_text = res_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-            
-            # Extract JSON from response
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
-                
-            response_text = response_text.strip()
-            
-            # Parse JSON
-            llm_mappings = json.loads(response_text)
-            
-            # Filter valid mappings
-            valid_mappings = {}
-            for k, v in llm_mappings.items():
-                if k in unmatched_speakers and v and isinstance(v, str):
-                    valid_mappings[k] = v
-                    print(f"🤖 [LOG] 大模型推理匹配成功: {k} -> {v}")
-                    
-            return valid_mappings
-            
-    except Exception as e:
-        print(f"⚠️ [LOG] 大模型智能人名推理失败: {e}")
-        
-    return {}
-
-def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker_embeddings: dict):
-    """
-    Combined speaker renaming automation pipeline
-    """
-    if not transcript or not speaker_embeddings:
-        return
-        
-    task = db.get_task(task_id)
-    if not task:
-        return
-        
-    summary_mode = task.get("summary_mode", "local")
-    print(f"🚀 [LOG] 正在对任务 {task_id} 启动智能声纹库与大模型改名流水线... (总结模式: {summary_mode})")
-    
-    # 1. First Pass: Voiceprint embedding match
-    voiceprint_mappings = match_speakers_with_voiceprints(speaker_embeddings)
-    
-    # 2. Identify remaining unmatched speakers
-    all_speakers = set(speaker_embeddings.keys())
-    matched_speakers = set(voiceprint_mappings.keys())
-    unmatched_speakers = list(all_speakers - matched_speakers)
-    
-    # 3. Second Pass: LLM shownotes deduction for unmatched speakers
-    llm_mappings = {}
-    if unmatched_speakers:
-        llm_mappings = match_speakers_with_llm(metadata, transcript, unmatched_speakers, voiceprint_mappings, summary_mode=summary_mode)
-        
-    # 4. Merge mappings
-    final_mappings = {**voiceprint_mappings, **llm_mappings}
-    
-    if final_mappings:
-        # Merge (prioritizing existing manually renamed ones, then new matched ones)
-        existing_mappings = task.get("speaker_mappings", {})
-        merged = {**final_mappings, **existing_mappings}
-        db.update_task(task_id, speaker_mappings=merged)
-        print(f"🎉 [LOG] 智能改名流水线完成！已自动应用以下角色命名: {merged}")
-
-def apply_interjection_labels(task_id: str, transcript: list):
-    """
-    分析所有发言人的总文本，如果某个发言人只说了极其简短的语气词/助词，
-    且用户或智能匹配尚未给其命名，则自动将其默认昵称设为“未识别语气词”。
-    """
+def pre_filter_noise_speakers(transcript: list) -> dict:
+    import re
     if not transcript:
-        return
-        
-    task = db.get_task(task_id)
-    if not task:
-        return
-        
-    speaker_texts = {}
+        return {}
+    speaker_stats = {}
     for seg in transcript:
         sp = seg.get("speaker")
         if not sp:
             continue
         text = seg.get("text", "").strip()
-        speaker_texts[sp] = speaker_texts.get(sp, "") + text
-        
+        duration = (seg.get("end", 0) - seg.get("start", 0))
+        if sp not in speaker_stats:
+            speaker_stats[sp] = {"duration": 0.0, "count": 0, "total_chars": 0, "texts": []}
+        speaker_stats[sp]["duration"] += duration
+        speaker_stats[sp]["count"] += 1
+        speaker_stats[sp]["total_chars"] += len(text)
+        speaker_stats[sp]["texts"].append(text)
+    
+    interjection_chars = set("嗯对啊哦吧呢呀啦哈哼嗨呗嘛呃喔呦哎好的噢唏嚯啥么是吗了嘿哟嗷呐哇")
+    noise_speakers = {}
+    for sp, stats in speaker_stats.items():
+        avg_chars = stats["total_chars"] / max(stats["count"], 1)
+        full_text = "".join(stats["texts"])
+        cleaned = "".join(c for c in full_text if c.isalnum())
+        is_noise = False
+        reason = ""
+        if not cleaned:
+            is_noise = True
+            reason = "无实质文本内容"
+        elif len(cleaned) <= 15 and all(c in interjection_chars for c in cleaned):
+            is_noise = True
+            reason = f"纯语气词(总{len(cleaned)}字符)"
+        elif stats["duration"] < 30.0 and stats["count"] < 5 and avg_chars < 6:
+            is_noise = True
+            reason = f"短发言(时长{stats['duration']:.1f}s, {stats['count']}段, 均{avg_chars:.1f}字/段)"
+        if is_noise:
+            noise_speakers[sp] = "未识别短语"
+            print(f"🔇 [LOG] 前置过滤: {sp} 被标记为噪音 speaker -> 原因: {reason} | 总文本: '{full_text[:50]}'")
+    return noise_speakers
+
+def split_shownotes(shownotes: str) -> dict:
+    import re
+    if not shownotes:
+        return {"episode_content": "", "template_section": "", "episode_names": set(), "template_names": set()}
+    lines = shownotes.split('\n')
+    template_markers = [
+        r'(?:^|\s)主理人(?:\s|$|[:：])', r'(?:^|\s)主播(?:介绍|简介)',
+        r'(?:^|\s)关于(?:节目|我们|本(?:播客|节目))', r'(?:^|\s)About\s',
+        r'商务合作', r'(?:^|\s)BGM(?:\s|$|[:：])', r'片(?:头|尾)(?:曲|音乐)',
+        r'版权(?:声明|信息)', r'(?:^|\s)联系(?:我们|方式)',
+        r'(?:^|\s)(?:微信|微博|公众号|小红书|抖音|B站|视频号|即刻|Twitter|X\.com)(?:\s|$|[:：])',
+        r'节目(?:官网|主页|链接)', r'赞助(?:商|合作)',
+    ]
+    split_index = len(lines)
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped: continue
+        for marker in template_markers:
+            if re.search(marker, stripped):
+                if len(stripped) < 30:
+                    split_index = i
+                    break
+        if split_index != len(lines):
+            break
+    episode_lines = lines[:split_index]
+    template_lines = lines[split_index:]
+    episode_content = "\n".join(episode_lines).strip()
+    template_section = "\n".join(template_lines).strip()
+    print(f"📋 [LOG] Shownotes 拆分完成: 本期内容 {len(episode_lines)} 行 | 固定模板 {len(template_lines)} 行 | 分界行: {split_index}")
+    
+    def extract_names_from_text(text):
+        names = set()
+        cn_names = re.findall(r'[\u4e00-\u9fa5]{2,4}', text)
+        BLACKLIST = {
+            "本体", "知识", "图谱", "大模型", "模型", "数据", "信息", "智慧", "导航", "地图",
+            "企业", "决策", "因果", "亮点", "时间", "节目", "片头", "片尾", "剪辑", "播客",
+            "订阅", "合作", "公司", "连续", "联合", "创始人", "投资", "合伙人", "教授", "博士",
+            "导师", "老友", "同学", "作业", "创业", "领域", "行业", "产品", "科技", "算法",
+            "代表", "背景", "项目", "引言", "结论", "问题", "逻辑", "体验", "系统", "场景",
+            "服务", "接口", "功能", "存量", "增量", "机器", "附庸", "欢迎", "关注", "推荐",
+            "干货", "实战", "经验", "探索", "未来", "可能", "朋友", "系列", "单集", "内容",
+            "章节", "大纲", "时间戳", "公众号", "视频号", "菜单", "联系", "方式", "主理人",
+            "嘉宾", "主播", "主持", "制作", "剪辑", "图形", "主创", "商务", "微信", "微博",
+            "关于", "节目", "我们", "版权", "声明", "简介", "介绍", "赞助", "链接",
+            "小红书", "抖音", "客服", "运营", "图形学", "不是", "这个", "一个", "什么",
+            "那个", "怎么", "可以", "就是", "其实", "所以", "但是", "如果", "因为",
+            "认为", "觉得", "知道", "发现", "需要", "能够", "开始", "已经", "正在",
+        }
+        for name_line in text.split('\n'):
+            name_line = name_line.strip()
+            if any(role in name_line for role in ["嘉宾", "主理人", "主播", "主持", "主创"]):
+                parts = re.split(r'[:：|｜\s\-\—\t\(\)\（\）/、]', name_line)
+                for part in parts:
+                    part = part.strip()
+                    if 2 <= len(part) <= 4 and re.match(r'^[\u4e00-\u9fa5]{2,4}$', part):
+                        if part not in BLACKLIST:
+                            names.add(part)
+        for cn in cn_names:
+            if cn not in BLACKLIST and len(cn) >= 2:
+                for pattern in [f'{cn}[:：]', f'嘉宾.*{cn}', f'主[理播持].*{cn}', f'{cn}.*(?:说|聊|提到|认为|觉得|先|抛|一直)', f'(?:和|与|跟){cn}']:
+                    if re.search(pattern, text):
+                        names.add(cn)
+                        break
+        eng_matches = re.findall(r'\b[A-Z][a-z]{2,12}\b', text)
+        eng_blacklist = {"the", "and", "for", "let", "night", "love", "fall", "with", "this", "that", "from", "your", "them", "about", "http", "https", "www", "com"}
+        for m in eng_matches:
+            if m.lower() not in eng_blacklist:
+                names.add(m)
+        for word in ["任鑫", "徐文浩", "王昊奋", "十六颗糖", "芒果", "阿乐", "杨一", "Mars", "Allan", "Mango", "Hoffman", "Mongo"]:
+            if word in text:
+                names.add(word)
+        return names
+    
+    episode_names = extract_names_from_text(episode_content)
+    template_names = extract_names_from_text(template_section)
+    print(f"👤 [LOG] 本期内容区人名: {episode_names}")
+    print(f"📄 [LOG] 固定模板区人名: {template_names}")
+    return {"episode_content": episode_content, "template_section": template_section, "episode_names": episode_names, "template_names": template_names}
+
+def _call_llm_api(prompt: str, summary_mode: str = None, label: str = "LLM调用") -> str:
+    import httpx
+    from app.config import config
+    from app.core.summarizer import doh_dns_bypass
+    if not summary_mode:
+        summary_mode = config.get("summary_mode", "local")
+    headers = {"Content-Type": "application/json"}
+    if summary_mode == "online":
+        api_key = config.get("online_summary_api_key", "").strip()
+        base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
+        target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
+        api_url = f"{base_url.rstrip('/')}/chat/completions"
+        if api_key: headers["Authorization"] = f"Bearer {api_key}"
+        print(f"📡 [LOG] {label}【在线模式】 - 接口: {api_url} | 模型: {target_model}")
+    else:
+        ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+        target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
+        base_url = ollama_url.rstrip('/')
+        if '/v1' not in base_url and '11434' not in base_url: api_url = f"{base_url}/v1/chat/completions"
+        elif '11434' in base_url and '/v1' not in base_url: api_url = f"{base_url}/v1/chat/completions"
+        else: api_url = f"{base_url}/chat/completions"
+        print(f"🤖 [LOG] {label}【本地模式】 - 接口: {api_url} | 模型: {target_model}")
+    payload = {"model": target_model, "messages": [{"role": "user", "content": prompt}], "stream": False, "temperature": 0.1}
+    response = None
+    try:
+        with httpx.Client(timeout=120.0, trust_env=True) as client:
+            response = client.post(api_url, headers=headers, json=payload)
+            if response.status_code == 200: print(f"🟢 [LOG] {label} 代理请求成功！")
+    except Exception as e_proxy:
+        print(f"⚠️ [LOG] {label} 代理请求失败: {e_proxy}。正在尝试直连与 DoH 绕过...")
+    if response is None or response.status_code != 200:
+        try:
+            with doh_dns_bypass(api_url):
+                with httpx.Client(timeout=120.0, trust_env=False) as client:
+                    response = client.post(api_url, headers=headers, json=payload)
+                    if response.status_code == 200: print(f"🟢 [LOG] {label} 直连(DoH DNS 绕过)成功！")
+        except Exception as e_doh:
+            print(f"❌ [LOG] {label} 直连(DoH DNS 绕过)请求失败: {e_doh}")
+    if response is None or response.status_code != 200:
+        detail_msg = response.text if response is not None else "无响应"
+        status_code = response.status_code if response is not None else "未知"
+        raise Exception(f"{label} 接口请求失败，状态码: {status_code}，详情: {detail_msg}")
+    res_data = response.json()
+    return res_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+def _llm_identify_participants(title: str, episode_content: str, template_names: set, summary_mode: str = None) -> list:
+    import json
+    template_names_list = list(template_names) if template_names else []
+    prompt = f"你是一个播客分析助手。我需要你分析一期播客节目的简介，判断哪些人**真正参与了本期节目的录制**。\n\n播客标题：《{title}》\n\n以下是本期节目简介的**内容部分**（章节大纲、亮点、讨论要点等）：\n---\n{episode_content}\n---\n\n该节目的固定主理人/主播名单（可能有人本期没参加）：{json.dumps(template_names_list, ensure_ascii=False)}\n\n请根据以上内容，分析并列出**本期节目中真正参与录制/发言的人物**。\n\n判断标准：\n1. 如果内容描述中提到某人'说了什么'、'聊了什么'、'提出了什么观点'、'和嘉宾对话'等主动行为 → 该人参与了\n2. 如果某人仅出现在'嘉宾介绍'等背景性文字中，描述的是其身份/头衔而非本期发言 → 也算参与了（嘉宾）\n3. 如果某人只出现在固定模板的主理人列表里，在本期内容描述中完全没被提及 → 该人本期未参与\n4. 优先识别具体的人名，而不是泛称（如'主持人'）\n\n请仅返回一个 JSON 数组，包含本期确认参与的人名，例如：[\"任鑫\", \"王昊奋\", \"芒果\"]\n不要包含任何解释文字、MarkDown标记或```json标签，直接输出 JSON 数组。"
+    try:
+        response_text = _call_llm_api(prompt, summary_mode, label="出场人物甄别")
+        if "```json" in response_text: response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text: response_text = response_text.split("```")[1].split("```")[0].strip()
+        response_text = response_text.strip()
+        participants = json.loads(response_text)
+        if isinstance(participants, list):
+            print(f"✅ [LOG] 阶段A-1 出场人物甄别完成: {participants}")
+            return participants
+        else:
+            print(f"⚠️ [LOG] 阶段A-1 返回格式异常(非数组): {participants}")
+            return list(template_names) if template_names else []
+    except Exception as e:
+        print(f"⚠️ [LOG] 阶段A-1 出场人物甄别失败: {e}，回退为全部模板人名")
+        return list(template_names) if template_names else []
+
+def _llm_match_speakers(participants: list, transcript: list, unmatched_speakers: list, known_mappings: dict, title: str, summary_mode: str = None) -> dict:
+    import json
+    import re
+    if not unmatched_speakers or not participants: return {}
+    def is_clean_text(text: str) -> bool:
+        t = text.lower()
+        return not ("request was rejected" in t or "considered high risk" in t or "internal server error" in t)
+    
+    transcript_sample = []
+    sampled_speakers = set()
+    for seg in transcript[:40]:
+        text = seg.get('text', '').strip()
+        if not is_clean_text(text): continue
+        speaker_tag = seg.get("speaker", "UNKNOWN")
+        sampled_speakers.add(speaker_tag)
+        speaker_name = known_mappings.get(speaker_tag, speaker_tag)
+        transcript_sample.append(f"【{speaker_name}】: {text}")
+    
+    for sp in unmatched_speakers:
+        if sp not in sampled_speakers:
+            sp_segs = [seg for seg in transcript if seg.get("speaker") == sp]
+            valid_segs = []
+            for seg in sp_segs:
+                txt = seg.get('text', '').strip()
+                if txt and is_clean_text(txt):
+                    valid_segs.append(f"【{sp}】: {txt}")
+                if len(valid_segs) >= 3: break
+            if valid_segs:
+                transcript_sample.append(f"\n--- 发言人 {sp} 后续的部分发言片段 ---")
+                transcript_sample.extend(valid_segs)
+    
+    candidate_list = [p.lower() for p in participants] + participants
+    matching_indices = []
+    for i, seg in enumerate(transcript):
+        text = seg.get("text", "")
+        for cand in candidate_list:
+            if cand.lower() in text.lower():
+                matching_indices.append(i)
+                break
+    
+    selected_indices = matching_indices[:15] if len(matching_indices) <= 15 else [matching_indices[int(round(idx * (len(matching_indices) - 1) / 14))] for idx in range(15)]
+    ranges = [(max(0, idx - 1), min(len(transcript) - 1, idx + 1)) for idx in selected_indices]
+    merged_ranges = []
+    if ranges:
+        ranges.sort()
+        curr_start, curr_end = ranges[0]
+        for r_start, r_end in ranges[1:]:
+            if r_start <= curr_end + 1: curr_end = max(curr_end, r_end)
+            else:
+                merged_ranges.append((curr_start, curr_end))
+                curr_start, curr_end = r_start, r_end
+        merged_ranges.append((curr_start, curr_end))
+    
+    if merged_ranges:
+        transcript_sample.append("\n=== 💡 检索到的关键姓名/角色提及对话上下文片段 ===")
+        for r_start, r_end in merged_ranges:
+            transcript_sample.append(f"\n[提及片段 - 对应时间: {transcript[r_start].get('start', 0):.1f}s - {transcript[r_end].get('end', 0):.1f}s]")
+            for i in range(r_start, r_end + 1):
+                seg = transcript[i]
+                text = seg.get('text', '').strip()
+                if not is_clean_text(text): continue
+                speaker_tag = seg.get("speaker", "UNKNOWN")
+                speaker_name = known_mappings.get(speaker_tag, speaker_tag)
+                transcript_sample.append(f"【{speaker_name}】: {text}")
+    
+    transcript_text = "\n".join(transcript_sample)
+    tips = []
+    participants_str = " ".join(participants)
+    if "任鑫" in participants_str: tips.append("Mars 是任鑫的英文名/代号")
+    if "徐文浩" in participants_str: tips.append("Allan 是徐文浩的英文名/代号")
+    if "芒果" in participants_str or "Mango" in participants_str: tips.append("Mango/芒果 是同一个人的代号")
+    if "王昊奋" in participants_str: tips.append("Hoffman 是王昊奋的英文名/代号")
+    tips_text = "提示信息（供推断参考）：\n" + "\n".join(f"- {t}" for t in tips) + "\n" if tips else ""
+    
+    prompt = f"我们有一个播客单集，标题是《{title}》。\n\n【本期确认出场的人物名单】：{json.dumps(participants, ensure_ascii=False)}\n（注意：你只能从上面这个名单中进行匹配，不能使用名单之外的人名！）\n\n以下是该单集不同发言人的一些对话文本片段：\n---\n{transcript_text}\n---\n\n{tips_text}已知的部分角色匹配：\n{json.dumps(known_mappings, ensure_ascii=False)}\n\n请通过分析对话文本中人物之间的称呼、打招呼方式、自我介绍以及发言内容，推断出以下未匹配的 SPEAKER ID 对应名单里的哪位具体人物：\n未匹配列表: {unmatched_speakers}\n\n注意：\n1. 仅返回一个简洁的 JSON 格式的字典映射，例如：{{\"SPEAKER_00\": \"张三\", \"SPEAKER_01\": \"李四\"}}\n2. 不要包含任何 MarkDown 格式标记（如 ```json 标签），也不要包含任何解释性文字，直接输出 JSON 纯文本。\n3. 你**只能**从上面的【本期确认出场的人物名单】中选择名字进行匹配。如果无法唯一确定，请返回 null。\n4. 如果未匹配的 speaker 数量多于出场人物名单中剩余的人数，那多余的 speaker 必须返回 null。\n5. 语音分割容错：有时一个发言人的简短话语可能被错误合并到另一个发言人的片段里，请结合整体上下文判断。"
+    try:
+        response_text = _call_llm_api(prompt, summary_mode, label="Speaker匹配")
+        if "```json" in response_text: response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text: response_text = response_text.split("```")[1].split("```")[0].strip()
+        response_text = response_text.strip()
+        llm_mappings = json.loads(response_text)
+        valid_mappings = {}
+        for k, v in llm_mappings.items():
+            if k in unmatched_speakers and v and isinstance(v, str):
+                valid_mappings[k] = v
+                print(f"🤖 [LOG] 阶段A-2 匹配成功: {k} -> {v}")
+        return valid_mappings
+    except Exception as e:
+        print(f"⚠️ [LOG] 阶段A-2 Speaker匹配失败: {e}")
+        return {}
+
+def _validate_mappings(llm_mappings: dict, episode_content: str, episode_names: set, template_names: set) -> dict:
+    if not llm_mappings: return {}
+    validated = {}
+    name_to_speakers = {}
+    for sp, name in llm_mappings.items():
+        if name: name_to_speakers.setdefault(name, []).append(sp)
+    duplicate_names = {name for name, sps in name_to_speakers.items() if len(sps) > 1}
+    if duplicate_names: print(f"⚠️ [LOG] 阶段D 检测到重复分配的名字: {duplicate_names} -> 全部降级为 null")
+    for sp, name in llm_mappings.items():
+        if not name: continue
+        if name in duplicate_names:
+            print(f"🚫 [LOG] 阶段D 验证失败: {sp} -> '{name}' (名字被分配给多个 speaker，降级)")
+            continue
+        name_in_episode = name in episode_names or any(name in n for n in episode_names) or any(n in name for n in episode_names)
+        name_in_template = name in template_names or any(name in n for n in template_names) or any(n in name for n in template_names)
+        name_mentioned_in_content = name.lower() in episode_content.lower() if episode_content else False
+        if name_in_template and not name_in_episode and not name_mentioned_in_content:
+            print(f"🚫 [LOG] 阶段D 验证失败: {sp} -> '{name}' (仅存在于固定模板区，本期内容未提及，降级)")
+            continue
+        validated[sp] = name
+        print(f"✅ [LOG] 阶段D 验证通过: {sp} -> '{name}'")
+    return validated
+
+def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict, summary_mode: str = None, noise_speakers: dict = None, shownotes_split: dict = None) -> dict:
+    import json
+    if not unmatched_speakers: return {}
+    try:
+        title = metadata.get("title", "")
+        if shownotes_split is None: shownotes_split = split_shownotes(metadata.get("shownotes", ""))
+        episode_content = shownotes_split.get("episode_content", "")
+        template_names = shownotes_split.get("template_names", set())
+        episode_names = shownotes_split.get("episode_names", set())
+        participants = _llm_identify_participants(title, episode_content, template_names, summary_mode)
+        if not participants:
+            print("⚠️ [LOG] 阶段A-1 未识别到任何出场人物，跳过阶段A-2")
+            return {}
+        llm_mappings = _llm_match_speakers(participants, transcript, unmatched_speakers, known_mappings, title, summary_mode)
+        print(f"🤖 [LOG] 阶段A-2 原始匹配结果: {llm_mappings}")
+        validated_mappings = _validate_mappings(llm_mappings, episode_content, episode_names, template_names)
+        print(f"✅ [LOG] 阶段D 最终验证后结果: {validated_mappings}")
+        return validated_mappings
+    except Exception as e:
+        print(f"⚠️ [LOG] 四阶段发言人识别流水线失败: {e}")
+    return {}
+
+def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker_embeddings: dict):
+    from app.database import db
+    if not transcript: return
+    task = db.get_task(task_id)
+    if not task: return
+    summary_mode = task.get("summary_mode", "local")
+    print(f"🚀 [LOG] 正在对任务 {task_id} 启动四阶段智能识别流水线... (总结模式: {summary_mode})")
+    all_speakers = set(seg.get("speaker") for seg in transcript if seg.get("speaker"))
+    noise_speakers = pre_filter_noise_speakers(transcript)
+    real_speakers = list(all_speakers - set(noise_speakers.keys()))
+    print(f"🔇 [LOG] 阶段C 完成: 过滤 {len(noise_speakers)} 个噪音 speaker，剩余 {len(real_speakers)} 个实质 speaker: {real_speakers}")
+    shownotes_split = split_shownotes(metadata.get("shownotes", ""))
+    llm_mappings = match_speakers_with_llm(metadata, transcript, real_speakers, known_mappings={}, summary_mode=summary_mode, noise_speakers=noise_speakers, shownotes_split=shownotes_split)
+    print(f"🤖 [LOG] 阶段A+D 完成: {llm_mappings}")
+    voiceprint_mappings = {}
+    unmatched_speakers = set(real_speakers) - set(llm_mappings.keys())
+    if unmatched_speakers and speaker_embeddings:
+        unmatched_embeddings = {sp: speaker_embeddings[sp] for sp in unmatched_speakers if sp in speaker_embeddings}
+        if unmatched_embeddings:
+            voiceprint_mappings = match_speakers_with_voiceprints(unmatched_embeddings)
+            print(f"🔍 [LOG] 声纹库对比兜底完成: {voiceprint_mappings}")
+    final_mappings = {**noise_speakers, **voiceprint_mappings, **llm_mappings}
+    if final_mappings:
+        existing_mappings = task.get("speaker_mappings", {})
+        merged = {**final_mappings, **existing_mappings}
+        db.update_task(task_id, speaker_mappings=merged)
+        print(f"🎉 [LOG] 四阶段智能识别完成！已自动应用以下角色命名: {merged}")
+
+def apply_interjection_labels(task_id: str, transcript: list):
+    from app.database import db
+    if not transcript: return
+    task = db.get_task(task_id)
+    if not task: return
+    speaker_texts = {}
+    for seg in transcript:
+        sp = seg.get("speaker")
+        if not sp: continue
+        speaker_texts[sp] = speaker_texts.get(sp, "") + seg.get("text", "").strip()
     mappings = task.get("speaker_mappings", {})
     modified = False
-    
-    interjection_chars = set("嗯对啊哦吧呢呀啦哈哼嗨呗嘛呃喔呦哎对好的噢唏嚯啥呀么）—（,，.。?？!！谢拜行了")
+    interjection_chars = set("嗯对啊哦吧呢呀啦哈哼嗨呗嘛呃喔呦哎好的噢唏嚯啥么是吗了嘿哟嗷呐哇")
     for sp, full_text in speaker_texts.items():
-        if sp in mappings and mappings[sp] and mappings[sp] != sp:
-            continue
+        if sp in mappings and mappings[sp] and mappings[sp] != sp: continue
         cleaned = "".join([c for c in full_text if c.isalnum()])
         if not cleaned:
             mappings[sp] = "未识别语气词"
             modified = True
             continue
-        all_chars_interjection = all(c in interjection_chars for c in cleaned)
-        if len(cleaned) <= 8 and all_chars_interjection:
+        if len(cleaned) <= 15 and all(c in interjection_chars for c in cleaned):
             mappings[sp] = "未识别语气词"
             modified = True
-            print(f"🏷️ [LOG] 自动将仅说语气助词的发言人 {sp} 标记为 '未识别语气词' (总文本: '{full_text}')")
-            
+            print(f"🏷️ [LOG] 自动将仅说语气助词的发言人 {sp} 标记为 '未识别语气词'")
     if modified:
         db.update_task(task_id, speaker_mappings=mappings)
 
@@ -557,8 +743,11 @@ def run_podcast_pipeline(task_id: str, url: str):
     """
     完整的本地播客处理异步流水线
     """
+    import time
     local_mp3 = None
     standardized_wav = None
+    pipeline_start_time = time.time()
+    timing_stats = {}
     
     try:
         # Step 0: 物理安全校验，如果任务被中途从数据库删除，立即跳过执行
@@ -598,7 +787,9 @@ def run_podcast_pipeline(task_id: str, url: str):
             mapped_progress = 10.0 + (percent / 100.0) * 20.0
             db.update_task(task_id, progress=round(mapped_progress, 1))
             
+        t_download_start = time.time()
         local_mp3, metadata = downloader.download_url_audio(url, progress_callback=download_progress_callback)
+        timing_stats['音频下载与解析'] = time.time() - t_download_start
         
         # 双重检查
         if not db.get_task(task_id):
@@ -618,7 +809,9 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not db.get_task(task_id):
             raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="transcribing", progress=40.0)
+        t_preprocess_start = time.time()
         standardized_wav = downloader.preprocess_audio(local_mp3)
+        timing_stats['音频预处理'] = time.time() - t_preprocess_start
         
         # 在数据库中记录音频相对于服务端的播放路径 (e.g. /audio/hash.mp3)
         if not db.get_task(task_id):
@@ -629,7 +822,9 @@ def run_podcast_pipeline(task_id: str, url: str):
         # Step 3: PyAnnote 声纹分割
         if not db.get_task(task_id):
             raise Exception("TASK_CANCELLED")
+        t_diarization_start = time.time()
         diar_data = transcriber.run_diarization(standardized_wav)
+        timing_stats['声纹分割 (PyAnnote)'] = time.time() - t_diarization_start
         db.update_task(task_id, progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
@@ -642,18 +837,22 @@ def run_podcast_pipeline(task_id: str, url: str):
             db.update_task(task_id, progress=current_progress)
 
         asr_mode = task.get("asr_mode", "local")
+        t_transcribe_start = time.time()
         merged_transcript = transcriber.transcribe_and_merge(
             standardized_wav, 
             diar_data, 
             progress_callback=progress_callback,
             asr_mode=asr_mode
         )
+        timing_stats['语音识别转录 (Whisper)'] = time.time() - t_transcribe_start
         db.update_task(task_id, transcript=merged_transcript, progress=75.0)
 
         # Step 4.2: 运行语义段落聚合 (Semantic Chunking)
         try:
             print("⏳ [LOG] 正在运行语义分块聚合管道...")
+            t_chunk_start = time.time()
             paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
+            timing_stats['语义段落聚合'] = time.time() - t_chunk_start
             db.add_paragraphs(paragraphs)
             print(f"✅ [LOG] 成功为任务 {task_id} 聚合出 {len(paragraphs)} 个语义段落。")
         except Exception as chunk_ex:
@@ -711,8 +910,10 @@ def run_podcast_pipeline(task_id: str, url: str):
                         print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
             
             # 运行智能改名流水线
+            t_rename_start = time.time()
             auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
         except Exception as emb_ex:
+            timing_stats['发言人智能推断'] = time.time() - t_rename_start
             if str(emb_ex) == "TASK_CANCELLED":
                 raise emb_ex
             print(f"⚠️ [LOG 警告] 提取声纹特征或智能改名失败: {emb_ex}")
@@ -738,7 +939,23 @@ def run_podcast_pipeline(task_id: str, url: str):
             raise Exception("TASK_CANCELLED")
         db.update_task(task_id, status="summarizing", progress=80.0)
         task_summary_mode = task.get("summary_mode", "local")
+        t_summary_start = time.time()
         summary_report = summarizer.summarize(metadata, merged_transcript, summary_mode=task_summary_mode)
+        timing_stats['AI 深度总结 (LLM)'] = time.time() - t_summary_start
+        
+        total_time = time.time() - pipeline_start_time
+        time_report = "\\n\\n---\\n\\n### ⏱️ 分析用时统计\\n"
+        for step, t in timing_stats.items():
+            if t > 60:
+                time_report += f"- **{step}**: {t/60:.1f} 分钟\\n"
+            else:
+                time_report += f"- **{step}**: {t:.1f} 秒\\n"
+        if total_time > 60:
+            time_report += f"\\n**总计耗时**: {total_time/60:.1f} 分钟"
+        else:
+            time_report += f"\\n**总计耗时**: {total_time:.1f} 秒"
+            
+        summary_report += time_report
         db.update_task(task_id, summary=summary_report, progress=95.0)
 
         # 标志任务已彻底成功

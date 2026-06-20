@@ -481,6 +481,14 @@ const getSourceLabel = (task) => {
   return { text: '其他来源', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)' };
 };
 
+const getWhisperModelName = (path) => {
+  if (!path) return 'Large V3';
+  const normalized = path.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  const last = parts[parts.length - 1] || parts[parts.length - 2] || 'Large V3';
+  return last;
+};
+
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 const TRANSLATIONS = {
@@ -2621,12 +2629,78 @@ export default function App() {
 
           {/* 模式 Badges */}
           <div style={{ display: 'flex', gap: '6px' }}>
-            <div style={{ flex: 1, padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', textAlign: 'center', fontSize: '11px', fontWeight: '500', color: asrMode === 'local' ? 'var(--primary)' : 'var(--accent)' }}>
-              {asrMode === 'local' ? `💻 ASR` : `🌐 ASR`}
+            <div style={{ 
+              flex: 1, 
+              padding: '6px 4px', 
+              background: 'rgba(0,0,0,0.2)', 
+              border: '1px solid rgba(255,255,255,0.05)', 
+              borderRadius: '6px', 
+              textAlign: 'center', 
+              fontSize: '11px', 
+              fontWeight: '500', 
+              color: asrMode === 'local' ? 'var(--primary)' : 'var(--accent)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                {asrMode === 'local' ? `💻` : `🌐`} <span style={{ fontWeight: '600' }}>ASR</span>
+              </div>
+              <div 
+                style={{ 
+                  fontSize: '9px', 
+                  color: 'var(--text-secondary)', 
+                  opacity: 0.8,
+                  marginTop: '3px', 
+                  maxWidth: '100%', 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap',
+                  padding: '0 2px'
+                }} 
+                title={asrMode === 'local' ? (configData.local_whisper_model_path ? getWhisperModelName(configData.local_whisper_model_path) : 'Large V3') : (configData.online_model || 'MiMo ASR')}
+              >
+                {asrMode === 'local' ? (configData.local_whisper_model_path ? getWhisperModelName(configData.local_whisper_model_path) : 'Large V3') : (configData.online_model || 'MiMo ASR')}
+              </div>
             </div>
             {perfData?.llm_status && (
-              <div style={{ flex: 1, padding: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', textAlign: 'center', fontSize: '11px', fontWeight: '500', color: perfData.llm_status === 'connected' ? '#10b981' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)') }}>
-                {perfData.llm_status === 'connected' ? `🧠 LLM` : (perfData.llm_status === 'online_mode' ? `☁️ LLM` : `❌ LLM`)}
+              <div style={{ 
+                flex: 1, 
+                padding: '6px 4px', 
+                background: 'rgba(0,0,0,0.2)', 
+                border: '1px solid rgba(255,255,255,0.05)', 
+                borderRadius: '6px', 
+                textAlign: 'center', 
+                fontSize: '11px', 
+                fontWeight: '500', 
+                color: perfData.llm_status === 'connected' ? '#10b981' : (perfData.llm_status === 'online_mode' ? 'var(--primary)' : 'var(--error)'),
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  {perfData.llm_status === 'connected' ? `🧠` : (perfData.llm_status === 'online_mode' ? `☁️` : `❌`)} <span style={{ fontWeight: '600' }}>LLM</span>
+                </div>
+                <div 
+                  style={{ 
+                    fontSize: '9px', 
+                    color: 'var(--text-secondary)', 
+                    opacity: 0.8,
+                    marginTop: '3px', 
+                    maxWidth: '100%', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    whiteSpace: 'nowrap',
+                    padding: '0 2px'
+                  }}
+                  title={configData.summary_mode === 'local' ? (configData.ollama_model || 'qwen2.5:7b') : (configData.online_summary_model || 'gpt-4o-mini')}
+                >
+                  {configData.summary_mode === 'local' ? (configData.ollama_model || 'qwen2.5:7b') : (configData.online_summary_model || 'gpt-4o-mini')}
+                </div>
               </div>
             )}
           </div>
@@ -3711,6 +3785,65 @@ export default function App() {
                           </div>
                           
                           <MarkdownRenderer text={activeTask.summary} />
+                          
+                          {activeTask.metadata?.time_stats && (
+                            <div style={{
+                              background: 'rgba(255,255,255,0.02)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              fontSize: '13px',
+                              color: 'var(--text-secondary)',
+                              marginTop: '24px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                                <span style={{ fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  ⏱️ 分析用时统计
+                                </span>
+                                <span style={{ color: 'var(--primary)', fontWeight: '700' }}>
+                                  总用时: {(() => {
+                                    const total = activeTask.metadata.time_stats.total_time;
+                                    if (total < 60) return `${total}秒`;
+                                    const m = Math.floor(total / 60);
+                                    const s = Math.round(total % 60);
+                                    return `${m}分${s}秒`;
+                                  })()}
+                                </span>
+                              </div>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(1, 1fr)',
+                                gap: '8px'
+                              }}>
+                                {(() => {
+                                  const stepNames = {
+                                    downloading: '1. 播客下载与元数据解析',
+                                    preprocessing: '2. 音频预处理 (重采样混合)',
+                                    diarization: '3. PyAnnote 声纹角色分割',
+                                    transcribing: '4. Whisper 语音识别与时间轴对齐',
+                                    chunking: '5. 语义段落聚合',
+                                    embeddings_and_renaming: '6. 声纹特征提取与智能改名',
+                                    interjection_labelling: '7. 语气词发言人过滤',
+                                    summarizing: '8. AI 总结报告生成'
+                                  };
+                                  return Object.entries(activeTask.metadata.time_stats.steps || {}).map(([key, val]) => {
+                                    const formattedVal = (() => {
+                                      if (val < 60) return `${val}秒`;
+                                      const m = Math.floor(val / 60);
+                                      const s = Math.round(val % 60);
+                                      return `${m}分${s}秒`;
+                                    })();
+                                    return (
+                                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>{stepNames[key] || key}</span>
+                                        <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{formattedVal}</span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -30,6 +30,8 @@ if not os.path.exists(venv_python):
 
 env = os.environ.copy()
 env["PYTHONIOENCODING"] = "utf-8"
+env["PYTHONUNBUFFERED"] = "1"
+env["NO_PROXY"] = "localhost,127.0.0.1,token-plan-sgp.xiaomimimo.com,hf-mirror.com"
 
 print("========================================")
 print("🚀 正在启动 whisperMe 项目服务...")

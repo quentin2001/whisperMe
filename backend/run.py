@@ -2,9 +2,15 @@ import os
 import sys
 import io
 import subprocess
+import warnings
 
 # 物理重写 stdout 流，屏蔽 Windows GBK 编码刺客
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='ignore')
+
+# Suppress torchaudio and pyannote warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
+warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
 
 def main():
     backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +35,7 @@ def main():
     # 使用 venv 中的 python.exe 执行 uvicorn
     cmd = [
         venv_python, 
+        "-u",
         "-m", "uvicorn", 
         "app.main:app", 
         "--host", "127.0.0.1", 

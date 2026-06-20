@@ -144,23 +144,20 @@ os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
 os.environ["HF_HUB_CACHE"] = SHORT_HF_CACHE_DIR
 os.environ["HF_ASSETS_CACHE"] = SHORT_HF_CACHE_DIR
 os.environ["XDG_CACHE_HOME"] = SHORT_HF_CACHE_DIR
-hf_token_temp = config.get("hf_token", "").strip()
-if hf_token_temp and len(hf_token_temp) >= 30:
-    os.environ["HF_ENDPOINT"] = "https://huggingface.co"
-else:
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"  # 国内高速镜像站
+# Use hf-mirror.com by default since huggingface.co is blocked in mainland China.
+# Gated models (like pyannote) work perfectly on hf-mirror.com as long as the token is passed.
+if not os.environ.get("HF_ENDPOINT"):
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # huggingface_hub API 动态 Patch 拦截
 try:
     import huggingface_hub.constants
     import huggingface_hub.file_download
     
-    if hf_token_temp and len(hf_token_temp) >= 30:
-        huggingface_hub.constants.ENDPOINT = "https://huggingface.co"
-        huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE = "https://huggingface.co/{repo_id}/resolve/{revision}/{filename}"
-    else:
-        huggingface_hub.constants.ENDPOINT = "https://hf-mirror.com"
-        huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE = "https://hf-mirror.com/{repo_id}/resolve/{revision}/{filename}"
+    # Always use the mirror unless the user has overridden the environment endpoint
+    endpoint_url = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
+    huggingface_hub.constants.ENDPOINT = endpoint_url
+    huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE = f"{endpoint_url}/{{repo_id}}/resolve/{{revision}}/{{filename}}"
         
     huggingface_hub.constants.HF_HOME = SHORT_HF_CACHE_DIR
     huggingface_hub.constants.HF_HUB_CACHE = SHORT_HF_CACHE_DIR
@@ -171,8 +168,11 @@ try:
     def patched_hf_hub_download(*args, **kwargs):
         if 'use_auth_token' in kwargs: 
             kwargs['token'] = kwargs.pop('use_auth_token')
+        # Only set cache_dir so that the standard cache directory layout (with models--...) is preserved.
+        # DO NOT specify local_dir here as it forces downloading to a flat directory and breaks Pipeline.from_pretrained loading.
         kwargs['cache_dir'] = SHORT_HF_CACHE_DIR
-        kwargs['local_dir'] = SHORT_HF_CACHE_DIR
+        if 'local_dir' in kwargs:
+            kwargs.pop('local_dir')
         return raw_hf_hub_download(*args, **kwargs)
     huggingface_hub.hf_hub_download = patched_hf_hub_download
     huggingface_hub.file_download.hf_hub_download = patched_hf_hub_download

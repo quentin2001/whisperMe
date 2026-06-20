@@ -172,6 +172,8 @@ class PodcastTranscriber:
             return diarization_list
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"❌ [🚨 熔断拦截] 声纹分割过程中报错: {e}。系统已自动降级为纯语音转文字，不包含说话人姓名区分。")
             return []
 
@@ -240,8 +242,6 @@ class PodcastTranscriber:
                     if res.returncode != 0 or not os.path.exists(chunk_mp3_path):
                         raise Exception(f"FFmpeg slice creation failed for chunk {i}: {res.stderr.decode('utf-8', errors='ignore')}")
 
-                    print(f"🎛️ [LOG] 分片 {i+1} 成功生成并压缩 ({os.path.getsize(chunk_mp3_path) / (1024*1024):.2f} MB)")
-
                     # 转换为 Base64
                     with open(chunk_mp3_path, "rb") as f:
                         audio_base_64 = "data:audio/mp3;base64," + base64.b64encode(f.read()).decode("utf-8")
@@ -249,7 +249,6 @@ class PodcastTranscriber:
                     # 物理清理临时分片 MP3 文件
                     try:
                         os.remove(chunk_mp3_path)
-                        print(f"🗑️ [LOG] 已物理清理分片临时文件: {chunk_mp3_path}")
                     except Exception:
                         pass
 
@@ -483,7 +482,7 @@ class PodcastTranscriber:
         has_diarization = len(diarization_segments) > 0
         merged_results = []
         
-        print("\n🎧 【实时瀑布流剧本输出展示开始】\n" + "="*50)
+        # print("\n🎧 【实时瀑布流剧本输出展示开始】\n" + "="*50)
         last_progress_int = 60
         
         for seg in whisper_segments:
@@ -519,7 +518,7 @@ class PodcastTranscriber:
             speaker_tag = f"【{current_speaker}】"
             line = f"{timestamp} {speaker_tag}: {seg.text}"
             
-            print(line)  # 控制台实时回显
+            # print(line)  # 控制台实时回显
             
             merged_results.append({
                 "start": seg.start,
