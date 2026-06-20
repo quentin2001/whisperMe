@@ -1221,6 +1221,11 @@ export default function App() {
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [volume, setVolume] = useState(0.8);
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
+
+  // 自动关闭发言人管理弹窗
+  useEffect(() => {
+    setShowSpeakerModal(false);
+  }, [activeTaskId, activeTab]);
   const audioPlayerRef = useRef(null);
   const activeBubbleRef = useRef(null);
   const activeTaskRef = useRef(null);
@@ -3415,7 +3420,7 @@ export default function App() {
                     right: '16px',
                     width: '340px',
                     maxHeight: 'calc(100% - 72px)',
-                    background: 'var(--bg-surface)',
+                    background: 'var(--player-bg)',
                     backdropFilter: 'blur(30px)',
                     WebkitBackdropFilter: 'blur(30px)',
                     border: '1px solid var(--border-hover)',
