@@ -1,0 +1,368 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>whisperMe | AI Workstation</title>
+<!-- Google Fonts: Geist & Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration using Warm Professional Design System -->
+<script id="tailwind-config">
+          tailwind.config = {
+            darkMode: "class",
+            theme: {
+              extend: {
+                "colors": {
+                        "surface-dim": "#ded9d3",
+                        "primary-fixed-dim": "#ffb3b1",
+                        "primary-container": "#e61337",
+                        "on-background": "#1d1c18",
+                        "secondary-container": "#f9dfb9",
+                        "on-tertiary-container": "#fffbff",
+                        "inverse-primary": "#ffb3b1",
+                        "secondary-fixed-dim": "#dbc39f",
+                        "on-tertiary-fixed": "#211b0d",
+                        "on-primary-container": "#fffbff",
+                        "outline-variant": "#e7bcbb",
+                        "on-surface-variant": "#5d3f3e",
+                        "on-secondary-fixed-variant": "#554428",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#635b4a",
+                        "surface-tint": "#bf0029",
+                        "on-error": "#ffffff",
+                        "on-surface": "#1d1c18",
+                        "error-container": "#ffdad6",
+                        "surface-container-highest": "#e6e2db",
+                        "on-error-container": "#93000a",
+                        "primary": "#bb0028",
+                        "secondary-fixed": "#f9dfb9",
+                        "on-secondary-fixed": "#261903",
+                        "inverse-surface": "#32302c",
+                        "on-secondary-container": "#746243",
+                        "surface": "#fef9f2",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#ece7e1",
+                        "secondary": "#6e5c3e",
+                        "on-primary-fixed": "#410007",
+                        "on-primary-fixed-variant": "#92001d",
+                        "surface-bright": "#fef9f2",
+                        "tertiary-container": "#7d7461",
+                        "on-tertiary-fixed-variant": "#4e4635",
+                        "outline": "#926e6d",
+                        "inverse-on-surface": "#f5f0e9",
+                        "surface-variant": "#e6e2db",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#d1c5b0",
+                        "background": "#fef9f2",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f8f3ec",
+                        "tertiary-fixed": "#eee1cb",
+                        "surface-container": "#f2ede6",
+                        "primary-fixed": "#ffdad8"
+                },
+                "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                },
+                "spacing": {
+                        "margin-mobile": "20px",
+                        "stack-md": "16px",
+                        "unit": "8px",
+                        "stack-xl": "48px",
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "stack-lg": "24px",
+                        "margin-desktop": "64px",
+                        "container-max": "1280px",
+                        "stack-xs": "4px"
+                },
+                "fontFamily": {
+                        "display-lg": ["Geist"],
+                        "label-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "headline-lg-mobile": ["Geist"],
+                        "display-lg-mobile": ["Geist"],
+                        "label-sm": ["Geist"],
+                        "body-md": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"]
+                },
+                "fontSize": {
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "display-lg-mobile": ["36px", {"lineHeight": "42px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                }
+              },
+            },
+          }
+        </script>
+<style>
+        body {
+            background-color: #fef9f2;
+            color: #1d1c18;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .waveform-bar {
+            width: 3px;
+            margin: 0 1px;
+            background-color: #e6e2db;
+            border-radius: 2px;
+            transition: height 0.2s ease;
+        }
+        .waveform-bar.active {
+            background-color: #bb0028; /* primary from theme */
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #fef9f2;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e7bcbb;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="overflow-hidden bg-background">
+<!-- MasterSidebar -->
+<aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-low border-r border-outline-variant flex flex-col p-stack-md gap-stack-lg z-30">
+<!-- Branding -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<div class="flex flex-col">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface leading-none">whisperMe</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant opacity-70">AI Workstation</p>
+</div>
+</div>
+</div>
+<!-- Primary CTA -->
+<div class="mt-stack-lg flex flex-col gap-stack-sm">
+<button class="bg-primary text-on-primary rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-bold transition-all active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span class="font-label-md text-label-md">New Transcription</span>
+</button>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">subscriptions</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold translate-x-1 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span class="font-label-md text-label-md">Workstation</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+<!-- Resource Monitor (Base) -->
+<div class="mt-auto pt-4 border-t border-outline-variant flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="memory">memory</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold">CPU: 24%</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="data_usage">data_usage</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold">RAM: 8GB</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- MasterTopbar -->
+<header class="fixed top-0 right-0 left-64 flex justify-between items-center bg-surface px-margin-desktop h-16 z-30 border-b border-outline-variant/30">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-medium text-primary">Strategic Review 2024.wav</span>
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-sm text-label-sm">In Progress</span>
+</div>
+<div class="flex items-center gap-stack-lg">
+<div class="relative hidden lg:block">
+<input class="bg-surface-container border-none rounded-full px-6 py-2 w-64 text-label-md focus:ring-1 focus:ring-primary" placeholder="Search transcript..." type="text">
+<span class="material-symbols-outlined absolute right-3 top-2 text-on-surface-variant" data-icon="search">search</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 pb-24 h-screen overflow-hidden flex flex-col lg:flex-row">
+<!-- Left Pane: Transcript -->
+<section class="flex-1 overflow-y-auto custom-scrollbar p-margin-desktop bg-surface">
+<div class="max-w-3xl mx-auto space-y-10">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-8">Full Transcript</h2>
+<!-- Speaker Group 1 -->
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-on-surface-variant">00:00 - 02:45</span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface leading-relaxed">
+                        Welcome to whisperMe's quarterly strategic review. Today, we're diving deep into the architecture of our neural transcription engines and how they've evolved over the last fiscal quarter. We have Speaker 1 here to lead the discussion on throughput optimization.
+                    </p>
+</div>
+<!-- Speaker Group 2 -->
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-on-surface-variant">02:46 - 05:12</span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface leading-relaxed">
+                        Thanks for the intro. The core breakthrough this month was the implementation of "whisper-v3-cream," which reduces latency by 40% while maintaining the warm tonal recognition we're known for. We've seen a massive uptick in user engagement since the beta rollout in the luxury SaaS vertical.
+                    </p>
+</div>
+<!-- Speaker Group 1 (inactive) -->
+<div class="space-y-4 opacity-50">
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-on-surface-variant">05:13 - 06:02</span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface leading-relaxed">
+                        That's impressive. How does this impact the real-time workstation performance for enterprise clients?
+                    </p>
+</div>
+</div>
+</section>
+<!-- Right Pane: AI Intelligence -->
+<section class="w-full lg:w-[450px] bg-surface-container-low border-l border-outline-variant overflow-y-auto custom-scrollbar p-stack-lg">
+<div class="space-y-stack-xl">
+<!-- Executive Summary -->
+<div class="bg-surface rounded-xl p-stack-md border border-outline-variant shadow-sm">
+<div class="flex items-center gap-2 mb-4 text-primary">
+<span class="material-symbols-outlined" data-icon="auto_awesome" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<h3 class="font-headline-md text-headline-md">Executive Summary</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        The discussion centers on the release of <span class="text-primary font-bold">whisper-v3-cream</span>. Key performance indicators show significant latency improvements and high adoption rates within the luxury software sector.
+                    </p>
+</div>
+<!-- Key Takeaways -->
+<div class="space-y-4">
+<h3 class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">Key Takeaways</h3>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 p-3 bg-secondary-container/30 rounded-lg">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="check_circle">check_circle</span>
+<p class="font-label-md text-label-md">Latency reduction of 40% achieved in Q4.</p>
+</li>
+<li class="flex items-start gap-3 p-3 bg-secondary-container/30 rounded-lg">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="check_circle">check_circle</span>
+<p class="font-label-md text-label-md">Strategic expansion into high-end SaaS markets.</p>
+</li>
+<li class="flex items-start gap-3 p-3 bg-secondary-container/30 rounded-lg">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="check_circle">check_circle</span>
+<p class="font-label-md text-label-md">Beta testing confirms 99.8% transcription accuracy.</p>
+</li>
+</ul>
+</div>
+<!-- Topic Timeline -->
+<div class="space-y-4">
+<h3 class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">Topic Timeline</h3>
+<div class="space-y-2">
+<button class="w-full text-left p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-white transition-all group flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold group-hover:text-primary">Introduction</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">00:00 — 02:45</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="play_circle">play_circle</span>
+</button>
+<button class="w-full text-left p-3 rounded-lg border-2 border-primary bg-white transition-all group flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-primary">Core Breakthroughs</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">02:46 — 10:12</span>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="pause_circle" style="font-variation-settings: 'FILL' 1;">pause_circle</span>
+</button>
+<button class="w-full text-left p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-white transition-all group flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold group-hover:text-primary">Latency Analysis</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">10:13 — 18:45</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="play_circle">play_circle</span>
+</button>
+</div>
+</div>
+<!-- Related Media / Visual Context -->
+<div class="space-y-4">
+<h3 class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">Visual Context</h3>
+<div class="rounded-xl overflow-hidden shadow-sm aspect-video border border-outline-variant">
+<img alt="Analog waveform display" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvav1d-CliaJSL4SMF1XDg3mcu0sAw07_AWWw7xG1kk64D5aRHXNVwledAhUpd7Z--ALBlyu9hv-lC3WyILIaHKkoedL8mA-5pBH4ZUi3gJFaQJbgh2WQOVKbdEfgC9SGNInqAR3fnOjiqhECXC1RdL5kcUGkVoKWGGozW05bh4ADv3ZwCia9GK0eDyzIg2a4fcsSKmxGgUirvgo6CbaMr2jpTViHlCtC9k-mRz5UNSPyW9QMsNynk_M98ECmE9_XqibycAhT5Oko">
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer / Audio Player -->
+<footer class="fixed bottom-0 left-0 w-full z-50 h-24 bg-surface-container-high border-t border-outline-variant shadow-lg flex items-center justify-between px-margin-desktop">
+<!-- File Info -->
+<div class="flex items-center gap-4 w-1/4">
+<div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined" data-icon="graphic_eq">graphic_eq</span>
+</div>
+<div class="overflow-hidden">
+<p class="font-label-md text-label-md font-bold text-primary truncate">Strategic Review 2024</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Processing: Transcribing...</p>
+</div>
+</div>
+<!-- Controls & Waveform -->
+<div class="flex-1 flex flex-col items-center gap-2 max-w-2xl px-8">
+<div class="flex items-center gap-8">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="skip_previous">skip_previous</span>
+</button>
+<button class="w-12 h-12 bg-primary hover:bg-[#d41f37] rounded-full flex items-center justify-center text-white shadow-md active:scale-90 transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="skip_next">skip_next</span>
+</button>
+</div>
+<div class="flex items-center gap-4 w-full">
+<span class="font-label-sm text-label-sm text-on-surface-variant">02:46</span>
+<div class="flex-1 flex items-end h-8 overflow-hidden" id="waveform-container">
+<!-- Script populates this -->
+<div class="waveform-bar active" style="height: 20.5116px;"></div><div class="waveform-bar active" style="height: 4.79633px;"></div><div class="waveform-bar active" style="height: 16.3926px;"></div><div class="waveform-bar active" style="height: 8.10492px;"></div><div class="waveform-bar active" style="height: 13.0514px;"></div><div class="waveform-bar active" style="height: 22.5985px;"></div><div class="waveform-bar active" style="height: 23.6125px;"></div><div class="waveform-bar active" style="height: 6.76855px;"></div><div class="waveform-bar active" style="height: 8.73595px;"></div><div class="waveform-bar active" style="height: 7.74196px;"></div><div class="waveform-bar active" style="height: 5.41693px;"></div><div class="waveform-bar active" style="height: 24.277px;"></div><div class="waveform-bar active" style="height: 16.3825px;"></div><div class="waveform-bar active" style="height: 17.7743px;"></div><div class="waveform-bar active" style="height: 12.0953px;"></div><div class="waveform-bar active" style="height: 21.0302px;"></div><div class="waveform-bar active" style="height: 24.2666px;"></div><div class="waveform-bar active" style="height: 20.3441px;"></div><div class="waveform-bar active" style="height: 6.04597px;"></div><div class="waveform-bar active" style="height: 14.3896px;"></div><div class="waveform-bar active" style="height: 10.8316px;"></div><div class="waveform-bar active" style="height: 18.9106px;"></div><div class="waveform-bar active" style="height: 21.3137px;"></div><div class="waveform-bar active" style="height: 6.98053px;"></div><div class="waveform-bar active" style="height: 22.8859px;"></div><div class="waveform-bar active" style="height: 14.0251px;"></div><div class="waveform-bar active" style="height: 11.8361px;"></div><div class="waveform-bar active" style="height: 16.9259px;"></div><div class="waveform-bar active" style="height: 23.3101px;"></div><div class="waveform-bar active" style="height: 22.0838px;"></div><div class="waveform-bar active" style="height: 17.9933px;"></div><div class="waveform-bar active" style="height: 17.489px;"></div><div class="waveform-bar active" style="height: 16.8853px;"></div><div class="waveform-bar active" style="height: 11.3885px;"></div><div class="waveform-bar active" style="height: 27.9498px;"></div><div class="waveform-bar active" style="height: 6.25333px;"></div><div class="waveform-bar active" style="height: 13.5972px;"></div><div class="waveform-bar active" style="height: 9.34617px;"></div><div class="waveform-bar active" style="height: 19.6887px;"></div><div class="waveform-bar active" style="height: 5.73786px;"></div><div class="waveform-bar" style="height: 6.82531px;"></div><div class="waveform-bar" style="height: 16.0385px;"></div><div class="waveform-bar" style="height: 18.7746px;"></div><div class="waveform-bar" style="height: 15.3804px;"></div><div class="waveform-bar" style="height: 14.4481px;"></div><div class="waveform-bar" style="height: 26.3986px;"></div><div class="waveform-bar" style="height: 15.2935px;"></div><div class="waveform-bar" style="height: 13.9981px;"></div><div class="waveform-bar" style="height: 24.7624px;"></div><div class="waveform-bar" style="height: 12.0698px;"></div><div class="waveform-bar" style="height: 26.7189px;"></div><div class="waveform-bar" style="height: 24.6345px;"></div><div class="waveform-bar" style="height: 26.3833px;"></div><div class="waveform-bar" style="height: 11.6394px;"></div><div class="waveform-bar" style="height: 18.4605px;"></div><div class="waveform-bar" style="height: 12.5195px;"></div><div class="waveform-bar" style="height: 4.76394px;"></div><div class="waveform-bar" style="height: 14.5483px;"></div><div class="waveform-bar" style="height: 20.8039px;"></div><div class="waveform-bar" style="height: 12.0135px;"></div><div class="waveform-bar" style="height: 7.76625px;"></div><div class="waveform-bar" style="height: 19.9712px;"></div><div class="waveform-bar" style="height: 11.5401px;"></div><div class="waveform-bar" style="height: 12.049px;"></div><div class="waveform-bar" style="height: 23.2842px;"></div><div class="waveform-bar" style="height: 23.8509px;"></div><div class="waveform-bar" style="height: 23.361px;"></div><div class="waveform-bar" style="height: 18.4911px;"></div><div class="waveform-bar" style="height: 9.43599px;"></div><div class="waveform-bar" style="height: 17.2968px;"></div><div class="waveform-bar" style="height: 27.4914px;"></div><div class="waveform-bar" style="height: 20.5475px;"></div><div class="waveform-bar" style="height: 17.596px;"></div><div class="waveform-bar" style="height: 20.8544px;"></div><div class="waveform-bar" style="height: 25.1581px;"></div><div class="waveform-bar" style="height: 24.5034px;"></div><div class="waveform-bar" style="height: 9.38051px;"></div><div class="waveform-bar" style="height: 22.9869px;"></div><div class="waveform-bar" style="height: 24.4989px;"></div><div class="waveform-bar" style="height: 21.9902px;"></div><div class="waveform-bar" style="height: 18.5374px;"></div><div class="waveform-bar" style="height: 25.3605px;"></div><div class="waveform-bar" style="height: 9.01168px;"></div><div class="waveform-bar" style="height: 15.6384px;"></div><div class="waveform-bar" style="height: 26.4229px;"></div><div class="waveform-bar" style="height: 18.7843px;"></div><div class="waveform-bar" style="height: 7.14403px;"></div><div class="waveform-bar" style="height: 10.2885px;"></div><div class="waveform-bar" style="height: 24.1931px;"></div><div class="waveform-bar" style="height: 6.06891px;"></div><div class="waveform-bar" style="height: 23.6929px;"></div><div class="waveform-bar" style="height: 15.9789px;"></div><div class="waveform-bar" style="height: 9.68127px;"></div><div class="waveform-bar" style="height: 14.4913px;"></div><div class="waveform-bar" style="height: 17.4587px;"></div><div class="waveform-bar" style="height: 26.4266px;"></div><div class="waveform-bar" style="height: 12.2744px;"></div><div class="waveform-bar" style="height: 12.717px;"></div><div class="waveform-bar" style="height: 20.6871px;"></div><div class="waveform-bar" style="height: 12.3241px;"></div></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">45:12</span>
+</div>
+</div>
+<!-- Extra Controls -->
+<div class="flex items-center justify-end gap-6 w-1/4">
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="font-label-sm text-label-sm hover:text-primary cursor-pointer transition-colors">Speed 1.0x</span>
+<span class="font-label-sm text-label-sm hover:text-primary cursor-pointer transition-colors">Waveform</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="volume_up">volume_up</span>
+<div class="w-20 h-1 bg-outline-variant rounded-full relative overflow-hidden">
+<div class="absolute inset-y-0 left-0 w-3/4 bg-primary rounded-full"></div>
+</div>
+</div>
+</div>
+</footer>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('waveform-container');
+            if (container) {
+                for(let i=0; i<100; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'waveform-bar';
+                    if(i < 40) bar.classList.add('active');
+                    bar.style.height = (Math.random() * 24 + 4) + 'px';
+                    container.appendChild(bar);
+                }
+            }
+        });
+    </script>
+
+
+</body></html>

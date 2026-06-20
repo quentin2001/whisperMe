@@ -1,6 +1,6 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-17 · Session `693458b4`
+> 最后更新：2026-06-20 · Session `adc707df`
 
 ---
 
@@ -11,10 +11,10 @@ whisperMe 采用经典的前后端分离 **SPA + REST API** 架构，部署于�
 ```mermaid
 graph TB
     subgraph Frontend ["🖥️ Frontend (Vite + React)"]
-        A[App.jsx — SPA 主入口]
-        B[SlotMachineModal.jsx — 认知沙盒·老虎机]
-        C[AiColliderModal.jsx — AI 碰撞器]
-        D[index.css — 全局样式 / 设计令牌]
+        A[App.jsx — SPA 路由与全局状态]
+        B[views/ — 页面级业务视图]
+        C[components/ — 侧边栏与表单件]
+        D[index.css — 设计令牌 / 扩展式滚动条]
     end
 
     subgraph Backend ["⚙️ Backend (FastAPI + Uvicorn)"]
@@ -75,12 +75,43 @@ whisperMe/
 │   └── app/
 │       ├── __init__.py
 │       ├── config.py          # 全局配置 & 环境防御层
-│       ├── database.py        # JSON 文件数据库 CRUD
+│       ├── database.py        # SQLite 数据库控制层
 │       ├── main.py            # FastAPI 路由 & 业务管道
 │       ├── prompt.json        # 内部 Prompt 备份
 │       └── core/
 │           ├── downloader.py      # 小宇宙 / Bilibili 下载器
 │           ├── transcriber.py     # Whisper / MiMo ASR 转录器
+│           ├── summarizer.py      # Ollama / 在线 LLM 总结器
+│           ├── notifier.py        # 邮件 & Windows 桌面通知
+│           ├── queue_manager.py   # FIFO 后台任务队列
+│           └── prompt_manager.py  # Prompt 模板 IO
+│
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── main.jsx           # React 挂载入口
+│       ├── App.jsx            # SPA 容器组件，负责全局导航与状态轮询
+│       ├── App.css            # 辅助样式
+│       ├── index.css          # 核心 CSS / 设计令牌 / 扩展式滚动条
+│       ├── components/        # 功能型局部件
+│       │   ├── Sidebar.jsx    # 品牌侧边栏导航
+│       │   └── Topbar.jsx     # 系统标题顶栏
+│       └── views/             # 视图级业务模块
+│           ├── LibraryView.jsx       # 播客库主视图，含存储量显示与录音入口
+│           ├── WorkstationView.jsx   # 播客工作台网格与列表切换视图
+│           ├── PodcastDetailView.jsx # 详情拖拽分析页，含三页签划分与发言人管理模态框
+│           └── SettingsView.jsx      # 系统高级配置表单视图
+│
+├── downloads/                 # 下载的原始音频
+├── transcripts/               # 转录结果 JSON
+├── temp_sandbox/              # 临时沙盒目录
+├── hf_cache_models/           # HuggingFace 模型缓存
+├── models/                    # 本地模型文件
+└── docs/                      # 项目文档
+```
+
+---��器
 │           ├── summarizer.py      # Ollama / 在线 LLM 总结器
 │           ├── notifier.py        # 邮件 & Windows 桌面通知
 │           ├── queue_manager.py   # FIFO 后台任务队列

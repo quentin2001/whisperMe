@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>whisperMe AI | Workstation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap');
+        
+        body {
+            background-color: #000000;
+            color: #e2e2e2;
+            overflow: hidden;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3D0000;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #950101;
+        }
+
+        .waveform-stepped {
+            mask-image: linear-gradient(to right, #fff 2px, transparent 2px);
+            mask-size: 4px 100%;
+        }
+
+        .glow-border {
+            box-shadow: 0 0 2px #FF0000;
+        }
+
+        @keyframes scanning {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(400%); }
+        }
+
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 0, 0, 0.1);
+            animation: scanning 4s linear infinite;
+            pointer-events: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#e3beb8",
+                        "inverse-surface": "#e2e2e2",
+                        "on-surface": "#e2e2e2",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed": "#ffdad4",
+                        "on-error": "#690005",
+                        "on-tertiary-container": "#ff9c8d",
+                        "secondary-container": "#7f2e24",
+                        "background": "#000000",
+                        "surface-bright": "#393939",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-container": "#ff9c8d",
+                        "on-secondary": "#5e160e",
+                        "secondary": "#ffb4a8",
+                        "inverse-on-surface": "#303030",
+                        "secondary-fixed-dim": "#ffb4a8",
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#930001",
+                        "surface-container": "#1f1f1f",
+                        "surface": "#131313",
+                        "on-background": "#e2e2e2",
+                        "surface-container-high": "#2a2a2a",
+                        "on-tertiary-fixed": "#410000",
+                        "surface-container-highest": "#353535",
+                        "tertiary": "#ffb4a8",
+                        "on-secondary-container": "#ff9f90",
+                        "surface-tint": "#ffb4a8",
+                        "primary-fixed-dim": "#ffb4a8",
+                        "secondary-fixed": "#ffdad4",
+                        "on-secondary-fixed-variant": "#7c2c22",
+                        "surface-dim": "#131313",
+                        "on-secondary-fixed": "#400101",
+                        "tertiary-fixed-dim": "#ffb4a8",
+                        "on-primary": "#690000",
+                        "primary-container": "#950101",
+                        "primary": "#ffb4a8",
+                        "outline": "#aa8984",
+                        "tertiary-container": "#950100",
+                        "outline-variant": "#5b403c",
+                        "surface-variant": "#353535",
+                        "inverse-primary": "#b72216",
+                        "surface-container-low": "#1b1b1b",
+                        "primary-fixed": "#ffdad4",
+                        "on-primary-fixed": "#410000",
+                        "on-tertiary-fixed-variant": "#930100",
+                        "on-tertiary": "#690100"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "base": "4px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "xl": "48px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Geist"],
+                        "display-lg": ["Geist"],
+                        "label-caps": ["Geist Mono"],
+                        "body-sm": ["Geist"],
+                        "mono-data": ["Geist Mono"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "title-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                        "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "mono-data": ["13px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-body-lg text-on-background selection:bg-primary-container selection:text-white">
+<!-- Sidebar Navigation -->
+<aside class="fixed inset-y-0 left-0 flex flex-col h-screen w-64 border-r border-outline-variant bg-background z-50">
+<div class="p-lg">
+<h1 class="font-headline-lg text-headline-lg font-black text-primary uppercase tracking-tighter">whisperMe AI</h1>
+<p class="font-mono-data text-[10px] text-primary-container tracking-widest mt-1">SYSTEM ACTIVE // ENCRYPTION: AES-256</p>
+</div>
+<nav class="flex-1 mt-md">
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span class="font-body-lg text-body-lg">Library</span>
+</a>
+<a class="flex items-center gap-4 bg-secondary-container text-on-secondary-container border-l-4 border-primary px-4 py-3 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-body-lg text-body-lg">Workstation</span>
+</a>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-on-surface px-4 py-3 hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-lg text-body-lg">Settings</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant p-md bg-surface-container-lowest">
+<button class="w-full bg-primary-container text-white py-3 px-4 font-label-caps text-label-caps uppercase hover:bg-primary transition-all active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">analytics</span>
+                RESOURCE MONITOR
+            </button>
+<div class="mt-4 flex flex-col gap-2">
+<div class="flex items-center justify-between font-mono-data text-mono-data text-on-surface-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">memory</span>
+<span>CPU: 24%</span>
+</div>
+<div class="w-16 h-1 bg-surface-container-highest">
+<div class="bg-primary h-full" style="width: 24%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between font-mono-data text-mono-data text-on-surface-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">analytics</span>
+<span>RAM: 1.2GB</span>
+</div>
+<div class="w-16 h-1 bg-surface-container-highest">
+<div class="bg-primary h-full" style="width: 45%"></div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Top Navigation -->
+<header class="fixed top-0 right-0 h-16 w-[calc(100%-16rem)] border-b border-outline-variant bg-background flex justify-between items-center px-lg z-40">
+<div class="flex items-center gap-md">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="bg-surface-container-lowest border-none border-b border-primary-container focus:ring-0 focus:border-primary text-body-sm text-on-surface w-64 pl-10 h-10" placeholder="Search workstation data..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<button class="text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="flex items-center gap-3 border-l border-outline-variant pl-lg">
+<div class="text-right">
+<p class="font-label-caps text-[10px] text-primary leading-none uppercase">Agent-01</p>
+<p class="font-mono-data text-mono-data text-on-surface-variant">Secure Session</p>
+</div>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-64 mt-16 h-[calc(100vh-144px)] overflow-hidden flex bg-background">
+<!-- Left Pane: Diarized Transcript -->
+<section class="w-1/2 border-r border-outline-variant flex flex-col relative overflow-hidden">
+<div class="scanline"></div>
+<div class="p-lg border-b border-outline-variant bg-surface-container-lowest flex justify-between items-center">
+<h2 class="font-label-caps text-label-caps uppercase text-primary flex items-center gap-2">
+<span class="w-2 h-2 bg-primary animate-pulse"></span>
+                    LIVE_TRANSCRIPT.LOG
+                </h2>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-secondary-container text-[10px] font-mono-data text-white">AUTO_SYNC</span>
+<span class="px-2 py-1 bg-surface-container-highest text-[10px] font-mono-data text-on-surface-variant border border-outline-variant">JSON_EXPORT</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-lg space-y-lg custom-scrollbar">
+<!-- Speaker 00 -->
+<div class="space-y-sm">
+<div class="flex items-center gap-3">
+<span class="font-mono-data text-[11px] text-primary opacity-50">00:04:12</span>
+<span class="font-label-caps text-label-caps text-primary bg-primary-container/20 px-2">SPEAKER_00</span>
+</div>
+<p class="font-body-lg text-on-surface leading-relaxed border-l-2 border-primary-container pl-4">
+                        We need to initialize the neural processing unit for the "whisperMe" core update. The latency spikes we observed in the last sprint are unacceptable for real-time diarization in high-noise environments.
+                    </p>
+</div>
+<!-- Speaker 01 -->
+<div class="space-y-sm">
+<div class="flex items-center gap-3">
+<span class="font-mono-data text-[11px] text-primary opacity-50">00:04:28</span>
+<span class="font-label-caps text-label-caps text-secondary bg-secondary-container/20 px-2">SPEAKER_01</span>
+</div>
+<p class="font-body-lg text-on-surface-variant leading-relaxed border-l-2 border-outline-variant pl-4">
+                        I've already begun refactoring the audio buffer logic. By implementing a ring buffer strategy with tiered priority queues, we can reduce overhead by approximately 18% during peak inference loads.
+                    </p>
+</div>
+<!-- Speaker 00 -->
+<div class="space-y-sm">
+<div class="flex items-center gap-3">
+<span class="font-mono-data text-[11px] text-primary opacity-50">00:04:45</span>
+<span class="font-label-caps text-label-caps text-primary bg-primary-container/20 px-2">SPEAKER_00</span>
+</div>
+<p class="font-body-lg text-on-surface leading-relaxed border-l-2 border-primary-container pl-4">
+                        Excellent. Make sure to document the Vantablack aesthetic requirements for the UI layer as well. The high-contrast modules need to be legible under tactical lighting conditions.
+                    </p>
+</div>
+<!-- Speaker 02 -->
+<div class="space-y-sm">
+<div class="flex items-center gap-3">
+<span class="font-mono-data text-[11px] text-primary opacity-50">00:05:01</span>
+<span class="font-label-caps text-label-caps text-white bg-surface-container-highest px-2">SPEAKER_02</span>
+</div>
+<p class="font-body-lg text-on-surface-variant leading-relaxed border-l-2 border-outline-variant pl-4">
+                        Acknowledged. The Executive Summary module is now parsing these technical requirements into actionable tickets. Topic identification is hovering at 99.4% accuracy.
+                    </p>
+</div>
+<!-- System Notification -->
+<div class="bg-primary-container/10 border border-primary-container p-4 flex items-start gap-4">
+<span class="material-symbols-outlined text-primary">terminal</span>
+<div>
+<p class="font-label-caps text-[10px] text-primary">SYSTEM_MESSAGE // INTERRUPT</p>
+<p class="font-mono-data text-xs text-on-surface">Ambient noise floor detected above 45dB. Activating noise suppression algorithms...</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Pane: AI Intelligence -->
+<section class="w-1/2 flex flex-col bg-surface-container-lowest">
+<div class="p-lg flex flex-col gap-lg h-full overflow-y-auto custom-scrollbar">
+<!-- Executive Summary -->
+<div class="border border-outline-variant p-gutter relative overflow-hidden">
+<div class="absolute top-0 right-0 p-2 opacity-10">
+<span class="material-symbols-outlined text-4xl">psychology</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">description</span>
+                        EXECUTIVE_SUMMARY
+                    </h3>
+<p class="font-body-lg text-on-surface leading-relaxed italic">
+                        "Session focus revolves around the technical optimization of whisperMe AI's core processing unit, specifically addressing latency issues and implementing tiered priority queues. Secondary focus on maintaining design integrity through high-contrast brutalist UI requirements."
+                    </p>
+</div>
+<!-- Topic Timeline -->
+<div>
+<h3 class="font-label-caps text-label-caps text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">timeline</span>
+                        TOPIC_TIMELINE
+                    </h3>
+<div class="space-y-2">
+<div class="flex items-center gap-4 group cursor-pointer">
+<span class="font-mono-data text-[11px] w-12 text-on-surface-variant group-hover:text-primary">00:00</span>
+<div class="flex-1 h-8 bg-surface-container border border-outline-variant flex items-center px-4 group-hover:border-primary group-hover:bg-primary-container/5 transition-all">
+<p class="font-label-caps text-[10px] uppercase tracking-wide">Infrastructure Setup</p>
+</div>
+</div>
+<div class="flex items-center gap-4 group cursor-pointer">
+<span class="font-mono-data text-[11px] w-12 text-on-surface-variant group-hover:text-primary">04:12</span>
+<div class="flex-1 h-8 bg-primary-container/20 border border-primary flex items-center px-4 shadow-[0_0_10px_rgba(255,0,0,0.1)]">
+<p class="font-label-caps text-[10px] uppercase tracking-wide text-primary">Latency Refactoring (Active)</p>
+</div>
+</div>
+<div class="flex items-center gap-4 group cursor-pointer">
+<span class="font-mono-data text-[11px] w-12 text-on-surface-variant group-hover:text-primary">12:30</span>
+<div class="flex-1 h-8 bg-surface-container border border-outline-variant flex items-center px-4 group-hover:border-primary">
+<p class="font-label-caps text-[10px] uppercase tracking-wide">UI/UX Implementation</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Key Takeaways (Bento-style Grid) -->
+<div>
+<h3 class="font-label-caps text-label-caps text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">checklist</span>
+                        KEY_TAKEAWAYS
+                    </h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="border border-outline-variant p-4 hover:border-primary transition-all">
+<div class="text-primary mb-2">
+<span class="material-symbols-outlined text-sm">memory</span>
+</div>
+<h4 class="font-label-caps text-[11px] text-white uppercase mb-1">Inference Spike</h4>
+<p class="font-body-sm text-[12px] text-on-surface-variant">Identified latency bottlenecks in the core audio buffer stream.</p>
+</div>
+<div class="border border-outline-variant p-4 hover:border-primary transition-all">
+<div class="text-primary mb-2">
+<span class="material-symbols-outlined text-sm">speed</span>
+</div>
+<h4 class="font-label-caps text-[11px] text-white uppercase mb-1">Performance Gain</h4>
+<p class="font-body-sm text-[12px] text-on-surface-variant">Estimated 18% improvement through ring buffer tiered queues.</p>
+</div>
+<div class="col-span-2 border border-outline-variant p-4 bg-primary-container/5">
+<div class="flex justify-between items-center mb-2">
+<h4 class="font-label-caps text-[11px] text-primary uppercase">Critical Task: Vantablack UI</h4>
+<span class="material-symbols-outlined text-primary text-sm">priority_high</span>
+</div>
+<p class="font-body-sm text-on-surface-variant">High-stakes legibility requirements for military-grade hardware aesthetics. Ensure contrast ratios exceed 21:1 for critical readouts.</p>
+</div>
+</div>
+</div>
+<!-- AI Analysis Shader -->
+<div class="mt-auto border border-outline-variant bg-black h-32 relative overflow-hidden">
+
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="text-center">
+<p class="font-label-caps text-[10px] text-primary animate-pulse tracking-[0.3em]">AI_ANALYSIS_ENGINE_RUNNING</p>
+<p class="font-mono-data text-[8px] text-on-surface-variant mt-1 opacity-50">RECOGNIZING_PATTERNS... 0.002ms</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer: Audio Player -->
+<footer class="fixed bottom-0 right-0 w-[calc(100%-16rem)] h-20 border-t-2 border-primary bg-surface-container-lowest flex items-center justify-between px-lg z-50 shadow-[0_-2px_10px_rgba(255,0,0,0.2)]">
+<div class="flex items-center gap-lg w-1/4">
+<button class="w-10 h-10 border border-primary flex items-center justify-center hover:bg-primary-container transition-all active:scale-95">
+<span class="material-symbols-outlined text-primary group-hover:text-white" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<div>
+<p class="font-label-caps text-[11px] text-white truncate w-32">SESSION_REF_882.WAV</p>
+<p class="font-mono-data text-[10px] text-primary">00:04:12 / 01:22:15</p>
+</div>
+</div>
+<div class="flex-1 px-xl flex flex-col justify-center gap-1">
+<div class="h-8 flex items-end gap-[1px] waveform-stepped">
+<!-- Mock Waveform -->
+<div class="bg-primary-container h-1/4 w-1"></div>
+<div class="bg-primary-container h-2/4 w-1"></div>
+<div class="bg-primary h-3/4 w-1"></div>
+<div class="bg-primary h-4/4 w-1"></div>
+<div class="bg-primary h-2/4 w-1"></div>
+<div class="bg-primary h-1/4 w-1"></div>
+<div class="bg-primary h-3/4 w-1"></div>
+<div class="bg-primary-container h-1/4 w-1"></div>
+<div class="bg-primary-container h-2/4 w-1"></div>
+<div class="bg-primary h-3/4 w-1"></div>
+<div class="bg-primary-container h-1/4 w-1"></div>
+<div class="bg-outline-variant h-1/4 w-1"></div>
+<div class="bg-outline-variant h-2/4 w-1"></div>
+<div class="bg-outline-variant h-1/4 w-1"></div>
+<div class="bg-outline-variant h-3/4 w-1"></div>
+<div class="bg-outline-variant h-1/4 w-1"></div>
+<div class="bg-outline-variant h-4/4 w-1"></div>
+<div class="bg-outline-variant h-2/4 w-1"></div>
+<div class="bg-outline-variant h-1/4 w-1"></div>
+<div class="bg-outline-variant h-3/4 w-1"></div>
+<!-- Repeat pattern for visuals -->
+<div class="bg-outline-variant h-2/4 w-1 hidden lg:block"></div>
+<div class="bg-outline-variant h-1/4 w-1 hidden lg:block"></div>
+<div class="bg-outline-variant h-4/4 w-1 hidden lg:block"></div>
+<div class="bg-outline-variant h-2/4 w-1 hidden lg:block"></div>
+<div class="bg-outline-variant h-1/4 w-1 hidden lg:block"></div>
+</div>
+<div class="relative w-full h-1 bg-surface-container-highest overflow-hidden">
+<div class="absolute left-0 top-0 h-full bg-[#FF0000] w-[35%] glow-border shadow-[0_0_8px_#FF0000]"></div>
+</div>
+</div>
+<div class="w-1/4 flex items-center justify-end gap-lg">
+<div class="flex items-center gap-4 text-on-surface-variant font-mono-data text-[10px]">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">settings_input_component</span>
+<span>PIPELINE: TRANSCRIBING</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">equalizer</span>
+<span>320KBPS</span>
+</div>
+<div class="text-primary font-bold">MONO</div>
+</div>
+<span class="font-mono-data text-mono-data text-on-surface-variant opacity-50">v2.4.0-STABLE</span>
+</div>
+</footer>
+<!-- Interactive Micro-Interactions -->
+<script>
+        document.querySelectorAll('nav a, button').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'scale(0.97)';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = 'scale(1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+        });
+
+        // Simple typing effect for terminal simulation
+        const termLog = document.querySelector('.font-mono-data.text-[8px]');
+        const logs = [
+            'RECOGNIZING_PATTERNS... 0.002ms',
+            'UPDATING_SEMANTIC_INDEX... OK',
+            'ENCRYPTING_METADATA... AES_GCM',
+            'SYNCING_DASHBOARD... 100%'
+        ];
+        let currentLog = 0;
+        setInterval(() => {
+            currentLog = (currentLog + 1) % logs.length;
+            if (termLog) termLog.textContent = logs[currentLog];
+        }, 3000);
+    </script>
+</body></html>

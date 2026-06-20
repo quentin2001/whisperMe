@@ -1,0 +1,408 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>whisperMe | System Settings</title>
+<!-- Google Fonts: Geist for the modern, premium feel -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols for Literal Transcription -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+          tailwind.config = {
+            darkMode: "class",
+            theme: {
+              extend: {
+                "colors": {
+                        "on-surface": "#1d1c18",
+                        "tertiary-container": "#7d7461",
+                        "on-background": "#1d1c18",
+                        "inverse-on-surface": "#f5f0e9",
+                        "tertiary": "#635b4a",
+                        "inverse-primary": "#ffb3b1",
+                        "surface-bright": "#fef9f2",
+                        "secondary-fixed": "#f9dfb9",
+                        "on-error": "#ffffff",
+                        "background": "#fef9f2",
+                        "primary-fixed-dim": "#ffb3b1",
+                        "surface-variant": "#e6e2db",
+                        "on-primary-fixed-variant": "#92001d",
+                        "surface-tint": "#f62440",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#211b0d",
+                        "inverse-surface": "#32302c",
+                        "on-secondary-container": "#746243",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#dbc39f",
+                        "on-tertiary-container": "#fffbff",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#e6e2db",
+                        "surface-container": "#f2ede6",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#ece7e1",
+                        "surface-container-low": "#f8f3ec",
+                        "secondary": "#6e5c3e",
+                        "outline-variant": "#e7bcbb",
+                        "on-primary-fixed": "#410007",
+                        "on-surface-variant": "#5d3f3e",
+                        "on-primary-container": "#fffbff",
+                        "on-secondary-fixed": "#261903",
+                        "tertiary-fixed": "#eee1cb",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#554428",
+                        "surface-dim": "#ded9d3",
+                        "surface": "#fef9f2",
+                        "primary-fixed": "#ffdad8",
+                        "secondary-container": "#f9dfb9",
+                        "primary-container": "#f62440",
+                        "tertiary-fixed-dim": "#d1c5b0",
+                        "primary": "#f62440",
+                        "on-tertiary-fixed-variant": "#4e4635",
+                        "outline": "#926e6d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff"
+                },
+                "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                },
+                "spacing": {
+                        "margin-mobile": "20px",
+                        "stack-lg": "24px",
+                        "stack-xs": "4px",
+                        "stack-md": "16px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "unit": "8px",
+                        "stack-sm": "8px",
+                        "stack-xl": "48px",
+                        "margin-desktop": "64px"
+                },
+                "fontFamily": {
+                        "body-lg": ["Geist"],
+                        "body-md": ["Geist"],
+                        "headline-lg-mobile": ["Geist"],
+                        "display-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "display-lg-mobile": ["Geist"],
+                        "label-md": ["Geist"],
+                        "label-sm": ["Geist"],
+                        "headline-lg": ["Geist"]
+                },
+                "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                        "display-lg-mobile": ["36px", {"lineHeight": "42px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                }
+              },
+            },
+          }
+        </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            background-color: #fef9f2; /* Ivory Base */
+            color: #1d1c18;
+            font-family: 'Geist', sans-serif;
+        }
+        .settings-card {
+            background-color: #f2ede6; /* Champagne surface */
+            border: 1px solid #e7bcbb; /* Subtle Coral/Outline Variant */
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .settings-card:hover {
+            transform: translateY(-2px);
+        }
+        /* Custom Toggle Switch Style */
+        .toggle-checkbox:checked {
+            right: 0;
+            background-color: #f62440; /* Coral Red */
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #e7bcbb;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #fef9f2;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e7bcbb;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-hidden">
+<!-- Sidebar Navigation (SideNavBar) -->
+<aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-low border-r border-outline-variant flex flex-col p-stack-md gap-stack-lg z-30">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<div class="flex flex-col">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface leading-none">whisperMe</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant opacity-70">AI Workstation</p>
+</div>
+</div>
+</div>
+<div class="mt-stack-lg flex flex-col gap-stack-sm">
+<button class="bg-primary text-on-primary rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-bold transition-all active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span class="font-label-md text-label-md">New Transcription</span>
+</button>
+</div>
+<nav class="flex-1 flex flex-col gap-2 mt-4">
+<!-- Library -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="subscriptions">subscriptions</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+<!-- Workstation -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span class="font-label-md text-label-md">Workstation</span>
+</a>
+<!-- Settings (Active) -->
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold translate-x-1 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col relative overflow-y-auto custom-scrollbar">
+<!-- TopNavBar Shell -->
+<header class="sticky top-0 w-full z-20 bg-surface/80 backdrop-blur-md flex justify-between items-center px-margin-desktop py-4 max-w-container-max mx-auto">
+<div class="flex items-center gap-2">
+<span class="font-headline-lg text-headline-lg font-black text-primary">System Settings</span>
+</div>
+<div class="flex items-center gap-stack-md">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-50" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container border border-outline-variant rounded-full text-label-md focus:outline-none focus:ring-2 focus:ring-primary/20 w-64 transition-all focus:w-80" placeholder="Search parameters..." type="text">
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-surface-variant rounded-full transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Settings Content Canvas -->
+<div class="px-margin-desktop py-stack-lg max-w-container-max mx-auto w-full flex flex-col gap-stack-xl pb-32">
+<!-- ASR Settings Section -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="record_voice_over">record_voice_over</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">ASR Engine</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Automatic Speech Recognition model configuration.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<!-- Model Path -->
+<div class="settings-card p-6 rounded-xl flex flex-col gap-4" style="transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px);">
+<label class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant opacity-70">Model Storage Path</label>
+<div class="flex gap-2">
+<input class="flex-1 bg-surface border border-outline-variant rounded-lg px-4 py-3 font-body-md text-body-md focus:border-primary focus:ring-0 transition-colors" type="text" value="/usr/local/share/whisper/models/large-v3.bin">
+<button class="p-3 bg-surface-container-highest border border-outline-variant rounded-lg hover:bg-outline-variant transition-colors">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+</button>
+</div>
+<p class="text-[12px] text-on-surface-variant">Path to pre-trained weights for local execution.</p>
+</div>
+<!-- API Key (Masked) -->
+<div class="settings-card p-6 rounded-xl flex flex-col gap-4" style="transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px);">
+<label class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant opacity-70">Whisper Cloud API Key</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-3 font-body-md text-body-md focus:border-primary focus:ring-0 transition-colors" type="password" value="sk-••••••••••••••••••••••••">
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant cursor-pointer hover:text-primary transition-colors" data-icon="visibility">visibility</span>
+</div>
+<p class="text-[12px] text-on-surface-variant">Required for cloud-assisted ultra-fast transcription.</p>
+</div>
+</div>
+</section>
+<!-- LLM Summary Settings Section -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-xl bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">LLM Insights</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage how your transcriptions are summarized and analyzed.</p>
+</div>
+</div>
+<div class="settings-card p-8 rounded-xl flex flex-col gap-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm font-bold text-on-surface">Preferred LLM Provider</label>
+<select class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-3 font-body-md text-body-md focus:border-primary focus:ring-0 appearance-none bg-no-repeat bg-[right_1rem_center]">
+<option>OpenAI GPT-4o (Default)</option>
+<option>Anthropic Claude 3.5 Sonnet</option>
+<option>Local Llama 3 (8B)</option>
+<option>Mistral Large</option>
+</select>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm font-bold text-on-surface">Endpoint URL</label>
+<input class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-3 font-body-md text-body-md focus:border-primary focus:ring-0" placeholder="https://api.openai.com/v1" type="text">
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold">Inference Temperature</span>
+<span class="text-[12px] text-on-surface-variant">Higher values produce more creative summaries.</span>
+</div>
+<span class="font-label-md text-label-md text-primary font-bold">0.7</span>
+</div>
+<input class="w-full h-2 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" max="1" min="0" step="0.1" type="range" value="0.7">
+</div>
+</div>
+</section>
+<!-- Notifications Section -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="notifications_active">notifications_active</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Notifications</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Stay updated on background processing status.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
+<!-- Toggle Card 1 -->
+<div class="settings-card p-6 rounded-xl flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined p-2 bg-white/50 rounded-lg text-primary" data-icon="desktop_windows">desktop_windows</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold">Desktop Notifications</p>
+<p class="text-[12px] text-on-surface-variant">Popups when processing ends.</p>
+</div>
+</div>
+<!-- Toggle Card 2 -->
+<div class="settings-card p-6 rounded-xl flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined p-2 bg-white/50 rounded-lg text-primary" data-icon="alternate_email">alternate_email</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold">Email Digest</p>
+<p class="text-[12px] text-on-surface-variant">Weekly summary of activity.</p>
+</div>
+</div>
+<!-- Toggle Card 3 -->
+<div class="settings-card p-6 rounded-xl flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined p-2 bg-white/50 rounded-lg text-primary" data-icon="sound_detection_dog_barking">sound_detection_dog_barking</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold">Audible Alerts</p>
+<p class="text-[12px] text-on-surface-variant">Chime when job completes.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Dangerous Area / Reset -->
+<section class="pt-8 border-t border-outline-variant mt-4">
+<div class="bg-error-container/20 border border-error/20 rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-error text-[32px]" data-icon="warning">warning</span>
+<div>
+<h3 class="font-headline-md text-headline-md text-error">Factory Reset</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Erase all model configurations and local indices. This cannot be undone.</p>
+</div>
+</div>
+<button class="px-6 py-3 border border-error text-error font-bold rounded-lg hover:bg-error hover:text-white transition-all active:scale-95">
+                    Reset Application
+                </button>
+</div>
+</section>
+</div>
+<!-- Sticky Footer Shell (Action Bar) -->
+<footer class="fixed bottom-0 left-64 right-0 h-20 bg-surface-container border-t border-outline-variant z-40 flex items-center justify-between px-margin-desktop shadow-sm">
+<div class="flex items-center gap-stack-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Processing: Transcribing...</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="play_arrow">play_arrow</span>
+<span class="font-label-sm text-label-sm font-bold text-primary">Playback Controls</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary">Speed 1.0x</span>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-3 bg-surface-container-highest border border-outline-variant rounded-lg font-bold text-on-surface hover:bg-outline-variant transition-all">
+                Discard
+            </button>
+<button class="px-10 py-3 bg-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all" onclick="saveNotification()">
+                Save Configuration
+            </button>
+</div>
+</footer>
+</main>
+<!-- Toast Notification -->
+<div class="fixed bottom-24 right-8 bg-on-surface text-surface py-3 px-6 rounded-xl shadow-2xl flex items-center gap-3 translate-y-20 opacity-0 transition-all duration-500 z-50" id="toast">
+<span class="material-symbols-outlined text-green-400" data-icon="check_circle">check_circle</span>
+<span class="font-label-md text-label-md">Settings updated successfully!</span>
+</div>
+<script>
+    function saveNotification() {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        
+        setTimeout(() => {
+            toast.classList.add('translate-y-20', 'opacity-0');
+            toast.classList.remove('translate-y-0', 'opacity-100');
+        }, 3000);
+    }
+
+    // Interactive card effect
+    document.querySelectorAll('.settings-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = (y - centerY) / 25;
+            const rotateY = (centerX - x) / 25;
+            card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0)`;
+        });
+    });
+</script>
+</body></html>
