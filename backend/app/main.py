@@ -944,16 +944,16 @@ def run_podcast_pipeline(task_id: str, url: str):
         timing_stats['AI 深度总结 (LLM)'] = time.time() - t_summary_start
         
         total_time = time.time() - pipeline_start_time
-        time_report = "\\n\\n---\\n\\n### ⏱️ 分析用时统计\\n"
+        time_report = "\n\n---\n\n### ⏱️ 分析用时统计\n"
         for step, t in timing_stats.items():
             if t > 60:
-                time_report += f"- **{step}**: {t/60:.1f} 分钟\\n"
+                time_report += f"- **{step}**: {t/60:.1f} 分钟\n"
             else:
-                time_report += f"- **{step}**: {t:.1f} 秒\\n"
+                time_report += f"- **{step}**: {t:.1f} 秒\n"
         if total_time > 60:
-            time_report += f"\\n**总计耗时**: {total_time/60:.1f} 分钟"
+            time_report += f"\n**总计耗时**: {total_time/60:.1f} 分钟"
         else:
-            time_report += f"\\n**总计耗时**: {total_time:.1f} 秒"
+            time_report += f"\n**总计耗时**: {total_time:.1f} 秒"
             
         summary_report += time_report
         db.update_task(task_id, summary=summary_report, progress=95.0)
@@ -1383,6 +1383,7 @@ import json
 class CreateCardRequest(BaseModel):
     paragraph_id: str
     podcast_id: str
+    board_id: str = "board_default"
 
 class ReviewCardRequest(BaseModel):
     direction: str  # "left" or "right"
@@ -1390,7 +1391,10 @@ class ReviewCardRequest(BaseModel):
 class CreateLinkRequest(BaseModel):
     source_card_id: str
     target_card_id: str
-    my_synthesis: str
+    my_synthesis: str = ""
+    board_id: str = None
+
+
 
 def call_llm(prompt: str) -> str:
     import httpx
@@ -1532,6 +1536,8 @@ def create_card(req: CreateCardRequest):
     }
     
     db.create_card(card)
+    if req.board_id:
+        db.add_card_to_board(req.board_id, card_id)
     return card
 
 @app.delete("/api/cards/paragraph/{paragraph_id}")
@@ -1552,9 +1558,54 @@ def delete_card_by_paragraph(paragraph_id: str):
         
     return {"status": "ok", "deleted_card_id": card_to_delete["id"]}
 
+class UpdateCardPositionRequest(BaseModel):
+    x: float
+    y: float
+
+@app.put("/api/cards/{card_id}/position")
+def update_card_position(card_id: str, req: UpdateCardPositionRequest):
+    card = db.get_card(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片未找到")
+    
+    updated_card = db.update_card(card_id, pos_x=req.x, pos_y=req.y)
+    return {"status": "ok", "card": updated_card}
+
+# ==================== BOARDS API ====================
+@app.get("/api/boards")
+def get_boards():
+    return db.get_all_boards()
+
+class CreateBoardRequest(BaseModel):
+    name: str
+
+@app.post("/api/boards")
+def create_board(req: CreateBoardRequest):
+    import uuid
+    b_id = f"board_{uuid.uuid4().hex[:12]}"
+    return db.create_board(b_id, req.name)
+
+class AddCardToBoardRequest(BaseModel):
+    card_id: str
+    pos_x: float = 0.0
+    pos_y: float = 0.0
+
+@app.post("/api/boards/{board_id}/cards")
+def add_card_to_board(board_id: str, req: AddCardToBoardRequest):
+    db.add_card_to_board(board_id, req.card_id, req.pos_x, req.pos_y)
+    return {"status": "ok"}
+
+@app.put("/api/boards/{board_id}/cards/{card_id}/position")
+def update_board_card_position(board_id: str, card_id: str, req: UpdateCardPositionRequest):
+    db.update_board_card_position(board_id, card_id, req.x, req.y)
+    return {"status": "ok"}
+
 @app.get("/api/cards")
-def get_cards():
-    cards = db.get_all_cards()
+def get_cards(board_id: str = None):
+    if board_id:
+        cards = db.get_cards_by_board(board_id)
+    else:
+        cards = db.get_all_cards()
     # Populate with podcast info (title, image_url, etc.)
     for c in cards:
         task = db.get_task(c["podcast_id"])
@@ -1758,6 +1809,14 @@ def create_link(req: CreateLinkRequest):
         s_quote = req.my_synthesis.strip()
         s_why = f"跨越不同播客领域的脑力对撞成果。融合了：{card_a.get('spark_title')} 与 {card_b.get('spark_title')}。"
 
+    # 计算两张卡片的中点，稍微偏上一点放置新卡片
+    pos_x_a = card_a.get("pos_x") or 0.0
+    pos_y_a = card_a.get("pos_y") or 0.0
+    pos_x_b = card_b.get("pos_x") or 0.0
+    pos_y_b = card_b.get("pos_y") or 0.0
+    mid_x = (pos_x_a + pos_x_b) / 2.0
+    mid_y = (pos_y_a + pos_y_b) / 2.0 - 200
+
     # 创建并保存合成的新卡片
     s_card_id = f"s_card_{uuid.uuid4().hex[:12]}"
     synthesized_card = {
@@ -1773,9 +1832,14 @@ def create_link(req: CreateLinkRequest):
         "parent_ids": [req.source_card_id, req.target_card_id],
         "parent_titles": [card_a.get("spark_title"), card_b.get("spark_title")],
         "efactor": 2.5,
-        "status": "stable"
+        "status": "stable",
+        "pos_x": mid_x,
+        "pos_y": mid_y
     }
     db.create_card(synthesized_card)
+    
+    if req.board_id:
+        db.add_card_to_board(req.board_id, s_card_id, mid_x, mid_y)
     
     # 建立两条连线：Card A -> Synthesized Card，和 Card B -> Synthesized Card
     link1 = {
@@ -1887,6 +1951,90 @@ def get_collider():
         "dissonance_index": dissonance_index,
         "match_reason": match_reason
     }
+
+# ==================== INSIGHTS API ====================
+
+class CreateInsightRequest(BaseModel):
+    podcast_id: str
+    original_text: str
+
+@app.post("/api/insights")
+def create_insight(req: CreateInsightRequest):
+    # Call LLM to refine the insight
+    prompt = f"""你是一个个人知识管理的洞察提炼助手。
+用户从一期播客中摘录了一段话，请你将这段长篇大论压缩、提炼成一句【以第一人称口吻表达的原则或格言】。
+要求：
+1. 极其简练，直击核心（不超过30个字）。
+2. 使用第一人称（例如：“限制社媒使用时间，可以让我的多巴胺基线恢复正常”）。
+3. 只输出这一句话，不要有任何其他解释。
+
+用户摘录原文：
+"{req.original_text}"
+"""
+    try:
+        response_str = _call_llm_api(prompt, summary_mode="local", label="Insight润色")
+        refined_content = response_str.strip()
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] Insight LLM refinement failed: {e}")
+        refined_content = req.original_text[:30] + "..." if len(req.original_text) > 30 else req.original_text
+
+    from datetime import datetime, timedelta
+    tomorrow = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    insight = {
+        "podcast_id": req.podcast_id,
+        "original_text": req.original_text,
+        "refined_content": refined_content,
+        "review_count": 0,
+        "next_review_date": tomorrow,
+        "status": "ACTIVE"
+    }
+    return db.create_insight(insight)
+
+@app.get("/api/insights/review")
+def get_insights_for_review():
+    insights = db.get_insights_for_review()
+    # Populate podcast name
+    for ins in insights:
+        task = db.get_task(ins["podcast_id"])
+        if task:
+            ins["podcast_title"] = task.get("title", "未知标题")
+            ins["podcast_name"] = task.get("podcast_name", "未知播客")
+    return insights
+
+class ReviewInsightRequest(BaseModel):
+    action: str # "keep" or "discard"
+
+@app.post("/api/insights/{insight_id}/review")
+def review_insight(insight_id: str, req: ReviewInsightRequest):
+    insight = db.get_all_insights() # Not efficient but works for now
+    target = None
+    for ins in insight:
+        if ins["id"] == insight_id:
+            target = ins
+            break
+            
+    if not target:
+        raise HTTPException(status_code=404, detail="Insight not found")
+        
+    from datetime import datetime, timedelta
+    today = datetime.today()
+    
+    if req.action == "keep":
+        current_count = target.get("review_count", 0)
+        # Simple spaced repetition logic for MVP: interval increases
+        intervals = [1, 3, 7, 14, 30]
+        next_interval = intervals[min(current_count, len(intervals)-1)]
+        next_date = (today + timedelta(days=next_interval)).strftime("%Y-%m-%d")
+        
+        db.update_insight(
+            insight_id,
+            review_count=current_count + 1,
+            next_review_date=next_date
+        )
+    elif req.action == "discard":
+        db.delete_insight(insight_id)
+        
+    return {"status": "ok"}
 
 # 辅助读取配置
 def load_config_dict():

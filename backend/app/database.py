@@ -70,6 +70,20 @@ class LocalDatabase:
             )''')
             c.execute('CREATE INDEX IF NOT EXISTS idx_paragraphs_podcast_id ON paragraphs(podcast_id)')
             
+            # insights table
+            c.execute('''CREATE TABLE IF NOT EXISTS insights (
+                id TEXT PRIMARY KEY,
+                podcast_id TEXT,
+                original_text TEXT,
+                refined_content TEXT NOT NULL,
+                review_count INTEGER DEFAULT 0,
+                next_review_date TEXT,
+                status TEXT DEFAULT 'ACTIVE',
+                created_at TEXT,
+                FOREIGN KEY(podcast_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_insights_podcast_id ON insights(podcast_id)')
+            
             # cards table
             c.execute('''CREATE TABLE IF NOT EXISTS cards (
                 id TEXT PRIMARY KEY,
@@ -82,7 +96,9 @@ class LocalDatabase:
                 efactor REAL,
                 interval INTEGER,
                 next_review_date TEXT,
-                quote TEXT
+                quote TEXT,
+                pos_x REAL,
+                pos_y REAL
             )''')
             c.execute('CREATE INDEX IF NOT EXISTS idx_cards_podcast_id ON cards(podcast_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_cards_paragraph_id ON cards(paragraph_id)')
@@ -94,6 +110,24 @@ class LocalDatabase:
                 target_card_id TEXT,
                 my_synthesis TEXT,
                 created_at TEXT
+            )''')
+            
+            # boards table
+            c.execute('''CREATE TABLE IF NOT EXISTS boards (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                created_at TEXT
+            )''')
+            
+            # board_cards table
+            c.execute('''CREATE TABLE IF NOT EXISTS board_cards (
+                board_id TEXT,
+                card_id TEXT,
+                pos_x REAL,
+                pos_y REAL,
+                PRIMARY KEY (board_id, card_id),
+                FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE,
+                FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             )''')
             self.conn.commit()
 
@@ -144,6 +178,39 @@ class LocalDatabase:
                     print(f"❌ [MIGRATION] 增加 audio_url 列失败: {e}")
                     self.conn.rollback()
 
+            # 增量升级：为 cards 表增加 pos_x 和 pos_y 用于白板画布
+            c.execute("PRAGMA table_info(cards)")
+            card_columns = [col["name"] for col in c.fetchall()]
+            if "pos_x" not in card_columns:
+                try:
+                    c.execute("ALTER TABLE cards ADD COLUMN pos_x REAL")
+                    c.execute("ALTER TABLE cards ADD COLUMN pos_y REAL")
+                    self.conn.commit()
+                    print("✅ [MIGRATION] 成功为 cards 表增加 pos_x 和 pos_y 列")
+                except Exception as e:
+                    print(f"❌ [MIGRATION] 增加 cards 表坐标列失败: {e}")
+                    self.conn.rollback()
+
+            # 增量升级：初始化默认画板，并将所有现有卡片加入默认画板
+            c.execute("SELECT COUNT(*) as count FROM boards")
+            b_count = c.fetchone()["count"]
+            if b_count == 0:
+                try:
+                    default_board_id = "board_default"
+                    c.execute("INSERT INTO boards (id, name, created_at) VALUES (?, ?, ?)", 
+                              (default_board_id, "全局总览 (All)", datetime.now().isoformat()))
+                    
+                    c.execute("SELECT id, pos_x, pos_y FROM cards")
+                    all_cards = c.fetchall()
+                    for crd in all_cards:
+                        c.execute("INSERT OR IGNORE INTO board_cards (board_id, card_id, pos_x, pos_y) VALUES (?, ?, ?, ?)",
+                                  (default_board_id, crd["id"], crd.get("pos_x") or 0.0, crd.get("pos_y") or 0.0))
+                    self.conn.commit()
+                    print("✅ [MIGRATION] 成功初始化默认画板并迁移现有卡片")
+                except Exception as e:
+                    print(f"❌ [MIGRATION] 初始化默认画板失败: {e}")
+                    self.conn.rollback()
+
     def _insert_task_internal(self, c, t: dict):
         metadata = json.dumps(t.get("metadata", {}), ensure_ascii=False)
         transcript = json.dumps(t.get("transcript", []), ensure_ascii=False)
@@ -170,11 +237,12 @@ class LocalDatabase:
 
     def _insert_card_internal(self, c, card: dict):
         c.execute('''INSERT OR REPLACE INTO cards 
-            (id, paragraph_id, podcast_id, spark_title, why_it_matters, created_at, status, efactor, interval, next_review_date, quote)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (id, paragraph_id, podcast_id, spark_title, why_it_matters, created_at, status, efactor, interval, next_review_date, quote, pos_x, pos_y)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (card.get("id"), card.get("paragraph_id"), card.get("podcast_id"), card.get("spark_title"),
              card.get("why_it_matters"), card.get("created_at"), card.get("status", "active"), 
-             card.get("efactor", 2.5), card.get("interval", 1), card.get("next_review_date"), card.get("quote", "")))
+             card.get("efactor", 2.5), card.get("interval", 1), card.get("next_review_date"), card.get("quote", ""),
+             card.get("pos_x", 0.0), card.get("pos_y", 0.0)))
 
     def _insert_link_internal(self, c, link: dict):
         c.execute('''INSERT OR REPLACE INTO links 
@@ -321,6 +389,66 @@ class LocalDatabase:
                 self._insert_paragraph_internal(c, p)
             self.conn.commit()
 
+    # ==================== INSIGHTS ====================
+    def _insert_insight_internal(self, c, insight: dict):
+        c.execute('''INSERT OR REPLACE INTO insights 
+            (id, podcast_id, original_text, refined_content, review_count, next_review_date, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (insight.get("id"), insight.get("podcast_id"), insight.get("original_text", ""),
+             insight.get("refined_content", ""), insight.get("review_count", 0),
+             insight.get("next_review_date", ""), insight.get("status", "ACTIVE"),
+             insight.get("created_at", datetime.now().isoformat())))
+
+    def get_all_insights(self) -> list[dict]:
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("SELECT * FROM insights WHERE status != 'DELETED' ORDER BY created_at DESC")
+            return c.fetchall()
+
+    def get_insights_for_review(self) -> list[dict]:
+        with self.lock:
+            c = self.conn.cursor()
+            now = datetime.now().isoformat()
+            # 简化逻辑，获取 active 的 insight 并按需要复习的时间排，或者随机取3-5个
+            c.execute("SELECT * FROM insights WHERE status = 'ACTIVE' ORDER BY RANDOM() LIMIT 5")
+            return c.fetchall()
+
+    def create_insight(self, insight: dict) -> dict:
+        import uuid
+        if "id" not in insight or not insight["id"]:
+            insight["id"] = str(uuid.uuid4())
+        if "created_at" not in insight:
+            insight["created_at"] = datetime.now().isoformat()
+        with self.lock:
+            c = self.conn.cursor()
+            self._insert_insight_internal(c, insight)
+            self.conn.commit()
+            return insight
+
+    def update_insight(self, insight_id: str, **kwargs) -> dict:
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("SELECT * FROM insights WHERE id=?", (insight_id,))
+            row = c.fetchone()
+            if not row:
+                return None
+            for k, v in kwargs.items():
+                row[k] = v
+            self._insert_insight_internal(c, row)
+            self.conn.commit()
+            
+            c.execute("SELECT * FROM insights WHERE id=?", (insight_id,))
+            return c.fetchone()
+
+    def delete_insight(self, insight_id: str) -> bool:
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("UPDATE insights SET status = 'DELETED' WHERE id=?", (insight_id,))
+            if c.rowcount > 0:
+                self.conn.commit()
+                return True
+            return False
+
     # ==================== CARDS ====================
     def get_all_cards(self) -> list[dict]:
         with self.lock:
@@ -417,6 +545,55 @@ class LocalDatabase:
                 self.conn.commit()
                 return True
             return False
+
+    # ==================== BOARDS ====================
+    def get_all_boards(self) -> list[dict]:
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("SELECT * FROM boards ORDER BY created_at ASC")
+            return c.fetchall()
+
+    def create_board(self, board_id: str, name: str) -> dict:
+        with self.lock:
+            c = self.conn.cursor()
+            board = {
+                "id": board_id,
+                "name": name,
+                "created_at": datetime.now().isoformat()
+            }
+            c.execute("INSERT INTO boards (id, name, created_at) VALUES (?, ?, ?)", 
+                      (board["id"], board["name"], board["created_at"]))
+            self.conn.commit()
+            return board
+
+    def get_cards_by_board(self, board_id: str) -> list[dict]:
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute('''
+                SELECT c.*, bc.pos_x as bc_pos_x, bc.pos_y as bc_pos_y
+                FROM cards c
+                JOIN board_cards bc ON c.id = bc.card_id
+                WHERE bc.board_id = ?
+            ''', (board_id,))
+            rows = c.fetchall()
+            for r in rows:
+                r["pos_x"] = r.pop("bc_pos_x")
+                r["pos_y"] = r.pop("bc_pos_y")
+            return rows
+
+    def add_card_to_board(self, board_id: str, card_id: str, pos_x: float = 0.0, pos_y: float = 0.0):
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("INSERT OR IGNORE INTO board_cards (board_id, card_id, pos_x, pos_y) VALUES (?, ?, ?, ?)",
+                      (board_id, card_id, pos_x, pos_y))
+            self.conn.commit()
+
+    def update_board_card_position(self, board_id: str, card_id: str, pos_x: float, pos_y: float):
+        with self.lock:
+            c = self.conn.cursor()
+            c.execute("UPDATE board_cards SET pos_x=?, pos_y=? WHERE board_id=? AND card_id=?",
+                      (pos_x, pos_y, board_id, card_id))
+            self.conn.commit()
 
 # 实例化全局单例数据库对象
 db = LocalDatabase()

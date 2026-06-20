@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import SlotMachineModal from './SlotMachineModal';
-import AiColliderModal from './AiColliderModal';
+import CanvasBoard from './components/CanvasBoard';
 
 // ==================== 🛠️ 像素级 SVG 图标组件 ====================
 const Icons = {
@@ -26,6 +25,7 @@ const Icons = {
   Sandbox: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
   ExternalLink: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
 };
+
 
 // ==================== 📝 自研高性能 Markdown 渲染器 ====================
 function parseInlineMarkdown(text) {
@@ -63,7 +63,7 @@ function formatSpeakerName(speakerId, mappings) {
 function MarkdownRenderer({ text }) {
   if (!text) return <p style={{ color: 'var(--text-secondary)' }}>暂无分析报告</p>;
   
-  const lines = text.split('\n');
+  const lines = text.replace(/\\n/g, '\n').split('\n');
   let inList = false;
   let listItems = [];
   const renderedElements = [];
@@ -494,7 +494,7 @@ const BACKEND_URL = "http://127.0.0.1:8000";
 const TRANSLATIONS = {
   'zh-CN': {
     'dashboard': '我的播客库',
-    'sandbox': '认知沙盒',
+
     'settings': '系统设置',
     'center_sub': '本地播客声纹自动化处理中心',
     'cpu': 'CPU 占用率',
@@ -595,7 +595,7 @@ const TRANSLATIONS = {
   },
   'zh-TW': {
     'dashboard': '我的播客庫',
-    'sandbox': '認知沙盒',
+
     'settings': '系統設定',
     'center_sub': '在地播客聲紋自動化處理中心',
     'cpu': 'CPU 使用率',
@@ -696,7 +696,7 @@ const TRANSLATIONS = {
   },
   'en-US': {
     'dashboard': 'My Podcast Library',
-    'sandbox': 'Cognitive Sandbox',
+
     'settings': 'Settings',
     'center_sub': 'Local Podcast Voiceprint Automation Center',
     'cpu': 'CPU Usage',
@@ -797,7 +797,7 @@ const TRANSLATIONS = {
   },
   'ja-JP': {
     'dashboard': 'ポッドキャストライブラリ',
-    'sandbox': '認知サンドボックス',
+
     'settings': 'システム設定',
     'center_sub': 'ローカル音声ダイアリゼーション処理センター',
     'cpu': 'CPU使用率',
@@ -911,7 +911,14 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
     targetParagraphIdRef.current = card.paragraph_id;
   };
 
-  const isSynthesis = !!card.is_synthesis;
+  const isSynthesis = !!card.is_synthesis || card.podcast_id === 'collider';
+
+  const handleToggleFold = (e) => {
+    e.stopPropagation();
+    if (card.toggleFold) {
+      card.toggleFold(card.id);
+    }
+  };
 
   return (
     <div 
@@ -946,7 +953,7 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
         }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '80%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
               {isSynthesis ? (
                 <span style={{ fontSize: '16px', filter: 'drop-shadow(0 0 4px #ffd700)' }}>💥</span>
               ) : card.podcast_image_url ? (
@@ -959,8 +966,33 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
               </span>
             </div>
             
-            {/* 🧭 溯源锚点（合成卡片不需要此锚点） */}
-            {!isSynthesis && (
+            {/* 🧭 溯源锚点（合成卡片不需要此锚点）或 展开折叠按钮 */}
+            {isSynthesis && card.toggleFold ? (
+              <button
+                onClick={handleToggleFold}
+                title="折叠/展开分支"
+                className="btn-ghost"
+                style={{
+                  padding: '2px 4px',
+                  color: 'var(--text-secondary)',
+                  opacity: 0.8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: card.isFolded ? 'rgba(255, 215, 0, 0.2)' : 'transparent',
+                  border: card.isFolded ? '1px solid rgba(255, 215, 0, 0.4)' : '1px solid transparent',
+                  borderRadius: '4px'
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {card.isFolded ? (
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  ) : (
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  )}
+                </svg>
+              </button>
+            ) : !isSynthesis ? (
               <button
                 onClick={handleAnchorClick}
                 className="btn-ghost"
@@ -980,7 +1012,7 @@ function CardItem({ card, shouldDim, isHoveredSelf, setHoveredCardId, setActiveT
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Body */}
@@ -1111,9 +1143,7 @@ export default function App() {
     setTimeout(() => setToastVisible(false), 3000);
   };
   
-  const [sandboxCards, setSandboxCards] = useState([]);
-  const [dueCards, setDueCards] = useState([]);
-  const [cardLinks, setCardLinks] = useState([]);
+  const [insights, setInsights] = useState([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isSlotOpen, setIsSlotOpen] = useState(false);
   const [leverActive, setLeverActive] = useState(false);
@@ -1582,354 +1612,7 @@ export default function App() {
     }
   }, [activeTask]);
 
-  // 切换到沙盒时自动更新所有数据
-  useEffect(() => {
-    if (activeTab === 'sandbox') {
-      fetchSandboxData();
-    }
-  }, [activeTab]);
 
-  const fetchSandboxData = async () => {
-    try {
-      // 1. 获取所有卡片
-      const cardsRes = await fetch(`${BACKEND_URL}/api/cards`);
-      let cards = [];
-      if (cardsRes.status === 200) {
-        cards = await cardsRes.json();
-        setSandboxCards(cards);
-      }
-      
-      // 2. 获取连线数据
-      const linksRes = await fetch(`${BACKEND_URL}/api/links`);
-      if (linksRes.status === 200) {
-        const links = await linksRes.json();
-        setCardLinks(links);
-      }
-      
-      // 3. 获取待复习卡片
-      const dueRes = await fetch(`${BACKEND_URL}/api/cards/due`);
-      if (dueRes.status === 200) {
-        const due = await dueRes.json();
-        setDueCards(due);
-      }
-
-      // 4. 自动认知雷达：如果卡片数 >= 2，且当前没有雷达惊喜结果，在后台偷偷发起一次探测
-      if (cards.length >= 2 && !radarSurprise) {
-        triggerRadarScan();
-      }
-    } catch (err) {
-      console.error("无法加载认知沙盒数据:", err);
-    }
-  };
-
-  // 动态计算卡片网格连线坐标
-  const calculateLinks = () => {
-    if (!svgRef.current || !gridRef.current || sandboxCards.length === 0 || cardLinks.length === 0) {
-      setSvgPaths([]);
-      return;
-    }
-
-    const svgRect = svgRef.current.getBoundingClientRect();
-    const paths = [];
-
-    cardLinks.forEach(link => {
-      const elA = document.getElementById(`card-${link.source_card_id}`);
-      const elB = document.getElementById(`card-${link.target_card_id}`);
-      
-      if (elA && elB) {
-        const rectA = elA.getBoundingClientRect();
-        const rectB = elB.getBoundingClientRect();
-        
-        // 计算两张卡片的中心坐标（相对于 SVG 容器）
-        const x1 = rectA.left - svgRect.left + rectA.width / 2;
-        const y1 = rectA.top - svgRect.top + rectA.height / 2;
-        const x2 = rectB.left - svgRect.left + rectB.width / 2;
-        const y2 = rectB.top - svgRect.top + rectB.height / 2;
-        
-        // 绘制一条平滑的贝塞尔曲线
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const cx1 = x1 + dx * 0.25;
-        const cy1 = y1 + dy * 0.1;
-        const cx2 = x1 + dx * 0.75;
-        const cy2 = y2 - dy * 0.1;
-        
-        paths.push({
-          id: link.id,
-          source: link.source_card_id,
-          target: link.target_card_id,
-          synthesis: link.my_synthesis,
-          d: `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`,
-          isGold: !!link.my_synthesis
-        });
-      }
-    });
-    setSvgPaths(paths);
-  };
-
-  // 监听窗口缩放与卡片变化，动态刷新路径
-  useEffect(() => {
-    if (activeTab === 'sandbox') {
-      const timer = setTimeout(calculateLinks, 500);
-      window.addEventListener('resize', calculateLinks);
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('resize', calculateLinks);
-      };
-    }
-  }, [activeTab, sandboxCards, cardLinks]);
-
-  // ==================== 🧠 认知沙盒 操作处理器 ====================
-  // 浏览器音频合成提醒声音
-  const playAudioSynth = (type) => {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const ctx = new AudioContext();
-      const time = ctx.currentTime;
-      
-      if (type === 'spin') {
-        // 低频嗡嗡声 + 齿轮刻度声
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(90, time);
-        osc.frequency.exponentialRampToValueAtTime(320, time + 1.2);
-        gain.gain.setValueAtTime(0.04, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 1.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(time);
-        osc.stop(time + 1.2);
-        
-        // 6声齿轮点击音效
-        for (let i = 0; i < 6; i++) {
-          const tickOsc = ctx.createOscillator();
-          const tickGain = ctx.createGain();
-          tickOsc.type = 'triangle';
-          tickOsc.frequency.setValueAtTime(700 - i * 60, time + i * 0.2);
-          tickGain.gain.setValueAtTime(0.03, time + i * 0.2);
-          tickGain.gain.exponentialRampToValueAtTime(0.001, time + i * 0.2 + 0.04);
-          tickOsc.connect(tickGain);
-          tickGain.connect(ctx.destination);
-          tickOsc.start(time + i * 0.2);
-          tickOsc.stop(time + i * 0.2 + 0.04);
-        }
-      } else if (type === 'resolve') {
-        // 清脆风铃声 (大三和弦)
-        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-        notes.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, time + idx * 0.04);
-          gain.gain.setValueAtTime(0.05, time + idx * 0.04);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.04 + 0.45);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(time + idx * 0.04);
-          osc.stop(time + idx * 0.04 + 0.45);
-        });
-      } else if (type === 'tamed') {
-        // 成功音效 (上行音阶)
-        const notes = [523.25, 659.25, 783.99, 1046.5];
-        notes.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, time + idx * 0.08);
-          gain.gain.setValueAtTime(0.06, time + idx * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + idx * 0.08 + 0.25);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(time + idx * 0.08);
-          osc.stop(time + idx * 0.08 + 0.25);
-        });
-      } else if (type === 'forgot') {
-        // 警示音效
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(140, time);
-        osc.frequency.linearRampToValueAtTime(100, time + 0.35);
-        gain.gain.setValueAtTime(0.06, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(time);
-        osc.stop(time + 0.35);
-      }
-    } catch (e) {
-      console.warn("Web Audio API warning:", e);
-    }
-  };
-
-  // 老虎机摇杆动作
-  const triggerLeverPull = () => {
-    if (isSpinning) return;
-    setLeverActive(true);
-    setTimeout(() => {
-      setLeverActive(false);
-      handleSpinSlotMachine();
-    }, 300);
-  };
-
-  const handleSpinSlotMachine = async () => {
-    if (isSpinning) return;
-    
-    setIsSpinning(true);
-    setSpinReelsResolved([false, false, false]);
-    setReviewedCardIds(new Set());
-    setForgottenCardIds(new Set());
-    playAudioSynth('spin');
-    
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/cards/due`);
-      if (res.status === 200) {
-        const cards = await res.json();
-        setDueCards(cards);
-        
-        // 滚轮停滞动画时间
-        setTimeout(() => {
-          setSpinReelsResolved([true, false, false]);
-          playAudioSynth('resolve');
-        }, 800);
-        
-        setTimeout(() => {
-          setSpinReelsResolved([true, true, false]);
-          playAudioSynth('resolve');
-        }, 1400);
-        
-        setTimeout(() => {
-          setSpinReelsResolved([true, true, true]);
-          playAudioSynth('resolve');
-          setIsSpinning(false);
-          if (cards.length === 0) {
-            showToast("ℹ️ 当前没有待复习的历史卡片，请先去详情页沉淀一些吧！");
-          } else {
-            showToast("🎰 卡片打捞出舱！命运之轮已选定观点");
-          }
-        }, 2000);
-      } else {
-        setIsSpinning(false);
-        showToast("❌ 捞取卡片失败，请重试");
-      }
-    } catch (err) {
-      setIsSpinning(false);
-      showToast("❌ 无法连接到后端服务");
-    }
-  };
-
-  // 卡片滑块提交复习
-  const handleReviewCard = async (cardId, direction) => {
-    playAudioSynth(direction === 'left' ? 'tamed' : 'forgot');
-    
-    // 乐观更新
-    const nextReviewed = new Set(reviewedCardIds);
-    nextReviewed.add(cardId);
-    setReviewedCardIds(nextReviewed);
-    
-    if (direction === 'right') {
-      const nextForgotten = new Set(forgottenCardIds);
-      nextForgotten.add(cardId);
-      setForgottenCardIds(nextForgotten);
-    }
-    
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/cards/${cardId}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direction })
-      });
-      if (res.status === 200) {
-        if (direction === 'left') {
-          showToast("✅ 卡片已驯服！已自动推迟下一次复习时间。");
-        } else {
-          showToast("🔥 卡片已置为警告状态！今晚将自动推送移动端复习。");
-        }
-        fetchSandboxData();
-      } else {
-        showToast("❌ 提交复习失败");
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("❌ 无法连接到后端服务");
-    }
-  };
-
-  // 触发认知雷达扫描
-  const triggerRadarScan = async () => {
-    setRadarScanning(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/cards/collider`);
-      if (res.status === 200) {
-        const data = await res.json();
-        setRadarSurprise(data);
-      }
-    } catch (err) {
-      console.error("认知雷达巡航扫描失败:", err);
-    } finally {
-      setRadarScanning(false);
-    }
-  };
-
-  const handleTriggerRadarCollider = (surprise) => {
-    setActiveCollider(surprise);
-    setColliderSynthesis('');
-    setRadarSurprise(null); // 消耗掉该惊喜，以便下次对撞完重新扫描
-  };
-
-  // 启动 AI 对撞机
-  const handleOpenCollider = async () => {
-    setColliderLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/cards/collider`);
-      if (res.status === 200) {
-        const data = await res.json();
-        setActiveCollider(data);
-        setColliderSynthesis('');
-        setColliderLoading(false);
-      } else {
-        const errData = await res.json();
-        setColliderLoading(false);
-        alert(errData.detail || "无法启动对撞机，请先去详情页沉淀至少2张卡片！");
-      }
-    } catch (err) {
-      setColliderLoading(false);
-      alert("启动对撞机失败，请检查后端服务是否就绪！");
-    }
-  };
-
-  // 提交对撞合成灵感
-  const handleCollideSubmit = async (e) => {
-    if (e) e.preventDefault();
-    if (!colliderSynthesis.trim() || !activeCollider) return;
-    
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/links`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source_card_id: activeCollider.card_a.id,
-          target_card_id: activeCollider.card_b.id,
-          my_synthesis: colliderSynthesis.trim()
-        })
-      });
-      if (res.status === 200) {
-        playAudioSynth('resolve');
-        showToast("💥 跨界观点成功对撞！金色的灵感连线已永久镌刻！");
-        setActiveCollider(null);
-        setColliderSynthesis('');
-        setRadarSurprise(null); // 清理缓存的惊喜，重新触发扫描
-        fetchSandboxData();
-      } else {
-        showToast("❌ 保存对撞灵感失败");
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("❌ 无法连接到后端服务");
-    }
-  };
 
   const fetchTasks = async () => {
     try {
@@ -2374,70 +2057,6 @@ export default function App() {
     }
   };
 
-  // 沉淀段落为卡片 (乐观更新)
-  const handleSedimentParagraph = async (paragraphId, podcastId) => {
-    let isSedimented = false;
-    if (activeTask && activeTask.paragraphs) {
-      const p = activeTask.paragraphs.find(p => p.id === paragraphId);
-      if (p) isSedimented = p.sedimented;
-    }
-
-    // 1. 乐观更新：立刻在前端改变状态，实现真正的“零延迟”点击体验
-    if (activeTask && activeTask.paragraphs) {
-      const optimisticParas = activeTask.paragraphs.map(p => 
-        p.id === paragraphId ? { ...p, sedimented: !isSedimented } : p
-      );
-      setActiveTask({ ...activeTask, paragraphs: optimisticParas });
-    }
-
-    // 2. 后台静默发起真正的网络请求
-    try {
-      if (isSedimented) {
-        // 取消沉淀
-        const res = await fetch(`${BACKEND_URL}/api/cards/paragraph/${paragraphId}`, {
-          method: 'DELETE'
-        });
-        if (res.status !== 200) {
-          // 失败回退状态
-          if (activeTask && activeTask.paragraphs) {
-            const rollbackParas = activeTask.paragraphs.map(p => 
-              p.id === paragraphId ? { ...p, sedimented: true } : p
-            );
-            setActiveTask({ ...activeTask, paragraphs: rollbackParas });
-          }
-          showToast("❌ 取消沉淀失败，请重试");
-        }
-      } else {
-        // 沉淀
-        const res = await fetch(`${BACKEND_URL}/api/cards/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paragraph_id: paragraphId, podcast_id: podcastId })
-        });
-        if (res.status !== 200) {
-          // 失败回退状态
-          if (activeTask && activeTask.paragraphs) {
-            const rollbackParas = activeTask.paragraphs.map(p => 
-              p.id === paragraphId ? { ...p, sedimented: false } : p
-            );
-            setActiveTask({ ...activeTask, paragraphs: rollbackParas });
-          }
-          showToast("❌ 沉淀卡片失败，请重试");
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      // 失败回退状态
-      if (activeTask && activeTask.paragraphs) {
-        const rollbackParas = activeTask.paragraphs.map(p => 
-          p.id === paragraphId ? { ...p, sedimented: isSedimented } : p
-        );
-        setActiveTask({ ...activeTask, paragraphs: rollbackParas });
-      }
-      showToast("❌ 无法连接到后端服务");
-    }
-  };
-
   // 获取所有说话人唯一列表
   const getUniqueSpeakers = () => {
     if (!activeTask || !activeTask.transcript) return [];
@@ -2511,21 +2130,6 @@ export default function App() {
               {t('dashboard')}
             </button>
 
-            <button 
-              onClick={() => { setActiveTab('sandbox'); setActiveTaskId(null); }}
-              className="btn-ghost" 
-              style={{ 
-                justifyContent: 'flex-start', 
-                background: activeTab === 'sandbox' ? 'var(--primary-glow)' : 'transparent',
-                borderColor: activeTab === 'sandbox' ? 'var(--primary)' : 'transparent',
-                color: activeTab === 'sandbox' ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: activeTab === 'sandbox' ? '700' : '500'
-              }}
-            >
-              <Icons.Sandbox />
-              {t('sandbox')}
-            </button>
-            
             <button 
               onClick={() => setActiveTab('config')}
               className="btn-ghost" 
@@ -2750,9 +2354,7 @@ export default function App() {
               <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>
                 {activeTab === 'dashboard'
                   ? t('my_podcast_lib')
-                  : activeTab === 'sandbox'
-                    ? '认知沙盒'
-                    : t('sys_config_header')}
+                  : t('sys_config_header')}
               </h2>
             )}
           </div>
@@ -3042,279 +2644,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ==================== PANEL 4: COGNITIVE SANDBOX ==================== */}
-          {activeTab === 'sandbox' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', width: '100%', maxWidth: '1100px', margin: '0 auto', paddingBottom: '60px' }}>
-              
-              {/* ── 顶部组件：时间轴画布标题栏与功能按钮 ── */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: '750', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <circle cx="12" cy="12" r="10" />
-                      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-                    </svg>
-                    认知时间轴画布 (Networked Timeline)
-                  </h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
-                    您在节目中高亮沉淀的所有卡片都将平铺于此。悬停卡片可直观观察大块脑图中的关联连线。
-                  </p>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {/* 老虎机入口按钮 */}
-                  <button 
-                    onClick={() => setIsSlotOpen(true)}
-                    className="btn-glow" 
-                    style={{ 
-                      padding: '8px 20px', 
-                      fontSize: '13px', 
-                      height: '38px', 
-                      fontWeight: '700',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="3" y1="9" x2="21" y2="9" />
-                      <line x1="9" y1="9" x2="9" y2="21" />
-                      <line x1="15" y1="9" x2="15" y2="21" />
-                    </svg>
-                    启动灵感老虎机
-                  </button>
 
-                  {/* AI对撞机按钮 */}
-                  <button 
-                    onClick={handleOpenCollider}
-                    disabled={colliderLoading}
-                    className="btn-ghost" 
-                    style={{ 
-                      padding: '8px 18px', 
-                      fontSize: '12.5px', 
-                      height: '38px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      border: '1px solid var(--accent-glow)',
-                      color: 'var(--accent)',
-                      background: 'var(--accent-glow)'
-                    }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                    </svg>
-                    启动 AI 强力对撞机
-                  </button>
-                </div>
-              </div>
-
-              {/* 📡 智能认知雷达 (Inspiration Radar Scout) */}
-              {(radarScanning || radarSurprise) && (
-                <div style={{
-                  background: 'linear-gradient(90deg, rgba(224, 175, 104, 0.08) 0%, rgba(255, 158, 100, 0.12) 100%)',
-                  border: '1px dashed rgba(224, 175, 104, 0.4)',
-                  borderRadius: '12px',
-                  padding: '12px 20px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(224, 175, 104, 0.05)',
-                  animation: radarSurprise ? 'pulse-glow 3s infinite' : 'none'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '20px', display: 'inline-block', animation: radarScanning ? 'spin 2s linear infinite' : 'bounce-slow 2s infinite' }}>
-                      {radarScanning ? '📡' : '⚡'}
-                    </span>
-                    <div>
-                      <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#ffd700', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {radarScanning ? '认知雷达正在巡航探测深层思维共鸣...' : `认知雷达捕捉：跨界思维奇点已锁定！(异界张力: ${radarSurprise.dissonance_index}%)`}
-                      </h4>
-                      <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                        {radarScanning ? '雷达正在卡片盒中扫描无关联的灵感粒子...' : `系统发现：《${radarSurprise.card_a?.spark_title}》与《${radarSurprise.card_b?.spark_title}》底层映射极强。`}
-                      </p>
-                    </div>
-                  </div>
-                  {radarSurprise && (
-                    <button 
-                      onClick={() => handleTriggerRadarCollider(radarSurprise)}
-                      className="btn-glow" 
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '12px',
-                        background: 'linear-gradient(135deg, #ffd700, #ff9e64)',
-                        color: '#0d0d15',
-                        fontWeight: '800',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)'
-                      }}
-                    >
-                      💥 开启对撞惊喜
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* 网格画布包容器 */}
-              <div 
-                ref={gridRef}
-                style={{ 
-                  position: 'relative', 
-                  width: '100%', 
-                  backgroundColor: 'rgba(10, 10, 15, 0.25)',
-                  backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px)',
-                  backgroundSize: '24px 24px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-lg)',
-                  minHeight: '480px',
-                  padding: '32px 24px',
-                  boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.4)',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* SVG 画布层 */}
-                <svg 
-                  ref={svgRef}
-                  style={{ 
-                    position: 'absolute', 
-                    top: 0, 
-                    left: 0, 
-                    width: '100%', 
-                    height: '100%', 
-                    pointerEvents: 'none', 
-                    zIndex: 0 
-                  }}
-                >
-                  <defs>
-                    <linearGradient id="gold-neon" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#e0af68" />
-                      <stop offset="100%" stopColor="#ff9e64" />
-                    </linearGradient>
-                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="3" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                  </defs>
-                  
-                  {svgPaths.map((path) => {
-                    const isHovered = hoveredCardId === path.source || hoveredCardId === path.target;
-                    
-                    return (
-                      <g key={path.id}>
-                        <path 
-                          d={path.d} 
-                          fill="none" 
-                          stroke={isHovered ? (path.isGold ? 'url(#gold-neon)' : '#73daca') : (path.isGold ? 'rgba(224, 175, 104, 0.25)' : 'rgba(122, 162, 247, 0.12)')} 
-                          strokeWidth={isHovered ? 3.5 : 1.5}
-                          filter={isHovered ? 'url(#glow)' : 'none'}
-                          className={isHovered ? "flow-path" : ""}
-                          style={{ 
-                            transition: 'stroke 0.3s, stroke-width 0.3s, filter 0.3s',
-                            strokeDasharray: !isHovered && path.isGold ? '5,5' : 'none'
-                          }}
-                        />
-                        {isHovered && path.synthesis && (
-                          <foreignObject 
-                            x={(path.d.match(/M\s+([\d.]+)/)?.[1] * 1 + path.d.match(/,\s+([\d.]+)\s*$/)?.[1] * 1) / 2 - 80 || 100}
-                            y={(path.d.match(/M\s+[\d.]+\s+([\d.]+)/)?.[1] * 1 + path.d.match(/,\s+[\d.]+\s+([\d.]+)\s*$/)?.[1] * 1) / 2 - 35 || 100}
-                            width="160"
-                            height="70"
-                          >
-                            <div style={{
-                              background: 'rgba(18, 18, 24, 0.95)',
-                              border: '1px solid #e0af68',
-                              borderRadius: '6px',
-                              padding: '6px 8px',
-                              fontSize: '10px',
-                              color: '#e0af68',
-                              textAlign: 'center',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              lineHeight: '1.4'
-                            }}>
-                              💡 跨界感悟: "{path.synthesis}"
-                            </div>
-                          </foreignObject>
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                {/* 卡片实体列表网格 */}
-                {sandboxCards.length === 0 ? (
-                  <div className="glass-panel" style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)', zIndex: 1, position: 'relative' }}>
-                    <span style={{ fontSize: '36px' }}>🧭</span>
-                    <p style={{ fontSize: '14px', marginTop: '12px' }}>沙盒中目前还没有沉淀任何观点卡牌</p>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>请先打开播客库详情页，鼠标悬停到语义段落上，点击 ⭐ 按钮进行沉淀吧！</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', position: 'relative', zIndex: 1 }}>
-                    {sandboxCards.map((card) => {
-                      const isHoveredSelf = hoveredCardId === card.id;
-                      // Determine if we should dim this card:
-                      const isAnyCardHovered = hoveredCardId !== null;
-                      const isConnected = isAnyCardHovered && cardLinks.some(link => 
-                        (link.source_card_id === hoveredCardId && link.target_card_id === card.id) ||
-                        (link.target_card_id === hoveredCardId && link.source_card_id === card.id)
-                      );
-                      const shouldDim = isAnyCardHovered && !isHoveredSelf && !isConnected;
-
-                      return (
-                        <CardItem 
-                          key={card.id}
-                          card={card}
-                          shouldDim={shouldDim}
-                          isHoveredSelf={isHoveredSelf}
-                          setHoveredCardId={setHoveredCardId}
-                          setActiveTab={setActiveTab}
-                          setActiveTaskId={setActiveTaskId}
-                          targetParagraphIdRef={targetParagraphIdRef}
-                          handleTimeJump={handleTimeJump}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* ── 隐藏彩蛋：AI 强力对撞机 Modal ── */}
-              <AiColliderModal
-                isOpen={!!activeCollider}
-                onClose={() => setActiveCollider(null)}
-                activeCollider={activeCollider}
-                colliderLoading={colliderLoading}
-                colliderSynthesis={colliderSynthesis}
-                setColliderSynthesis={setColliderSynthesis}
-                handleCollideSubmit={handleCollideSubmit}
-              />
-
-              {/* ── 🎰 灵感捞取：JUMBO 老虎机 Modal 遮罩层 ── */}
-              <SlotMachineModal
-                isOpen={isSlotOpen}
-                onClose={() => setIsSlotOpen(false)}
-                isSpinning={isSpinning}
-                spinReelsResolved={spinReelsResolved}
-                dueCards={dueCards}
-                reviewedCardIds={reviewedCardIds}
-                forgottenCardIds={forgottenCardIds}
-                leverActive={leverActive}
-                triggerLeverPull={triggerLeverPull}
-                handleReviewCard={handleReviewCard}
-                handleSpinSlotMachine={handleSpinSlotMachine}
-                slotTheme={slotTheme}
-                setSlotTheme={setSlotTheme}
-              />
-            </div>
-          )}
           {/* ==================== PANEL 2: DETAIL WORKSPACE ==================== */}
           {activeTab === 'detail' && activeTask && (
             <div ref={containerRef} style={{ display: 'flex', flex: '1', height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative', gap: '0' }}>
@@ -3602,36 +2932,6 @@ export default function App() {
                                 para.content
                               )}
                             </div>
-                            
-                            {/* 一键沉淀星号图标 (鼠标 Hover 时显现) */}
-                            <button
-                              className="sediment-star-btn btn-ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSedimentParagraph(para.id, activeTask.id);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                right: '12px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                padding: '6px',
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 10,
-                                color: para.sedimented ? 'var(--warning)' : 'var(--text-muted)'
-                              }}
-                            >
-                              {para.sedimented ? (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--warning)" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                              ) : (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                              )}
-                            </button>
                           </div>
                         );
                       })}
@@ -5356,7 +4656,6 @@ export default function App() {
             </div>
           </div>
         )}
-
         {/* 全局丝滑 Toast 提示层 */}
         {toastVisible && (
           <div style={{
