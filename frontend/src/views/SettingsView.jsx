@@ -43,7 +43,7 @@ export default function SettingsView({
                   onChange={(e) => handleConfigChange("asr_mode", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                 >
-                  <option value="local">LOCAL OFFLINE (FASTER-WHISPER)</option>
+                  <option value="local">LOCAL OFFLINE</option>
                   <option value="online">ONLINE API</option>
                 </select>
               </div>
@@ -126,8 +126,8 @@ export default function SettingsView({
                   onChange={(e) => handleConfigChange("summary_mode", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                 >
-                  <option value="local">LOCAL (OLLAMA)</option>
-                  <option value="online">ONLINE API (OPENAI COMPATIBLE)</option>
+                  <option value="local">LOCAL</option>
+                  <option value="online">ONLINE API</option>
                 </select>
               </div>
 

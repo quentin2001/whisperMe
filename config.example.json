@@ -13,11 +13,11 @@
   "notification_email": "YOUR_EMAIL@qq.com",
   "enable_win_notification": true,
   "enable_email_notification": false,
-  "asr_mode": "local",
+  "asr_mode": "online",
   "online_api_key": "YOUR_ONLINE_ASR_API_KEY",
   "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
   "online_model": "mimo-v2.5-asr",
-  "summary_mode": "local",
+  "summary_mode": "online",
   "online_summary_api_key": "YOUR_LLM_SUMMARY_API_KEY",
   "online_summary_base_url": "https://api.openai.com/v1",
   "online_summary_model": "gpt-4o-mini"
