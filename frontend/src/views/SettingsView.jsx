@@ -488,6 +488,33 @@ export default function SettingsView({
                 Your API key is kept strictly confidential on the secure container. Configure your credentials under the <b>Settings &gt; Secrets</b> panel in Google AI Studio to unlock live real-time analysis.
               </p>
             </div>
+
+            {/* GitHub Repo & Version Info */}
+            <a
+              href="https://github.com/quentin2001/whisperMe"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+              className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs hover:border-[#f62440]/55 hover:shadow-xs transition-all flex items-center justify-between group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#f2ede6]/65 flex items-center justify-center text-[#1d1c18] group-hover:scale-105 transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-[#1d1c18] font-display group-hover:text-[#f62440] transition-all">GitHub Repository</h4>
+                  <p className="text-[11px] text-[#5d5a55] font-semibold mt-0.5">quentin2001/whisperMe</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className="bg-[#ffdad6]/40 text-[#b81a1a] text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border border-[#ffb4a8]/30 font-mono">
+                  v1.0.0
+                </span>
+                <span className="text-[10px] text-[#5d3f3e]/40 font-semibold group-hover:text-[#f62440]/80 transition-all flex items-center gap-0.5">
+                  Visit Project ↗
+                </span>
+              </div>
+            </a>
           </div>
 
         </div>
