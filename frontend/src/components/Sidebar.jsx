@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Library, Sliders, Settings, Plus, CircleHelp, Terminal, Cpu } from "lucide-react";
+import { Library, Sliders, Settings, Plus, Cpu } from "lucide-react";
 
 export default function Sidebar({
   currentTab,
@@ -106,8 +106,8 @@ export default function Sidebar({
         </nav>
       </div>
 
-      {/* Footer System Status & Utilites */}
-      <div className="flex flex-col gap-4 border-t border-[#e7bcbb]/40 pt-4">
+      {/* Footer System Status */}
+      <div className="border-t border-[#e7bcbb]/40 pt-4">
         {/* Dynamic System Status */}
         <div id="telemetry-info" className="flex flex-col gap-1 bg-[#f2ede6]/40 p-3 rounded-lg border border-[#e7bcbb]/20">
           <p className="text-[10px] text-[#5d3f3e]/60 font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -117,31 +117,6 @@ export default function Sidebar({
           <p className="text-xs font-mono font-medium text-[#1d1c18] mt-0.5">
             CPU: {displayCpu}% | RAM: {displayRam}GB
           </p>
-        </div>
-
-        {/* Static links details */}
-        <div className="flex flex-col gap-1 text-[13px] font-medium text-[#5d3f3e]/80">
-          <a
-            id="btn-help-link"
-            href="#help"
-            onClick={(e) => {
-              e.preventDefault();
-              alert("whisperMe Support:\n1. Open Workstation to view audio cards.\n2. Click 'Start New Recording' to test audio capturing from your microphone.\n3. Make sure to allow microphone inside Chrome preview.");
-            }}
-            className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-[#f2ede6]/50 rounded-md transition-all"
-          >
-            <CircleHelp size={16} className="text-[#926e6d]" />
-            <span>Help</span>
-          </a>
-
-          <button
-            id="btn-all-logs-trigger"
-            onClick={onShowLogsTrigger}
-            className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-[#f2ede6]/50 rounded-md w-full text-left transition-all cursor-pointer border-0 outline-none bg-transparent"
-          >
-            <Terminal size={16} className="text-[#926e6d]" />
-            <span>Logs</span>
-          </button>
         </div>
       </div>
     </aside>
