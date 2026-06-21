@@ -930,7 +930,18 @@ class PodcastDownloader:
         # 运行 FFmpeg 并隐藏输出
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
-            err_msg = res.stderr.decode('utf-8', errors='ignore')
-            raise Exception(f"FFmpeg 音频预处理失败: {err_msg}")
+            print("⚠️ [LOG 警告] 使用指定 FFMPEG_PATH 预处理失败，尝试全局 ffmpeg 兜底...")
+            cmd_fallback = [
+                'ffmpeg', 
+                '-y', 
+                '-i', short_input, 
+                '-ac', '1', 
+                '-ar', '16000', 
+                short_output
+            ]
+            res_fallback = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res_fallback.returncode != 0:
+                err_msg = res_fallback.stderr.decode('utf-8', errors='ignore')
+                raise Exception(f"FFmpeg 音频预处理失败 (含全局兜底尝试): {err_msg}")
             
         return output_wav

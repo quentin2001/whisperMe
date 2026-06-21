@@ -240,7 +240,21 @@ class PodcastTranscriber:
                     ]
                     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if res.returncode != 0 or not os.path.exists(chunk_mp3_path):
-                        raise Exception(f"FFmpeg slice creation failed for chunk {i}: {res.stderr.decode('utf-8', errors='ignore')}")
+                        print("⚠️ [LOG 警告] 使用指定 FFMPEG_PATH 生成分片失败，尝试全局 ffmpeg 兜底...")
+                        cmd_fallback = [
+                            'ffmpeg', 
+                            '-y', 
+                            '-i', get_short_path_name(wav_path), 
+                            '-ss', str(start_offset),
+                            '-t', str(slice_duration),
+                            '-codec:a', 'libmp3lame', 
+                            '-b:a', '32k', 
+                            '-ac', '1', 
+                            get_short_path_name(chunk_mp3_path)
+                        ]
+                        res_fallback = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        if res_fallback.returncode != 0 or not os.path.exists(chunk_mp3_path):
+                            raise Exception(f"FFmpeg slice creation failed for chunk {i} (含全局兜底尝试): {res_fallback.stderr.decode('utf-8', errors='ignore')}")
 
                     # 转换为 Base64
                     with open(chunk_mp3_path, "rb") as f:
