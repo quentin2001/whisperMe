@@ -84,8 +84,9 @@ export default function SettingsView({
                       value={configData.online_base_url || ""}
                       onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="https://api.openai.com/v1"
+                      placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Model ID</label>
@@ -94,8 +95,9 @@ export default function SettingsView({
                       value={configData.online_model || ""}
                       onChange={(e) => handleConfigChange("online_model", e.target.value)}
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="whisper-1"
+                      placeholder="mimo-v2.5-asr"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：mimo-v2.5-asr 或 whisper-1</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Key</label>
@@ -106,6 +108,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">输入您在 ASR 服务商申请的 API 密钥</span>
                   </div>
                 </>
               )}
@@ -169,6 +172,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="https://api.openai.com/v1"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：https://api.openai.com/v1 或第三方中转 API 地址</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Online Model ID</label>
@@ -179,6 +183,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="gpt-4o-mini"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：gpt-4o-mini 或 qwen-plus</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Key</label>
@@ -189,6 +194,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">输入您在大模型服务商申请的 API 密钥</span>
                   </div>
                 </>
               )}
@@ -387,8 +393,9 @@ export default function SettingsView({
                   value={configData.ffmpeg_path || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                  placeholder="/usr/local/bin/ffmpeg"
+                  placeholder="C:\ffmpeg\bin\ffmpeg.exe 或 /opt/homebrew/bin/ffmpeg"
                 />
+                <span className="text-xs text-[#5d3f3e]/60 font-medium">Windows 示例：C:\ffmpeg\bin\ffmpeg.exe，Mac 示例：/opt/homebrew/bin/ffmpeg</span>
               </div>
 
               {/* FFmpeg Bin Directory */}
@@ -399,8 +406,9 @@ export default function SettingsView({
                   value={configData.ffmpeg_bin_dir || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                  placeholder="/usr/local/bin"
+                  placeholder="C:\ffmpeg\bin 或 /opt/homebrew/bin"
                 />
+                <span className="text-xs text-[#5d3f3e]/60 font-medium">Windows 示例：C:\ffmpeg\bin，Mac 示例：/opt/homebrew/bin</span>
               </div>
 
               {/* Language Preference */}
