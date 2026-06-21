@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Library, Sliders, Settings, Plus, Cpu } from "lucide-react";
+import { Library, Sliders, Settings, Cpu } from "lucide-react";
 
 export default function Sidebar({
   currentTab,
@@ -53,15 +53,7 @@ export default function Sidebar({
           <h1 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display">whisperMe</h1>
         </div>
 
-        {/* Primary Action Button */}
-        <button
-          id="btn-new-project-trigger"
-          onClick={onNewSessionTrigger}
-          className="w-full bg-[#f62440] hover:bg-[#bb0028] text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm active:scale-98 font-sans mt-2 cursor-pointer border-0 outline-none"
-        >
-          <Plus size={18} />
-          <span>Add New Link</span>
-        </button>
+
 
         {/* Main Tabs Navigation */}
         <nav id="sidebar-navigation" className="flex flex-col gap-1.5 mt-4">

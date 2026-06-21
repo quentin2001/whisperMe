@@ -227,7 +227,7 @@ export default function LibraryView({
             </div>
             <h3 className="text-3xl font-bold tracking-tight text-[#1d1c18] font-display">Parse Podcast Link</h3>
             <p className="text-[#5d5a55] text-sm mt-2 max-w-lg leading-relaxed">
-              Enter a podcast or video link (XiaoUzhu, Bilibili) or upload a local audio file to automatically extract, transcribe, and summarize.
+              Enter a podcast link or upload a local audio file to automatically extract, transcribe, and summarize.
             </p>
           </div>
 
