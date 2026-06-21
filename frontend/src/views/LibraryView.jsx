@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
-  Search, SlidersHorizontal, Mic, Square, Sparkles, Cloud, Play, 
-  Download, MoreVertical, BarChart3, Database, FileText
+  Search, SlidersHorizontal, Mic, Square, Cloud, Play, 
+  Download, MoreVertical, BarChart3, Database
 } from "lucide-react";
 
 export default function LibraryView({
@@ -427,58 +427,6 @@ export default function LibraryView({
         </button>
       </section>
 
-      {/* AI Analysis Log bento section */}
-      <section>
-        <h3 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display mb-4">AI Analysis Log</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {logs.map((log) => (
-            <div
-              key={log.id}
-              className="bg-[#ffffff] border border-[#e7bcbb]/45 p-5 rounded-lg flex flex-col justify-between hover:shadow-xs hover:border-[#f62440]/40 transition-all text-xs"
-            >
-              <div>
-                <div className="flex items-center justify-between text-[11px] font-mono text-[#5d5a55]/70 mb-3 select-none">
-                  <span className="flex items-center gap-1 font-bold">
-                    <FileText size={12} className="text-[#bf0029]" />
-                    ID: {log.id}
-                  </span>
-                  <span>{log.timeAgo}</span>
-                </div>
-                <p className="text-[#1d1c18] italic font-medium leading-relaxed mb-4">
-                  "{log.text}"
-                </p>
-              </div>
-
-              {/* Tags matching layout */}
-              <div className="flex flex-wrap items-center gap-1">
-                {log.tags.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="bg-[#f2ede6] text-[#554428] px-2.5 py-1 text-[10px] font-bold uppercase rounded-sm"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          <div
-            id="btn-analyze-logs"
-            onClick={() => alert("功能待上线")}
-            className="bg-[#f9f3ea] hover:bg-[#f2ede6] cursor-pointer border border-[#e7bcbb]/60 border-dashed rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all group"
-          >
-            <div className="w-10 h-10 bg-[#f62440]/10 text-[#f62440] group-hover:scale-105 transition-all rounded-full flex items-center justify-center">
-              <Sparkles size={18} fill="#f62440" />
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-[#1d1c18] font-display">Analyze All Logs</h4>
-              <p className="text-[#5d5a55] text-[11px] mt-1 pr-2">Regenerate structured summaries from recent session audio.</p>
-            </div>
-          </div>
-        </div>
-      </section>
       </div>
     </div>
   );
