@@ -53,10 +53,11 @@ export default function Sidebar({
           <h1 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display">whisperMe</h1>
         </div>
 
-
+        {/* Top Divider */}
+        <div className="border-t border-[#e7bcbb]/40 -mt-4" />
 
         {/* Main Tabs Navigation */}
-        <nav id="sidebar-navigation" className="flex flex-col gap-1.5 mt-4">
+        <nav id="sidebar-navigation" className="flex flex-col gap-1.5 -mt-2">
           <button
             id="tab-btn-library"
             onClick={() => onTabChange("library")}
