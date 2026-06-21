@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { 
-  Plus, Search, List, LayoutGrid, Calendar, SlidersHorizontal, ArrowRight, Play, MoreVertical 
+  Plus, Search, List, LayoutGrid, Calendar, SlidersHorizontal, Play, MoreVertical 
 } from "lucide-react";
 
 export default function WorkstationView({
@@ -140,11 +140,12 @@ export default function WorkstationView({
 
       {/* Grid or List of Available sessions */}
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map((session) => (
             <div
               key={session.id}
-              className="bg-white border border-[#e7bcbb]/40 rounded-xl overflow-hidden hover:border-[#f62440]/50 hover:shadow-sm transition-all flex flex-col group"
+              onClick={() => onOpenSession(session.rawTask)}
+              className="bg-white border border-[#e7bcbb]/40 rounded-xl overflow-hidden hover:border-[#f62440]/50 hover:shadow-sm transition-all flex flex-col group cursor-pointer"
             >
               {/* Media Thumbnail Container */}
               <div className="aspect-[4/3] bg-neutral-900 relative overflow-hidden shrink-0">
@@ -161,12 +162,11 @@ export default function WorkstationView({
                 </span>
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button 
-                    onClick={() => onOpenSession(session.rawTask)}
-                    className="w-12 h-12 bg-[#f62440] hover:bg-[#bb0028] text-white flex items-center justify-center rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 cursor-pointer border-0 outline-none"
+                  <div 
+                    className="w-12 h-12 bg-[#f62440] hover:bg-[#bb0028] text-white flex items-center justify-center rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300"
                   >
                     <Play size={18} fill="white" className="ml-0.5" />
-                  </button>
+                  </div>
                 </div>
               </div>
 
@@ -208,15 +208,7 @@ export default function WorkstationView({
                   </div>
                 </div>
 
-                {/* Primary launcher trigger button */}
-                <button
-                  id={`btn-open-workspace-card-${session.id}`}
-                  onClick={() => onOpenSession(session.rawTask)}
-                  className="w-full mt-6 bg-[#f62440] hover:bg-[#bb0028] text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-99 shadow-xs cursor-pointer border-0 outline-none"
-                >
-                  <span>Open in Workstation</span>
-                  <ArrowRight size={13} />
-                </button>
+
               </div>
             </div>
           ))}

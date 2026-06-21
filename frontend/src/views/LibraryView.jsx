@@ -34,7 +34,7 @@ export default function LibraryView({
     ];
     
     let uiStatus = "COMPLETED";
-    if (task.status === "processing" || task.status === "downloading" || task.status === "transcribing" || task.status === "summarizing") {
+    if (task.status === "processing" || task.status === "downloading" || task.status === "transcribing" || task.status === "summarizing" || task.status === "pending") {
       uiStatus = "IN_PROGRESS";
     } else if (task.status === "failed") {
       uiStatus = "FAILED";
@@ -354,7 +354,7 @@ export default function LibraryView({
                       <span>•</span>
                       {session.status === 'IN_PROGRESS' ? (
                         <span className="bg-[#ffdad6] text-[#b81a1a] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
-                          • In Progress ({session.progress}%)
+                          • {session.rawTask.status === 'pending' ? 'Queued' : `In Progress (${session.progress}%)`}
                         </span>
                       ) : (
                         <span className="bg-[#f0e2b7] text-[#554428] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
@@ -369,7 +369,7 @@ export default function LibraryView({
                 <div className="flex items-center gap-4 mt-3 md:mt-0 self-end md:self-auto">
                   {session.status === 'IN_PROGRESS' ? (
                     <span className="text-[12px] font-mono text-[#5d3f3e]/60 italic font-medium">
-                      AI generating tags...
+                      {session.rawTask.status === 'pending' ? 'Waiting in queue...' : 'AI generating tags...'}
                     </span>
                   ) : (
                     /* Brief simulated sound waves */
