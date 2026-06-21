@@ -421,6 +421,7 @@ export default function App() {
                 logs={logs}
                 perfData={perfData}
                 onJumpToWorkstation={() => setActiveTab("workstation")}
+                onNewSessionTrigger={() => setIsIngestModalOpen(true)}
                 onOpenSession={(task) => {
                   setActiveTaskId(task.id);
                   setActiveTab("detail");

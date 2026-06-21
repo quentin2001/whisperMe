@@ -60,7 +60,7 @@ export default function Sidebar({
           className="w-full bg-[#f62440] hover:bg-[#bb0028] text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm active:scale-98 font-sans mt-2 cursor-pointer border-0 outline-none"
         >
           <Plus size={18} />
-          <span>New Recording</span>
+          <span>Add New Link</span>
         </button>
 
         {/* Main Tabs Navigation */}

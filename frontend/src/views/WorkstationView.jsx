@@ -68,7 +68,7 @@ export default function WorkstationView({
             className="flex items-center gap-2 px-5 py-2.5 bg-[#f62440] hover:bg-[#bb0028] text-white text-sm font-semibold rounded-lg shadow-sm transition-all cursor-pointer border-0 outline-none"
           >
             <Plus size={16} />
-            <span>New Recording</span>
+            <span>Add New Link</span>
           </button>
         </div>
       </div>

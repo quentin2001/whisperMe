@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, SlidersHorizontal, Mic, Square, Cloud, Play, 
-  Download, MoreVertical, BarChart3, Database
+  Download, MoreVertical, BarChart3, Database, Plus
 } from "lucide-react";
 
 export default function LibraryView({
@@ -12,7 +12,8 @@ export default function LibraryView({
   onAnalyzeLogs,
   onDeleteTask,
   perfData,
-  onJumpToWorkstation
+  onJumpToWorkstation,
+  onNewSessionTrigger
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -224,38 +225,21 @@ export default function LibraryView({
               <span className="w-1.5 h-1.5 bg-[#f62440] rounded-full animate-ping" />
               Active Engine: V3-Noir
             </div>
-            <h3 className="text-3xl font-bold tracking-tight text-[#1d1c18] font-display">Begin a new session</h3>
+            <h3 className="text-3xl font-bold tracking-tight text-[#1d1c18] font-display">Parse Podcast Link</h3>
             <p className="text-[#5d5a55] text-sm mt-2 max-w-lg leading-relaxed">
-              Capture high-fidelity audio with real-time vampiric AI processing and instant transcription.
+              Enter a podcast or video link (XiaoUzhu, Bilibili) or upload a local audio file to automatically extract, transcribe, and summarize.
             </p>
           </div>
 
           <div className="mt-8 flex items-center gap-4 relative z-10">
-            {!isRecording ? (
-              <button
-                id="btn-start-recording-inner"
-                onClick={() => alert("功能待上线")}
-                className="bg-[#f62440] hover:bg-[#bb0028] text-white font-semibold px-6 py-3 rounded-lg flex items-center gap-2.5 transition-all shadow-sm active:scale-98 cursor-pointer border-0 outline-none"
-              >
-                <Mic size={18} />
-                <span>Start New Recording</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-4 bg-[#ffdad6] border border-[#e7bcbb] p-2.5 rounded-lg">
-                <span className="text-sm font-mono font-bold text-[#b81a1a] animate-pulse flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-[#f62440] rounded-full animate-ping" />
-                  Recording [{recordedTime}]
-                </span>
-                <button
-                  id="btn-stop-recording-inner"
-                  onClick={stopRecording}
-                  className="bg-[#b81a1a] hover:bg-[#93000a] text-white font-semibold px-4 py-2 rounded-md flex items-center gap-1.5 transition-all text-xs cursor-pointer border-0 outline-none"
-                >
-                  <Square size={13} fill="white" />
-                  <span>Stop Capture</span>
-                </button>
-              </div>
-            )}
+            <button
+              id="btn-add-link-hero"
+              onClick={onNewSessionTrigger}
+              className="bg-[#f62440] hover:bg-[#bb0028] text-white font-semibold px-6 py-3 rounded-lg flex items-center gap-2.5 transition-all shadow-sm active:scale-98 cursor-pointer border-0 outline-none"
+            >
+              <Plus size={18} />
+              <span>Add New Link</span>
+            </button>
           </div>
         </div>
 
