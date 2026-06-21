@@ -6,7 +6,8 @@ export default function Sidebar({
   onTabChange,
   onNewSessionTrigger,
   onShowLogsTrigger,
-  perfData
+  perfData,
+  t
 }) {
   // Live simulated system stats that fluctuate slightly to feel alive and realistic!
   const [systStats, setSystStats] = useState({ cpu: 12, ram: 2.4 });
@@ -36,7 +37,11 @@ export default function Sidebar({
     >
       <div className="flex flex-col gap-6">
         {/* Brand Header with Logo */}
-        <div id="brand-header" className="flex items-center gap-2 mb-2">
+        <div 
+          id="brand-header" 
+          onClick={() => onTabChange("library")}
+          className="flex items-center gap-2 mb-2 cursor-pointer hover:opacity-80 transition-opacity select-none"
+        >
           <div className="w-8 h-8 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" className="w-full h-full">
               <defs>
@@ -68,7 +73,7 @@ export default function Sidebar({
             }`}
           >
             <Library size={18} className="text-[#bf0029]" />
-            <span className="text-[15px]">Library</span>
+            <span className="text-[15px]">{t("媒体库", "Library")}</span>
           </button>
 
           <button
@@ -81,7 +86,7 @@ export default function Sidebar({
             }`}
           >
             <Sliders size={18} className="text-[#bf0029]" />
-            <span className="text-[15px]">Workstation</span>
+            <span className="text-[15px]">{t("工作台", "Workstation")}</span>
           </button>
 
           <button
@@ -94,7 +99,7 @@ export default function Sidebar({
             }`}
           >
             <Settings size={18} className="text-[#bf0029]" />
-            <span className="text-[15px]">Settings</span>
+            <span className="text-[15px]">{t("系统设置", "Settings")}</span>
           </button>
         </nav>
       </div>
@@ -105,7 +110,7 @@ export default function Sidebar({
         <div id="telemetry-info" className="flex flex-col gap-1 bg-[#f2ede6]/40 p-3 rounded-lg border border-[#e7bcbb]/20">
           <p className="text-[10px] text-[#5d3f3e]/60 font-bold uppercase tracking-wider flex items-center gap-1.5">
             <Cpu size={12} className="text-[#f62440]" />
-            System Status
+            {t("系统状态", "System Status")}
           </p>
           <p className="text-xs font-mono font-medium text-[#1d1c18] mt-0.5">
             CPU: {displayCpu}% | RAM: {displayRam}GB

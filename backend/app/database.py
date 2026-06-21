@@ -211,6 +211,54 @@ class LocalDatabase:
                     print(f"❌ [MIGRATION] 初始化默认画板失败: {e}")
                     self.conn.rollback()
 
+            # 增量升级：为历史完成任务自动回填音频总时长
+            try:
+                c.execute("SELECT id, audio_url, metadata FROM tasks WHERE status='completed'")
+                completed_tasks = c.fetchall()
+                updated_count = 0
+                for task_row in completed_tasks:
+                    meta = task_row.get("metadata") or {}
+                    if isinstance(meta, str):
+                        try: meta = json.loads(meta)
+                        except: meta = {}
+                    
+                    if "duration" not in meta or meta["duration"] == "00:00":
+                        audio_url = task_row.get("audio_url")
+                        if audio_url:
+                            filename = os.path.basename(audio_url)
+                            from app.config import SHORT_DOWNLOADS_DIR, FFMPEG_PATH
+                            physical_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+                            if os.path.exists(physical_path):
+                                duration_str = "00:00"
+                                try:
+                                    import subprocess
+                                    import re
+                                    cmd = [FFMPEG_PATH, "-i", physical_path]
+                                    res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
+                                    output = res.stderr or ""
+                                    match = re.search(r"Duration:\s*(\d{2}:\d{2}:\d{2})", output)
+                                    if match:
+                                        raw_d = match.group(1)
+                                        parts = raw_d.split(":")
+                                        if parts[0] == "00":
+                                            duration_str = f"{parts[1]}:{parts[2]}"
+                                        else:
+                                            duration_str = raw_d
+                                except Exception as e_dur:
+                                    print(f"⚠️ [LOG] 迁移回填任务 {task_row['id']} 音频时长失败: {e_dur}")
+                                
+                                if duration_str != "00:00":
+                                    meta["duration"] = duration_str
+                                    c.execute("UPDATE tasks SET metadata=? WHERE id=?", 
+                                              (json.dumps(meta, ensure_ascii=False), task_row["id"]))
+                                    updated_count += 1
+                if updated_count > 0:
+                    self.conn.commit()
+                    print(f"✅ [MIGRATION] 成功为 {updated_count} 个历史播客任务回填音频总时长")
+            except Exception as e_backfill:
+                print(f"⚠️ [MIGRATION] 历史任务音频时长回填失败: {e_backfill}")
+
+
     def _insert_task_internal(self, c, t: dict):
         metadata = json.dumps(t.get("metadata", {}), ensure_ascii=False)
         transcript = json.dumps(t.get("transcript", []), ensure_ascii=False)
@@ -273,9 +321,11 @@ class LocalDatabase:
                 # Ensure boolean conversion
                 r["obsidian_synced"] = bool(r["obsidian_synced"])
                 r["restoring"] = bool(r["restoring"])
+                r["duration"] = meta.get("duration", "00:00")
                 r["metadata"] = {
                     "pub_date": meta.get("pub_date", ""),
-                    "source": meta.get("source", "")
+                    "source": meta.get("source", ""),
+                    "duration": meta.get("duration", "00:00")
                 }
                 tasks_list.append(r)
             return tasks_list
@@ -290,6 +340,12 @@ class LocalDatabase:
                 # Boolean fields
                 row["obsidian_synced"] = bool(row["obsidian_synced"])
                 row["restoring"] = bool(row["restoring"])
+                # Inject duration at root
+                meta = row.get("metadata") or {}
+                if isinstance(meta, str):
+                    try: meta = json.loads(meta)
+                    except: meta = {}
+                row["duration"] = meta.get("duration", "00:00")
                 return row
             return None
 
@@ -349,6 +405,12 @@ class LocalDatabase:
             if updated_row:
                 updated_row["obsidian_synced"] = bool(updated_row["obsidian_synced"])
                 updated_row["restoring"] = bool(updated_row["restoring"])
+                # Inject duration at root
+                meta = updated_row.get("metadata") or {}
+                if isinstance(meta, str):
+                    try: meta = json.loads(meta)
+                    except: meta = {}
+                updated_row["duration"] = meta.get("duration", "00:00")
             return updated_row
 
     def delete_task(self, task_id: str) -> bool:

@@ -82,6 +82,37 @@ def clean_html_to_text(html_content: str) -> str:
     lines = [line.strip() for line in text.split('\n')]
     return '\n'.join(lines).strip()
 
+def get_audio_duration_str(file_path: str) -> str:
+    try:
+        import subprocess
+        import re
+        from app.config import FFMPEG_PATH
+        # Run ffmpeg to extract duration
+        cmd = [FFMPEG_PATH, "-i", file_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
+        output = res.stderr or ""
+        match = re.search(r"Duration:\s*(\d{2}:\d{2}:\d{2})", output)
+        if match:
+            duration_str = match.group(1)
+            parts = duration_str.split(":")
+            if parts[0] == "00":
+                return f"{parts[1]}:{parts[2]}"
+            return duration_str
+        # Fallback to global ffmpeg
+        cmd_fallback = ["ffmpeg", "-i", file_path]
+        res_fallback = subprocess.run(cmd_fallback, capture_output=True, text=True, errors="ignore")
+        output_fallback = res_fallback.stderr or ""
+        match_fallback = re.search(r"Duration:\s*(\d{2}:\d{2}:\d{2})", output_fallback)
+        if match_fallback:
+            duration_str = match_fallback.group(1)
+            parts = duration_str.split(":")
+            if parts[0] == "00":
+                return f"{parts[1]}:{parts[2]}"
+            return duration_str
+    except Exception as e:
+        print(f"⚠️ [LOG] 获取音频时长失败: {e}")
+    return "00:00"
+
 class PodcastDownloader:
     def __init__(self):
         self.headers = {
@@ -521,6 +552,16 @@ class PodcastDownloader:
         }
 
     def download_url_audio(self, url: str, progress_callback=None) -> tuple[str, dict]:
+        local_path, metadata = self._download_url_audio_impl(url, progress_callback)
+        # Inject duration into metadata
+        if local_path and os.path.exists(local_path):
+            duration_str = get_audio_duration_str(local_path)
+            metadata["duration"] = duration_str
+        else:
+            metadata["duration"] = "00:00"
+        return local_path, metadata
+
+    def _download_url_audio_impl(self, url: str, progress_callback=None) -> tuple[str, dict]:
         """
         下载链接音频，支持本地路径绕过、小宇宙解析和 yt-dlp 兜底
         返回: (本地下载文件路径, 播客元数据字典)

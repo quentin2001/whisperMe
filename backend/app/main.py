@@ -286,6 +286,7 @@ class UpdateConfigRequest(BaseModel):
     enable_llm_semantic_sewing: bool = False
     webhook_url: str = ""
     custom_storage_dir: str = ""
+    language: str = "en"
 
 
 # --- 智能声纹特征与大模型命名推理引擎 ---
@@ -1311,9 +1312,11 @@ def refresh_metadata(task_id: str):
                 "comment_count": updated_t.get("metadata", {}).get("comment_count", 0),
                 "obsidian_synced": updated_t.get("obsidian_synced", False),
                 "image_url": updated_t.get("image_url", ""),
+                "duration": updated_t.get("duration", "00:00"),
                 "metadata": {
                     "pub_date": updated_t.get("metadata", {}).get("pub_date", ""),
-                    "source": updated_t.get("metadata", {}).get("source", "")
+                    "source": updated_t.get("metadata", {}).get("source", ""),
+                    "duration": updated_t.get("metadata", {}).get("duration", "00:00")
                 }
             }
         }
@@ -2038,7 +2041,6 @@ def review_insight(insight_id: str, req: ReviewInsightRequest):
 
 # 辅助读取配置
 def load_config_dict():
-    from app.config import CONFIG_FILE_PATH
-    import json
-    with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    from app.config import load_config
+    return load_config()
+

@@ -69,105 +69,17 @@ whisperMe 把「听播客」变成一条完整的知识管线。你只需要贴�
 
 - **Python 3.10+**
 - **Node.js 18+**
-- **FFmpeg** — 通过 [WinGet](https://github.com/GyanD/codexffmpeg/releases) 或 [官网](https://ffmpeg.org/download.html) 安装
-- **GPU（可选）** — 有 NVIDIA 显卡可加速转录，没有也能跑（自动降级 CPU）
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/quentin2001/whisperMe.git
-cd whisperMe
-```
-
-### 2. 配置
-
-```bash
-cp config.example.json config.json
-```
-
-打开 `config.json`，填入你的本地路径和密钥。详见下方 [配置说明](#配置说明)。
-
-### 3. 安装后端依赖并启动
-
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate        # macOS/Linux: source venv/bin/activate
-pip install -r requirements.txt
-python run.py
-```
-
-后端启动于 `http://127.0.0.1:8000`。
-
-### 4. 安装前端依赖并启动
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-前端启动于 `http://localhost:5173`，在浏览器中打开即可使用。
-
-### 5. 一键启动（可选）
-
-项目根目录下提供了 `start_project.py` 一键启动脚本，双击 `一键启动.bat` 即可同时拉起前后端，按 `Ctrl+C` 统一关闭。日志自动保存在 `logs/` 目录。
+- **FFmpeg** — 通过 [WinGet](https://github.com/GyanD/codexffmpeg/releases) 或 [官网](https://ffmpeg.org/download.html) 安装---
 
 <br />
 
----
+## 配置与常见问题
 
-<br />
+详细的 `config.json` 配置文件参数说明（如 FFmpeg 路径、ASR 引擎及 LLM 密钥等配置项），以及代理连不上、HuggingFace Token 等常见问题，已整理至独立文档中：
 
-## 工作流程
+👉 **[使用手册 & 配置指南 (User Guide)](docs/user_guide.md)**
 
-```
-粘贴链接 / 上传音频  →  自动下载  →  声纹分轨 + 转录  →  AI 总结
-```
-
-```mermaid
-graph LR
-    A["📥 输入链接"] --> B["⚙️ 音频下载"]
-    B --> C["👤 声纹分轨"]
-    C --> D["📝 AI 总结"]
-    style D fill:#7C3AED,stroke:#5B21B6,color:#fff
-```
-
-整条管线全自动异步执行（FIFO 队列），你可以同时提交多个任务，它们会依次排队处理。处理完成后会通过 Windows 桌面通知或邮件提醒你。
-
-<br />
-
----
-
-<br />
-
-## 配置说明
-
-配置文件为项目根目录下的 `config.json`（已被 `.gitignore` 排除，不会上传到仓库）。
-
-首次使用请复制模板：
-
-```bash
-cp config.example.json config.json
-```
-
-### 必填项
-
-| 配置项 | 说明 |
-|---|---|
-| `ffmpeg_path` | FFmpeg 可执行文件的绝对路径（`.exe`） |
-| `ffmpeg_bin_dir` | FFmpeg `bin` 目录的绝对路径 |
-
-### ASR 语音转录
-
-| 配置项 | 说明 |
-|---|---|
-| `asr_mode` | `local`（离线）或 `online`（在线 API） |
-| `local_whisper_model_path` | 本地 Whisper 模型目录路径（`asr_mode=local` 时必填） |
-| `hf_token` | HuggingFace Token，用于下载 PyAnnote 声纹模型 |
-| `online_api_key` | 在线 ASR API Key（`asr_mode=online` 时必填） |
-| `online_base_url` | 在线 ASR API 地址，默认 MiMo ASR |
-| `online_model` | 在线 ASR 模型名称 |
+<br />称 |
 
 ### AI 总结
 
@@ -295,6 +207,7 @@ whisperMe/
 
 ## 详细文档
 
+- [使用手册 & 配置指南](docs/user_guide.md) — 详细配置说明与常见问题解答
 - [系统架构设计](docs/architecture.md) — 目录结构、API 清单、数据流、设计决策
 - [变更日志](docs/changelog.md) — 功能迭代与 Bug 修复记录
 

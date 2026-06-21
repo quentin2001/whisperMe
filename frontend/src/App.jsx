@@ -11,6 +11,7 @@ const BACKEND_URL = "http://127.0.0.1:8000";
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard', 'workstation', 'detail', 'config'
   const [activeTaskId, setActiveTaskId] = useState(null);
+  const [detailSourceTab, setDetailSourceTab] = useState("dashboard"); // 'dashboard' or 'workstation'
   const [activeTask, setActiveTask] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [newUrl, setNewUrl] = useState("");
@@ -55,8 +56,10 @@ export default function App() {
     online_summary_model: "",
     enable_llm_semantic_sewing: false,
     webhook_url: "",
-    custom_storage_dir: ""
+    custom_storage_dir: "",
+    language: "en"
   });
+  const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [asrMode, setAsrMode] = useState("online");
 
   // Prompt 编辑状态
@@ -141,7 +144,7 @@ export default function App() {
   };
 
   const handleResetPrompt = () => {
-    if (window.confirm("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。")) {
+    if (window.confirm(t("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。", "Are you sure you want to restore the default Prompt templates? This will overwrite your current configuration."))) {
       const defaultPrompt = {
         base_prompt: `请根据下面提供的【播客单集 Shownotes】、【听众热门评论】和【播客对话转录文本】，生成一份详尽、结构清晰的【播客价值总结分析报告】。
 
@@ -257,7 +260,7 @@ export default function App() {
         fetchTasks();
       }
     } catch (e) {
-      alert("发起任务失败，请检查后端服务是否启动！");
+      alert(t("发起任务失败，请检查后端服务是否启动！", "Failed to start task. Please check if the backend service is running!"));
     } finally {
       setLoading(false);
     }
@@ -279,13 +282,13 @@ export default function App() {
       if (res.ok) {
         setIsIngestModalOpen(false);
         fetchTasks();
-        alert("音频文件导入成功！");
+        alert(t("音频文件导入成功！", "Audio file imported successfully!"));
       } else {
-        alert("文件上传失败。");
+        alert(t("文件上传失败。", "File upload failed."));
       }
     } catch (err) {
       console.error(err);
-      alert("上传出错：" + err.message);
+      alert(t("上传出错：", "Upload error: ") + err.message);
     } finally {
       setUploading(false);
     }
@@ -300,7 +303,7 @@ export default function App() {
         setActiveTab("dashboard");
       }
     } catch (e) {
-      alert("删除失败");
+      alert(t("删除失败", "Delete failed"));
     }
   };
 
@@ -313,11 +316,11 @@ export default function App() {
         body: JSON.stringify(configData)
       });
       if (res.status === 200) {
-        alert("配置已成功更新！");
+        alert(t("配置已成功更新！", "Configuration updated successfully!"));
         fetchConfig();
       }
     } catch (e) {
-      alert("保存配置失败");
+      alert(t("保存配置失败", "Failed to save configuration"));
     }
   };
 
@@ -342,7 +345,7 @@ export default function App() {
   };
 
   const handleAnalyzeAllLogs = () => {
-    alert("Analyzing logs across all session records to find action items... Synthesis calculations loaded.");
+    alert(t("正在对所有单集记录进行日志分析以寻找行动项... 综合计算已加载。", "Analyzing logs across all session records to find action items... Synthesis calculations loaded."));
     const newLog = {
       id: "9912-S",
       text: "Global action trace compiled. Synthesis confirms latency trends is stable and workspace frame rate of 60fps achieved.",
@@ -360,14 +363,22 @@ export default function App() {
     setLogs(initialLogs);
     setActiveTaskId(null);
     setActiveTab("dashboard");
-    alert("Local workspace memory wiped cleanly! Restored default recordings.");
+    alert(t("本地工作区内存已完全清除！已恢复默认录音。", "Local workspace memory wiped cleanly! Restored default recordings."));
   };
 
   return (
     <div id="application-layout-frame" className="flex h-screen w-screen overflow-hidden bg-[#fef9f2]">
       {/* Persistent Left Menu Sidebar */}
       <Sidebar
-        currentTab={activeTab === "dashboard" ? "library" : activeTab === "workstation" ? "workstation" : "settings"}
+        currentTab={
+          activeTab === "dashboard"
+            ? "library"
+            : activeTab === "workstation"
+            ? "workstation"
+            : activeTab === "detail"
+            ? (detailSourceTab === "workstation" ? "workstation" : "library")
+            : "settings"
+        }
         onTabChange={(tab) => {
           if (tab === "library") setActiveTab("dashboard");
           else if (tab === "workstation") setActiveTab("workstation");
@@ -387,6 +398,7 @@ export default function App() {
           }, 200);
         }}
         perfData={perfData}
+        t={t}
       />
 
       {/* Main split screens panel area */}
@@ -409,8 +421,9 @@ export default function App() {
             onRefreshTask={() => fetchTaskDetail(activeTask.id, true)}
             onBack={() => {
               setActiveTaskId(null);
-              setActiveTab("dashboard");
+              setActiveTab(detailSourceTab === "workstation" ? "workstation" : "dashboard");
             }}
+            t={t}
           />
         ) : (
           /* Tab contents switch */
@@ -420,9 +433,12 @@ export default function App() {
                 tasks={tasks}
                 logs={logs}
                 perfData={perfData}
+                configData={configData}
                 onJumpToWorkstation={() => setActiveTab("workstation")}
+                onJumpToSettings={() => setActiveTab("config")}
                 onNewSessionTrigger={() => setIsIngestModalOpen(true)}
                 onOpenSession={(task) => {
+                  setDetailSourceTab("dashboard");
                   setActiveTaskId(task.id);
                   setActiveTab("detail");
                 }}
@@ -441,6 +457,7 @@ export default function App() {
                 }}
                 onAnalyzeLogs={handleAnalyzeAllLogs}
                 onDeleteTask={handleDeleteTask}
+                t={t}
               />
             )}
 
@@ -448,10 +465,13 @@ export default function App() {
               <WorkstationView
                 tasks={tasks}
                 onOpenSession={(task) => {
+                  setDetailSourceTab("workstation");
                   setActiveTaskId(task.id);
                   setActiveTab("detail");
                 }}
                 onNewSessionTrigger={() => setIsIngestModalOpen(true)}
+                onDeleteTask={handleDeleteTask}
+                t={t}
               />
             )}
 
@@ -466,6 +486,7 @@ export default function App() {
                 promptSaveStatus={promptSaveStatus}
                 handleSavePrompt={handleSavePrompt}
                 handleResetPrompt={handleResetPrompt}
+                t={t}
               />
             )}
           </>
@@ -493,7 +514,7 @@ export default function App() {
           <div className="bg-white border border-[#e7bcbb]/50 rounded-xl max-w-lg w-full relative flex flex-col shadow-2xl">
             <div className="p-6 border-b border-[#e7bcbb]/30 flex justify-between items-center bg-[#f9f3ea]/50 rounded-t-xl">
               <h3 className="text-xl font-bold font-display text-[#1d1c18] flex items-center gap-2">
-                New Transcription
+                {t("新建转录任务", "New Transcription")}
               </h3>
               <button onClick={() => setIsIngestModalOpen(false)} className="text-[#5d3f3e]/60 hover:text-[#f62440] transition-colors cursor-pointer border-0 bg-transparent text-lg">
                 ✕
@@ -502,61 +523,57 @@ export default function App() {
             
             <div className="p-6 flex flex-col gap-4">
               <p className="text-sm text-[#5d5a55]/85">
-                Enter an episode link or upload a local audio file to initiate processing.
+                {t("选择 ASR 模式并提供单集播客链接或上传本地音频文件。", "Select ASR mode and provide either an episode link or upload a local audio file.")}
               </p>
 
-              <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
-                <input 
-                  type="text" 
-                  placeholder="Paste podcast URL..." 
-                  value={newUrl} 
-                  onChange={(e) => setNewUrl(e.target.value)} 
-                  disabled={loading}
-                  className="w-full bg-white border border-[#e7bcbb]/40 focus:border-[#f62440] focus:ring-1 focus:ring-[#f62440] rounded-lg px-4 py-3 text-sm text-[#1d1c18] placeholder-[#5d3f3e]/40 outline-none transition-colors"
-                />
-                
-                <div className="flex gap-4 items-center">
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#5d3f3e]/70">ASR MODE:</span>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
-                    <input type="radio" checked={asrMode === "online"} onChange={() => setAsrMode("online")} className="accent-[#f62440]" /> ONLINE API
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
-                    <input type="radio" checked={asrMode === "local"} onChange={() => setAsrMode("local")} className="accent-[#f62440]" /> LOCAL OFFLINE
-                  </label>
+              <div className="flex gap-4 items-center">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#5d3f3e]/70">{t("ASR 模式：", "ASR MODE:")}</span>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
+                  <input type="radio" checked={asrMode === "online"} onChange={() => setAsrMode("online")} className="accent-[#f62440]" /> {t("在线 API", "ONLINE API")}
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
+                  <input type="radio" checked={asrMode === "local"} onChange={() => setAsrMode("local")} className="accent-[#f62440]" /> {t("本地离线", "LOCAL OFFLINE")}
+                </label>
+              </div>
+
+              {asrMode === "online" ? (
+                <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
+                  <input 
+                    type="text" 
+                    placeholder={t("粘贴播客 URL...", "Paste podcast URL...")} 
+                    value={newUrl} 
+                    onChange={(e) => setNewUrl(e.target.value)} 
+                    disabled={loading}
+                    className="w-full bg-white border border-[#e7bcbb]/40 focus:border-[#f62440] focus:ring-1 focus:ring-[#f62440] rounded-lg px-4 py-3 text-sm text-[#1d1c18] placeholder-[#5d3f3e]/40 outline-none transition-colors"
+                  />
+                  
+                  <button 
+                    type="submit" 
+                    disabled={loading || !newUrl.trim()} 
+                    className="w-full bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-0 outline-none"
+                  >
+                    {loading ? t("正在初始化...", "INITIATING...") : t("获取音频", "FETCH AUDIO")}
+                  </button>
+                </form>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    disabled={uploading || loading} 
+                    className="w-full border-2 border-dashed border-[#e7bcbb] hover:border-[#f62440] hover:bg-[#ffdad6]/10 text-[#5d3f3e]/70 hover:text-[#f62440] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
+                  >
+                    <span className="text-3xl mb-1">☁️</span>
+                    <span className="text-xs font-bold">{uploading ? t("正在上传...", "UPLOADING...") : t("浏览本地文件", "BROWSE FILES")}</span>
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleLocalFileUpload} 
+                    accept=".mp3,.wav,.m4a,.aac,.flac,.ogg" 
+                    className="hidden" 
+                  />
                 </div>
-
-                <button 
-                  type="submit" 
-                  disabled={loading || !newUrl.trim()} 
-                  className="w-full bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-0 outline-none"
-                >
-                  {loading ? "INITIATING..." : "FETCH AUDIO"}
-                </button>
-              </form>
-
-              <div className="flex items-center gap-4 text-[#e7bcbb] select-none my-2">
-                <div className="flex-1 h-[1px] bg-current"></div>
-                <span className="text-[10px] uppercase tracking-widest text-[#5d3f3e]/60 font-bold">OR UPLOAD LOCAL</span>
-                <div className="flex-1 h-[1px] bg-current"></div>
-              </div>
-
-              <div>
-                <button 
-                  onClick={() => fileInputRef.current?.click()} 
-                  disabled={uploading || loading} 
-                  className="w-full border-2 border-dashed border-[#e7bcbb] hover:border-[#f62440] hover:bg-[#ffdad6]/10 text-[#5d3f3e]/70 hover:text-[#f62440] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
-                >
-                  <span className="text-3xl mb-1">☁️</span>
-                  <span className="text-xs font-bold">{uploading ? "UPLOADING..." : "BROWSE FILES"}</span>
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleLocalFileUpload} 
-                  accept=".mp3,.wav,.m4a,.aac,.flac,.ogg" 
-                  className="hidden" 
-                />
-              </div>
+              )}
             </div>
           </div>
         </div>

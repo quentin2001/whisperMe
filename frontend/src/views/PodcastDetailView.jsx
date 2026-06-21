@@ -31,8 +31,8 @@ function parseInlineMarkdown(text) {
 }
 
 // ==================== 📝 High-Performance Markdown Parser with Alerts ====================
-function MarkdownRenderer({ text }) {
-  if (!text) return <p className="text-[#5d3f3e]/60 text-xs">暂无总结内容</p>;
+function MarkdownRenderer({ text, t }) {
+  if (!text) return <p className="text-[#5d3f3e]/60 text-xs">{t("暂无总结内容", "No summary content available")}</p>;
   
   const lines = text.replace(/\\n/g, "\n").split("\n");
   let inList = false;
@@ -333,7 +333,8 @@ export default function PodcastDetailView({
   volume,
   setVolume,
   onRefreshTask,
-  onBack
+  onBack,
+  t
 }) {
   const [searchWord, setSearchWord] = useState("");
   const [isMuted, setIsMuted] = useState(false);
@@ -384,11 +385,11 @@ export default function PodcastDetailView({
           onRefreshTask();
         }
       } else {
-        alert("重命名发言人失败，请重试。");
+        alert(t("重命名发言人失败，请重试。", "Failed to rename speaker. Please try again."));
       }
     } catch (err) {
       console.error(err);
-      alert("通信出错：" + err.message);
+      alert(t("通信出错：", "Communication error: ") + err.message);
     } finally {
       setIsSavingSpeaker(false);
     }
@@ -459,13 +460,13 @@ export default function PodcastDetailView({
         method: "POST"
       });
       if (res.ok) {
-        alert("AI总结与深度分析已重新排队生成，请稍候！");
+        alert(t("AI总结与深度分析已重新排队生成，请稍候！", "AI summary and deep analysis have been queued for regeneration, please wait!"));
       } else {
-        alert("无法联系服务器发起AI总结。");
+        alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
       }
     } catch (err) {
       console.error(err);
-      alert("通信错误：" + err.message);
+      alert(t("通信出错：", "Communication error: ") + err.message);
     } finally {
       setAnalyzing(false);
     }
@@ -568,7 +569,7 @@ export default function PodcastDetailView({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5d3f3e]/40 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search transcript..."
+              placeholder={t("搜索转录文本...", "Search transcript...")}
               value={searchWord}
               onChange={(e) => setSearchWord(e.target.value)}
               className="pl-9 pr-4 py-1.5 bg-white border border-[#e7bcbb]/40 rounded-lg text-xs w-56 focus:outline-none focus:ring-1 focus:ring-[#f62440]"
@@ -585,7 +586,7 @@ export default function PodcastDetailView({
             ) : (
               <Sparkles size={13} fill="white" />
             )}
-            <span>{analyzing ? "Regenerating..." : "AI Analysis"}</span>
+            <span>{analyzing ? t("重新生成中...", "Regenerating...") : t("AI 深度总结", "AI Analysis")}</span>
           </button>
 
           <button
@@ -593,7 +594,7 @@ export default function PodcastDetailView({
             className="flex items-center gap-1.5 px-4 py-1.5 bg-white border border-[#e7bcbb]/40 hover:bg-[#f2ede6] text-[#5d3f3e] text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none animate-fade-in"
           >
             <Users size={13} className="text-[#bf0029]" />
-            <span>发言人管理</span>
+            <span>{t("发言人管理", "Speaker Management")}</span>
           </button>
         </div>
       </header>
@@ -606,7 +607,7 @@ export default function PodcastDetailView({
           className="overflow-y-auto px-10 py-8 border-r border-[#e7bcbb]/30 h-full shrink-0"
           style={{ width: `${leftWidth}%` }}
         >
-          <h2 className="text-3xl font-extrabold tracking-tight text-[#1d1c18] font-display mb-6">Full Transcript</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-[#1d1c18] font-display mb-6">{t("完整转录文本", "Full Transcript")}</h2>
           
           <div className="flex flex-col gap-6">
             {paragraphs
@@ -659,7 +660,7 @@ export default function PodcastDetailView({
                   : "border-transparent text-[#5d3f3e]/70 hover:text-[#f62440] hover:bg-[#ffdad6]/5 bg-transparent"
               }`}
             >
-              AI总结
+              {t("AI 总结", "AI Summary")}
             </button>
             <button
               onClick={() => setDetailSubTab("shownotes")}
@@ -669,7 +670,7 @@ export default function PodcastDetailView({
                   : "border-transparent text-[#5d3f3e]/70 hover:text-[#f62440] hover:bg-[#ffdad6]/5 bg-transparent"
               }`}
             >
-              节目简介
+              {t("节目简介", "Shownotes")}
             </button>
             <button
               onClick={() => setDetailSubTab("comments")}
@@ -679,7 +680,7 @@ export default function PodcastDetailView({
                   : "border-transparent text-[#5d3f3e]/70 hover:text-[#f62440] hover:bg-[#ffdad6]/5 bg-transparent"
               }`}
             >
-              听众热评
+              {t("听众热评", "Listener Comments")}
             </button>
           </div>
 
@@ -689,24 +690,24 @@ export default function PodcastDetailView({
               <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs select-text animate-fade-in">
                 <div className="flex items-center gap-2 mb-4 text-[#bf0029] select-none">
                   <Sparkles size={16} fill="#bf0029" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider">AI VALUE ANALYSIS REPORT</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-wider">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
                 </div>
                 
                 {/* Custom Markdown renderer rendering entire summary including metrics */}
-                <MarkdownRenderer text={activeTask.summary} />
+                <MarkdownRenderer text={activeTask.summary} t={t} />
               </div>
             )}
 
             {detailSubTab === "shownotes" && (
               <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in">
-                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">Shownotes Timeline</h3>
+                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
                 <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} />
               </div>
             )}
 
             {detailSubTab === "comments" && (
               <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in">
-                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">Hot Listener Comments</h3>
+                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">{t("听众热门评论", "Hot Listener Comments")}</h3>
                 
                 <div className="flex flex-col gap-4">
                   {commentsList.length > 0 ? (
@@ -714,7 +715,7 @@ export default function PodcastDetailView({
                       <div key={cIdx} className="border border-[#e7bcbb]/30 p-4 rounded-xl bg-[#fef9f2]/40 hover:border-[#f62440]/30 transition-all">
                         <div className="flex justify-between items-center mb-2 text-xs">
                           <span className="font-bold text-[#1d1c18] flex items-center gap-1.5 select-none">
-                            👤 {comment.author || "Anonymous Listener"}
+                            👤 {comment.author || t("匿名听众", "Anonymous Listener")}
                           </span>
                           <span className="font-mono text-[#bf0029] font-bold flex items-center gap-1 select-none">
                             ❤️ {comment.likes ?? 0}
@@ -727,7 +728,7 @@ export default function PodcastDetailView({
                     ))
                   ) : (
                     <div className="border-2 border-dashed border-[#e7bcbb]/40 p-8 text-center rounded-xl select-none">
-                      <span className="text-xs text-[#5d3f3e]/50 font-bold uppercase tracking-wider">No comments indexed</span>
+                      <span className="text-xs text-[#5d3f3e]/50 font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
                     </div>
                   )}
                 </div>
@@ -750,7 +751,7 @@ export default function PodcastDetailView({
           <div className="hidden sm:block overflow-hidden">
             <h4 className="font-bold text-xs text-[#1d1c18] font-display max-w-[200px] truncate">{displayTitle}</h4>
             <p className="text-[10px] font-semibold text-[#f62440] uppercase tracking-wider mt-0.5 animate-pulse">
-              {isPlaying ? "Active Playback Decoding" : "Playback Idle"}
+              {isPlaying ? t("解码播放中", "Active Playback Decoding") : t("播放空闲", "Playback Idle")}
             </p>
           </div>
         </div>
@@ -812,7 +813,7 @@ export default function PodcastDetailView({
             onClick={handleSpeedToggle}
             className="px-2.5 py-1 bg-[#f2ede6] text-[#5d3f3e] rounded-md border border-[#e7bcbb]/30 active:scale-98 transition-all cursor-pointer border-0 outline-none"
           >
-            Speed {playbackRate.toFixed(1)}x
+            {t("语速", "Speed")} {playbackRate.toFixed(1)}x
           </button>
 
           {/* Volume bars and state */}
@@ -843,7 +844,7 @@ export default function PodcastDetailView({
             <div className="p-6 border-b border-[#e7bcbb]/30 flex justify-between items-center bg-[#f9f3ea]/50 rounded-t-xl">
               <h3 className="text-xl font-bold font-display text-[#1d1c18] flex items-center gap-2">
                 <Users size={20} className="text-[#bf0029]" />
-                发言人管理
+                {t("发言人管理", "Speaker Management")}
               </h3>
               <button 
                 onClick={() => {
@@ -858,13 +859,13 @@ export default function PodcastDetailView({
             
             <div className="p-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
               <p className="text-sm text-[#5d5a55]/85">
-                在此处修改发言人名称。修改后将自动更新整个文本的发言人标签。
+                {t("在此处修改发言人名称。修改后将自动更新整个文本的发言人标签。", "Update speaker names here. The speaker tags across the entire transcript will be updated automatically.")}
               </p>
 
               <div className="flex flex-col gap-3">
                 {getUniqueSpeakers().length === 0 ? (
                   <div className="border border-[#e7bcbb]/40 border-dashed p-8 text-center rounded-lg text-sm text-[#5d5a55]/60 font-semibold">
-                    未检测到发言人
+                    {t("未检测到发言人", "No speakers detected")}
                   </div>
                 ) : (
                   getUniqueSpeakers().map((spId) => {
@@ -892,14 +893,14 @@ export default function PodcastDetailView({
                               disabled={isSavingSpeaker || !editingSpeakerName.trim()}
                               className="px-3 py-1.5 bg-[#f62440] hover:bg-[#bb0028] disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer border-0 outline-none"
                             >
-                              保存
+                              {t("保存", "Save")}
                             </button>
                             <button
                               onClick={() => setEditingSpeakerId(null)}
                               disabled={isSavingSpeaker}
                               className="px-3 py-1.5 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded cursor-pointer border-0 outline-none"
                             >
-                              取消
+                              {t("取消", "Cancel")}
                             </button>
                           </div>
                         ) : (
@@ -907,7 +908,7 @@ export default function PodcastDetailView({
                             <div className="flex flex-col">
                               <span className="text-sm font-bold text-[#1d1c18]">{currentName}</span>
                               {activeTask.speaker_mappings?.[spId] && (
-                                <span className="text-[10px] text-[#5d5a55] font-semibold mt-0.5">原始 ID: {spId}</span>
+                                <span className="text-[10px] text-[#5d5a55] font-semibold mt-0.5">{t("原始 ID: ", "Original ID: ")}{spId}</span>
                               )}
                             </div>
                             <button
@@ -917,7 +918,7 @@ export default function PodcastDetailView({
                               }}
                               className="text-xs text-[#bf0029] hover:underline font-bold bg-transparent border-0 outline-none cursor-pointer"
                             >
-                              编辑
+                              {t("编辑", "Edit")}
                             </button>
                           </>
                         )}
@@ -936,7 +937,7 @@ export default function PodcastDetailView({
                 }}
                 className="px-4 py-2 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded-lg cursor-pointer border-0 outline-none"
               >
-                关闭
+                {t("关闭", "Close")}
               </button>
             </div>
           </div>

@@ -67,7 +67,8 @@ def load_config():
         "online_summary_model": "gpt-4o-mini",
         "enable_llm_semantic_sewing": False,
         "webhook_url": "",
-        "custom_storage_dir": ""
+        "custom_storage_dir": "",
+        "language": "en"
     }
 
     if not CONFIG_FILE_PATH.exists():

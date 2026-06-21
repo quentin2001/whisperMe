@@ -1,5 +1,64 @@
-import React, { useState } from "react";
-import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle } from "lucide-react";
+
+function SettingsDropdown({ value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between bg-white border p-2.5 rounded-lg text-sm font-semibold text-[#1d1c18] transition-all text-left outline-none cursor-pointer ${
+          isOpen 
+            ? "border-[#f62440] ring-1 ring-[#f62440]" 
+            : "border-[#e7bcbb]/40 hover:border-[#f62440]/50"
+        }`}
+      >
+        <span className="truncate">{selectedOption.label}</span>
+        <ChevronDown size={16} className={`text-[#5d3f3e]/60 transition-transform duration-200 ${isOpen ? "rotate-180 text-[#f62440]" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 mt-1 w-full bg-white border border-[#e7bcbb]/40 rounded-lg shadow-lg z-50 py-0 overflow-hidden animate-fade-in">
+          {options.map((opt) => {
+            const active = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer border-0 outline-none block ${
+                  active 
+                    ? "bg-[#f62440] text-white" 
+                    : "text-[#5d3f3e] bg-transparent hover:bg-[#ffdad6]/40 hover:text-[#f62440]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsView({
   configData,
@@ -12,15 +71,15 @@ export default function SettingsView({
   handleSavePrompt,
   handleResetPrompt
 }) {
-  const [language, setLanguage] = useState("zh-CN");
+  const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
 
   return (
     <div id="settings-view-section" className="flex-1 overflow-y-auto w-full">
       <div className="max-w-[1280px] mx-auto p-10 font-sans w-full">
         <div className="mb-8">
-          <h2 className="text-4xl font-extrabold tracking-tight text-[#1d1c18] font-display">Settings</h2>
-          <p className="text-sm text-[#5d5a55]/80 mt-1 font-medium">Fine-tune acoustic processing thresholds and neural transcription engine models.</p>
+          <h2 className="text-4xl font-extrabold tracking-tight text-[#1d1c18] font-display">{t("设置", "Settings")}</h2>
+          <p className="text-sm text-[#5d5a55]/80 mt-1 font-medium">{t("精细化配置音频处理阈值及神经网络转录引擎大模型参数。", "Fine-tune acoustic processing thresholds and neural transcription engine models.")}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -32,27 +91,27 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
               <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
                 <Sliders size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">ASR Engine Settings</h3>
+                <h3 className="text-lg font-bold text-[#1d1c18]">{t("ASR 引擎设置", "ASR Engine Settings")}</h3>
               </div>
 
               {/* Engine Mode */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Engine Mode</label>
-                <select
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("引擎工作模式", "Engine Mode")}</label>
+                <SettingsDropdown
                   value={configData.asr_mode || "local"}
-                  onChange={(e) => handleConfigChange("asr_mode", e.target.value)}
-                  className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                >
-                  <option value="local">LOCAL OFFLINE</option>
-                  <option value="online">ONLINE API</option>
-                </select>
+                  onChange={(val) => handleConfigChange("asr_mode", val)}
+                  options={[
+                    { value: "local", label: t("本地离线", "LOCAL OFFLINE") },
+                    { value: "online", label: t("在线 API", "ONLINE API") }
+                  ]}
+                />
               </div>
 
               {/* Local Mode Subfields */}
               {configData.asr_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Local Model Path</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
                     <input
                       type="text"
                       value={configData.local_whisper_model_path || ""}
@@ -62,7 +121,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">HF Token (Diarization)</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("HF Token (人声分割分段)", "HF Token (Diarization)")}</label>
                     <input
                       type="password"
                       value={configData.hf_token || ""}
@@ -78,7 +137,7 @@ export default function SettingsView({
               {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Base URL</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 接口基础地址", "API Base URL")}</label>
                     <input
                       type="text"
                       value={configData.online_base_url || ""}
@@ -86,10 +145,10 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1", "Example: https://token-plan-sgp.xiaomimimo.com/v1 or https://api.openai.com/v1")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Model ID</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型标识符 (Model ID)", "Model ID")}</label>
                     <input
                       type="text"
                       value={configData.online_model || ""}
@@ -97,10 +156,10 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="mimo-v2.5-asr"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：mimo-v2.5-asr 或 whisper-1</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：mimo-v2.5-asr 或 whisper-1", "Example: mimo-v2.5-asr or whisper-1")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Key</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 密钥 (API Key)", "API Key")}</label>
                     <input
                       type="password"
                       value={configData.online_api_key || ""}
@@ -108,7 +167,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">输入您在 ASR 服务商申请的 API 密钥</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key you requested from your ASR service provider")}</span>
                   </div>
                 </>
               )}
@@ -118,27 +177,27 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
               <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
                 <Cpu size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">LLM Summary Settings</h3>
+                <h3 className="text-lg font-bold text-[#1d1c18]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
               </div>
 
               {/* LLM Mode */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">LLM Mode</label>
-                <select
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("大模型工作模式", "LLM Mode")}</label>
+                <SettingsDropdown
                   value={configData.summary_mode || "online"}
-                  onChange={(e) => handleConfigChange("summary_mode", e.target.value)}
-                  className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                >
-                  <option value="local">LOCAL</option>
-                  <option value="online">ONLINE API</option>
-                </select>
+                  onChange={(val) => handleConfigChange("summary_mode", val)}
+                  options={[
+                    { value: "local", label: t("本地 OLLAMA", "LOCAL OLLAMA") },
+                    { value: "online", label: t("在线 API", "ONLINE API") }
+                  ]}
+                />
               </div>
 
               {/* Local Ollama Subfields */}
               {configData.summary_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Local API URL</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 API 接口地址", "Local API URL")}</label>
                     <input
                       type="text"
                       value={configData.ollama_url || ""}
@@ -148,7 +207,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Model ID</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型 ID", "Model ID")}</label>
                     <input
                       type="text"
                       value={configData.ollama_model || ""}
@@ -164,7 +223,7 @@ export default function SettingsView({
               {configData.summary_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Online API Base URL</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线 API 基础地址", "Online API Base URL")}</label>
                     <input
                       type="text"
                       value={configData.online_summary_base_url || ""}
@@ -172,10 +231,10 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="https://api.openai.com/v1"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：https://api.openai.com/v1 或第三方中转 API 地址</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Online Model ID</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线大模型 ID", "Online Model ID")}</label>
                     <input
                       type="text"
                       value={configData.online_summary_model || ""}
@@ -183,10 +242,10 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="gpt-4o-mini"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">样例：gpt-4o-mini 或 qwen-plus</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Key</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API Key", "API Key")}</label>
                     <input
                       type="password"
                       value={configData.online_summary_api_key || ""}
@@ -194,7 +253,7 @@ export default function SettingsView({
                       className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">输入您在大模型服务商申请的 API 密钥</span>
+                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
                   </div>
                 </>
               )}
@@ -205,22 +264,23 @@ export default function SettingsView({
               <div className="flex items-center justify-between pb-4 border-b border-[#e7bcbb]/20">
                 <div className="flex items-center gap-2">
                   <Terminal size={18} className="text-[#bf0029]" />
-                  <h3 className="text-lg font-bold text-[#1d1c18]">总结 Prompt 模板</h3>
+                  <h3 className="text-lg font-bold text-[#1d1c18]">{t("总结 Prompt 模板配置", "Summary Prompt Template")}</h3>
                 </div>
                 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleResetPrompt}
-                    className="px-3 py-1.5 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none"
+                    className="px-3 py-1.5 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none flex items-center gap-1.5"
                   >
-                    ↩️ 恢复默认
+                    <RotateCcw size={13} />
+                    <span>{t("恢复默认", "Reset to Default")}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSavePrompt}
                     disabled={promptSaveStatus === "saving"}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none ${
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none flex items-center gap-1.5 ${
                       promptSaveStatus === "saved"
                         ? "bg-[#d1e7dd] text-[#0f5132]"
                         : promptSaveStatus === "error"
@@ -228,7 +288,19 @@ export default function SettingsView({
                         : "bg-[#f62440] hover:bg-[#bb0028] text-white"
                     }`}
                   >
-                    {promptSaveStatus === "saving" ? "⏳ 保存中..." : promptSaveStatus === "saved" ? "✅ 已保存" : promptSaveStatus === "error" ? "❌ 保存失败" : "💾 保存 Prompt"}
+                    {promptSaveStatus === "saving" && <Loader2 size={13} className="animate-spin" />}
+                    {promptSaveStatus === "saved" && <Check size={13} />}
+                    {promptSaveStatus === "error" && <AlertCircle size={13} />}
+                    {promptSaveStatus !== "saving" && promptSaveStatus !== "saved" && promptSaveStatus !== "error" && <Save size={13} />}
+                    <span>
+                      {promptSaveStatus === "saving" 
+                        ? t("保存中...", "Saving...") 
+                        : promptSaveStatus === "saved" 
+                        ? t("已保存", "Saved") 
+                        : promptSaveStatus === "error" 
+                        ? t("保存失败", "Failed") 
+                        : t("保存 Prompt", "Save Prompt")}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -236,42 +308,42 @@ export default function SettingsView({
               {/* Base Prompt */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">
-                  🔒 防幻觉守则 / 基础指令 (Base Prompt)
+                  {t("🔒 防幻觉守则 / 基础指令 (Base Prompt)", "🔒 Anti-Hallucination Rules / Base Prompt")}
                 </label>
                 <p className="text-xs text-[#5d5a55]/80 font-medium">
-                  注入给大模型的核心行为准则（防止脑补/幻觉）。数据块（转录文本、评论等）会自动注入在本段与 Action Prompt 之间。
+                  {t("注入给大模型的核心行为准则（防止脑补/幻觉）。数据块（转录文本、评论等）会自动注入在本段与 Action Prompt 之间。", "Core guidelines injected to the LLM to prevent hallucination. Data chunks (transcripts, comments, etc.) will be automatically injected between this block and Action Prompt.")}
                 </p>
                 <textarea
                   value={promptData?.base_prompt || ""}
                   onChange={(e) => setPromptData(prev => ({ ...prev, base_prompt: e.target.value }))}
                   rows={8}
                   className="w-full bg-white border border-[#e7bcbb]/40 rounded-lg p-3 text-sm font-mono text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] resize-y min-h-[160px]"
-                  placeholder="输入基础 Prompt（角色定义、防幻觉规则等）..."
+                  placeholder={t("输入基础 Prompt（角色定义、防幻觉规则等）...", "Enter base prompt (role definitions, anti-hallucination rules, etc.)...")}
                 />
               </div>
 
               {/* Action Prompt */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">
-                  📋 输出格式指令 (Action Prompt)
+                  {t("📋 输出格式指令 (Action Prompt)", "📋 Output Format Directive / Action Prompt")}
                 </label>
                 <p className="text-xs text-[#5d5a55]/80 font-medium">
-                  定义总结报告的具体输出章节与格式（章节结构、评级维度等）。这部分出现在数据块之后。
+                  {t("定义总结报告的具体输出章节与格式（章节结构、评级维度等）。这部分出现在数据块之后。", "Defines the specific sections and formatting of the summary report. Appended after data chunks.")}
                 </p>
                 <textarea
                   value={promptData?.action_prompt || ""}
                   onChange={(e) => setPromptData(prev => ({ ...prev, action_prompt: e.target.value }))}
                   rows={10}
                   className="w-full bg-white border border-[#e7bcbb]/40 rounded-lg p-3 text-sm font-mono text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] resize-y min-h-[220px]"
-                  placeholder="输入输出格式 Prompt（要求的章节、格式、评级等）..."
+                  placeholder={t("输入输出格式 Prompt（要求的章节、格式、评级等）...", "Enter output formatting prompt (requested chapters, templates, ratings, etc.)...")}
                 />
               </div>
 
               {/* Layout schema visual helper */}
               <div className="p-3.5 bg-[#f9f3ea]/50 border border-[#e7bcbb]/30 rounded-lg text-xs text-[#5d3f3e] leading-relaxed">
-                💡 <b>最终 Prompt 拼接顺序：</b>
+                {t("💡 最终 Prompt 拼接顺序：", "💡 Final prompt composition sequence:")}
                 <code className="block mt-1 font-mono text-[11px] text-[#bf0029] select-all">
-                  [Base Prompt] → [播客元数据 + 评论 + 转录文本（自动注入）] → [Action Prompt]
+                  {t("[Base Prompt] → [播客元数据 + 评论 + 转录文本（自动注入）] → [Action Prompt]", "[Base Prompt] → [Metadata + Comments + Transcript (Auto Injected)] → [Action Prompt]")}
                 </code>
               </div>
             </div>
@@ -280,34 +352,34 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
               <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
                 <Bell size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">System Notifications</h3>
+                <h3 className="text-lg font-bold text-[#1d1c18]">{t("系统提醒设置", "System Notifications")}</h3>
               </div>
 
               {/* Windows Toast Notifications */}
               <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
                 <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">Windows Toast Notifications</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">Push notification on desktop when processing ends.</p>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("Windows 气泡通知", "Windows Toast Notifications")}</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={configData.enable_win_notification !== false}
                   onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)}
-                  className="w-4 h-4 accent-[#f62440] cursor-pointer"
+                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
                 />
               </div>
 
               {/* Email Alerts */}
               <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
                 <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">Email Alerts</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">Send mail alerts (SMTP) when task completes.</p>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("邮件提醒 (Email Alerts)", "Email Alerts")}</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("任务结束时发送邮件通知（需要配置 SMTP）。", "Send mail alerts (SMTP) when task completes.")}</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={configData.enable_email_notification === true}
                   onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)}
-                  className="w-4 h-4 accent-[#f62440] cursor-pointer"
+                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
                 />
               </div>
 
@@ -315,7 +387,7 @@ export default function SettingsView({
               {configData.enable_email_notification === true && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e7bcbb]/20 pt-4 animate-fade-in">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">SMTP Server</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("SMTP 服务器", "SMTP Server")}</label>
                     <input
                       type="text"
                       value={configData.smtp_server || ""}
@@ -325,7 +397,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Port</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("端口", "Port")}</label>
                     <input
                       type="number"
                       value={configData.smtp_port || 465}
@@ -335,7 +407,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Username</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("用户名", "Username")}</label>
                     <input
                       type="text"
                       value={configData.smtp_username || ""}
@@ -345,7 +417,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Password</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("密码/授权码", "Password")}</label>
                     <input
                       type="password"
                       value={configData.smtp_password || ""}
@@ -355,7 +427,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Sender Email</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("发件邮箱", "Sender Email")}</label>
                     <input
                       type="text"
                       value={configData.smtp_sender || ""}
@@ -365,7 +437,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Receiver Email</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("收件人邮箱", "Receiver Email")}</label>
                     <input
                       type="text"
                       value={configData.notification_email || ""}
@@ -382,59 +454,59 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
               <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
                 <Terminal size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">Advanced Dependencies</h3>
+                <h3 className="text-lg font-bold text-[#1d1c18]">{t("核心运行时依赖路径", "Advanced Dependencies")}</h3>
               </div>
 
               {/* FFmpeg Executable Path */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">FFmpeg Executable Path</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg 执行文件路径", "FFmpeg Executable Path")}</label>
                 <input
                   type="text"
                   value={configData.ffmpeg_path || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                  placeholder="C:\ffmpeg\bin\ffmpeg.exe 或 /opt/homebrew/bin/ffmpeg"
+                  placeholder={t("C:\\ffmpeg\\bin\\ffmpeg.exe 或 /opt/homebrew/bin/ffmpeg", "C:\\ffmpeg\\bin\\ffmpeg.exe or /opt/homebrew/bin/ffmpeg")}
                 />
-                <span className="text-xs text-[#5d3f3e]/60 font-medium">Windows 示例：C:\ffmpeg\bin\ffmpeg.exe，Mac 示例：/opt/homebrew/bin/ffmpeg</span>
+                <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin\\ffmpeg.exe，Mac 示例：/opt/homebrew/bin/ffmpeg", "Example for Windows: C:\\ffmpeg\\bin\\ffmpeg.exe, for Mac: /opt/homebrew/bin/ffmpeg")}</span>
               </div>
 
               {/* FFmpeg Bin Directory */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">FFmpeg Bin Directory</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg Bin 目录", "FFmpeg Bin Directory")}</label>
                 <input
                   type="text"
                   value={configData.ffmpeg_bin_dir || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)}
                   className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                  placeholder="C:\ffmpeg\bin 或 /opt/homebrew/bin"
+                  placeholder={t("C:\\ffmpeg\\bin 或 /opt/homebrew/bin", "C:\\ffmpeg\\bin or /opt/homebrew/bin")}
                 />
-                <span className="text-xs text-[#5d3f3e]/60 font-medium">Windows 示例：C:\ffmpeg\bin，Mac 示例：/opt/homebrew/bin</span>
+                <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin，Mac 示例：/opt/homebrew/bin", "Example for Windows: C:\\ffmpeg\\bin, for Mac: /opt/homebrew/bin")}</span>
               </div>
 
               {/* Language Preference */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Language Preference</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                >
-                  <option value="zh-CN">简体中文 (ZH-CN)</option>
-                  <option value="en">ENGLISH (EN-US)</option>
-                </select>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("语言首选项", "Language Preference")}</label>
+                <SettingsDropdown
+                  value={configData.language || "en"}
+                  onChange={(val) => handleConfigChange("language", val)}
+                  options={[
+                    { value: "zh-CN", label: t("简体中文 (ZH-CN)", "CHINESE (ZH-CN)") },
+                    { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
+                  ]}
+                />
               </div>
 
               {/* Auto Save Toggle */}
               <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30 mt-2">
                 <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">Auto-Save Changes</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">Automatically trigger save commands when input parameters change.</p>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("自动保存设置更改", "Auto-Save Changes")}</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("当配置输入参数发生变化时自动执行保存操作。", "Automatically trigger save commands when input parameters change.")}</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={autoSaveEnabled}
                   onChange={(e) => setAutoSaveEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-[#f62440] cursor-pointer"
+                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
                 />
               </div>
             </div>
@@ -444,7 +516,7 @@ export default function SettingsView({
               className="w-full mt-2 bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs border-0 outline-none cursor-pointer"
             >
               <Save size={16} />
-              <span>Save Configuration</span>
+              <span>{t("保存配置表", "Save Configuration")}</span>
             </button>
           </div>
 
@@ -454,23 +526,23 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
               <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">
                 <Database size={16} />
-                <h3 className="font-bold text-sm text-[#1d1c18]">Workspace Database Cache</h3>
+                <h3 className="font-bold text-sm text-[#1d1c18]">{t("工作区数据库缓存", "Workspace Database Cache")}</h3>
               </div>
               
               <p className="text-xs text-[#5d5a55] leading-relaxed mb-4 font-medium">
-                Recorded tracks and parsed summaries are stored in your browser's persistent key-value namespace.
+                {t("所有已录制的音频和生成的AI总结都会保存在浏览器的本地存储库中。", "Recorded tracks and parsed summaries are stored in your browser's persistent key-value namespace.")}
               </p>
 
               <button
                 onClick={() => {
-                  if (confirm("Reset current sessions and database logs to initial reference state? All user custom recordings will be permanently removed.")) {
+                  if (confirm(t("确定要重置当前工作区和数据库日志吗？所有用户录音及任务记录将被永久删除！", "Reset current sessions and database logs to initial reference state? All user custom recordings will be permanently removed."))) {
                     onResetData();
                   }
                 }}
                 className="w-full py-2.5 px-4 rounded-lg bg-[#ffdad6] text-[#b81a1a] hover:bg-[#ffdad6]/80 text-xs font-bold transition-all border border-[#ffb4a8]/50 flex items-center justify-center gap-2 border-0 outline-none cursor-pointer"
               >
                 <ShieldAlert size={14} />
-                <span>Reset Workspace to Defaults</span>
+                <span>{t("重置工作区数据库", "Reset Workspace to Defaults")}</span>
               </button>
             </div>
 
@@ -478,14 +550,14 @@ export default function SettingsView({
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
               <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">
                 <Cpu size={16} />
-                <h3 className="font-bold text-sm text-[#1d1c18]">AI Secrets & Credentials</h3>
+                <h3 className="font-bold text-sm text-[#1d1c18]">{t("AI 引擎机密凭据说明", "AI Secrets & Credentials")}</h3>
               </div>
               
               <p className="text-xs text-[#5d5a55] leading-relaxed font-semibold">
-                This application utilizes server-side **Gemini 3.5 Models** for complete voice processing and transcript summarization.
+                {t("本应用调用服务器端的大模型进行语音处理与大模型自动总结。", "This application utilizes server-side AI Models for complete voice processing and transcript summarization.")}
               </p>
               <p className="text-xs text-[#5d5a55] leading-relaxed mt-2 font-medium">
-                Your API key is kept strictly confidential on the secure container. Configure your credentials under the <b>Settings &gt; Secrets</b> panel in Google AI Studio to unlock live real-time analysis.
+                {t("您的 API 密钥在安全容器中受到严格保护。您可以通过配置大模型 API Key 来解锁实时的总结分析功能。", "Your API key is kept strictly confidential on the secure container. Configure your credentials under the settings to unlock live real-time analysis.")}
               </p>
             </div>
 
@@ -502,7 +574,7 @@ export default function SettingsView({
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18] font-display group-hover:text-[#f62440] transition-all">GitHub Repository</h4>
+                  <h4 className="font-bold text-sm text-[#1d1c18] font-display group-hover:text-[#f62440] transition-all">{t("GitHub 仓库", "GitHub Repository")}</h4>
                   <p className="text-[11px] text-[#5d5a55] font-semibold mt-0.5">quentin2001/whisperMe</p>
                 </div>
               </div>
@@ -511,7 +583,7 @@ export default function SettingsView({
                   v1.0.0
                 </span>
                 <span className="text-[10px] text-[#5d3f3e]/40 font-semibold group-hover:text-[#f62440]/80 transition-all flex items-center gap-0.5">
-                  Visit Project ↗
+                  {t("访问项目 ↗", "Visit Project ↗")}
                 </span>
               </div>
             </a>

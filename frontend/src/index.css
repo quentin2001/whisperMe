@@ -1,3 +1,5 @@
+@import url('https://npm.elemecdn.com/@font/font-smiley-sans/style.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,8 +8,11 @@
   body {
     background-color: #fef9f2;
     color: #1d1c18;
-    font-family: "Inter", "Geist", system-ui, sans-serif;
+    font-family: "smiley-sans", "Inter", "Geist", system-ui, sans-serif;
     overflow-x: hidden;
+  }
+  input:focus, textarea:focus {
+    border-color: #f62440 !important;
   }
 }
 
@@ -46,13 +51,36 @@
   border-width: 0px; /* Expands to full width */
 }
 
+/* Fix textarea scrollbar clipping rounded corners */
+textarea::-webkit-scrollbar-track {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+/* Custom premium grab handle for textarea resizer */
+textarea::-webkit-resizer {
+  background-color: transparent;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10"><line x1="10" y1="0" x2="0" y2="10" stroke="%23bf0029" stroke-width="1.5" opacity="0.3"/><line x1="10" y1="4" x2="4" y2="10" stroke="%23bf0029" stroke-width="1.5" opacity="0.3"/><line x1="10" y1="8" x2="8" y2="10" stroke="%23bf0029" stroke-width="1.5" opacity="0.3"/></svg>');
+  background-repeat: no-repeat;
+  background-position: bottom right;
+}
+
+/* Unified hover border effects for inputs and textareas */
+input:not([type="checkbox"]):not([type="radio"]):hover, textarea:hover, select:hover {
+  border-color: rgba(246, 36, 64, 0.5) !important;
+  transition: border-color 0.2s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus {
+  border-color: #f62440 !important;
+}
+
 /* Add support for font families matching the AIStudio Geist font families */
 .font-display {
-  font-family: "Geist", "Inter", system-ui, sans-serif;
+  font-family: "smiley-sans", "Geist", "Inter", system-ui, sans-serif;
 }
 
 .font-sans {
-  font-family: "Inter", "Geist", system-ui, sans-serif;
+  font-family: "smiley-sans", "Inter", "Geist", system-ui, sans-serif;
 }
 
 .font-mono {
