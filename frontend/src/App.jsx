@@ -420,6 +420,7 @@ export default function App() {
                 tasks={tasks}
                 logs={logs}
                 perfData={perfData}
+                onJumpToWorkstation={() => setActiveTab("workstation")}
                 onOpenSession={(task) => {
                   setActiveTaskId(task.id);
                   setActiveTab("detail");

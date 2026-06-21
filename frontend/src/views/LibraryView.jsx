@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, SlidersHorizontal, Mic, Square, Sparkles, Cloud, Play, 
-  Download, MoreVertical, LayoutGrid, List, BarChart3, Database, FileText
+  Download, MoreVertical, BarChart3, Database, FileText
 } from "lucide-react";
 
 export default function LibraryView({
@@ -11,7 +11,8 @@ export default function LibraryView({
   onAddNewSession,
   onAnalyzeLogs,
   onDeleteTask,
-  perfData
+  perfData,
+  onJumpToWorkstation
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -303,19 +304,11 @@ export default function LibraryView({
       <section className="mb-10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display">Recent Recordings</h3>
-          <div className="flex items-center gap-2">
-            <button className="p-1.5 rounded-md hover:bg-[#e6e2db]/50 text-[#5d3f3e]/60 cursor-pointer border-0 outline-none bg-transparent" onClick={() => alert("Layout preset matches image mockups list layout")}>
-              <LayoutGrid size={16} />
-            </button>
-            <button className="p-1.5 rounded-md bg-[#ffffff] border border-[#e7bcbb]/40 text-[#f62440] cursor-pointer outline-none">
-              <List size={16} />
-            </button>
-          </div>
         </div>
 
         {/* List Layout with Row blocks */}
         <div className="flex flex-col gap-3">
-          {filteredSessions.map((session) => {
+          {filteredSessions.slice(0, 5).map((session) => {
             const isSelected = false; // can be customized
             return (
               <div
@@ -423,13 +416,14 @@ export default function LibraryView({
           })}
         </div>
 
-        {/* Load More Archives dotted button */}
+        {/* View All in Workstation button */}
         <button
-          id="btn-load-more"
-          onClick={() => alert("All matching recordings are fully displayed.")}
-          className="w-full mt-4 py-3.5 bg-transparent border border-dashed border-[#e7bcbb] rounded-lg text-[#bf0029] hover:bg-[#ffdad6]/20 transition-all font-semibold text-center text-sm cursor-pointer outline-none"
+          id="btn-jump-to-workstation"
+          onClick={onJumpToWorkstation}
+          className="w-full mt-4 py-3 bg-transparent border border-dashed border-[#e7bcbb] hover:border-[#f62440] rounded-lg text-[#bf0029] hover:text-[#f62440] hover:bg-[#ffdad6]/10 transition-all font-semibold text-center text-sm cursor-pointer outline-none flex items-center justify-center gap-1.5"
         >
-          Load More Archives
+          <span>View All in Workstation</span>
+          <span className="text-xs">→</span>
         </button>
       </section>
 
