@@ -55,7 +55,7 @@ export default function WorkstationView({
         <div className="flex items-center gap-3">
           <button
             id="btn-station-filters"
-            onClick={() => alert("Adv. workstation filter parameters opened.")}
+            onClick={() => alert("功能待上线")}
             className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-[#e7bcbb]/40 text-sm text-[#5d3f3e] font-semibold rounded-lg hover:bg-[#f9f3ea]/40 transition-all shadow-xs cursor-pointer border-0 outline-none"
           >
             <SlidersHorizontal size={14} />

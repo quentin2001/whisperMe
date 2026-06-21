@@ -179,14 +179,16 @@ export default function LibraryView({
               placeholder="Search sessions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2.5 bg-white border border-[#e7bcbb]/40 rounded-lg text-sm w-64 text-[#1d1c18] placeholder-[#5d3f3e]/40 focus:outline-none focus:ring-1 focus:ring-[#f62440] focus:border-[#f62440]"
+              onClick={() => alert("功能待上线")}
+              readOnly
+              className="pl-10 pr-4 py-2.5 bg-white border border-[#e7bcbb]/40 rounded-lg text-sm w-64 text-[#1d1c18] placeholder-[#5d3f3e]/40 focus:outline-none focus:ring-1 focus:ring-[#f62440] focus:border-[#f62440] cursor-pointer"
             />
           </div>
 
           <button
             id="btn-all-time-filter"
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#f2ede6] text-sm text-[#1d1c18] font-bold rounded-lg border border-[#e7bcbb]/30 hover:bg-[#e6e2db] transition-all cursor-pointer border-0 outline-none"
-            onClick={() => alert("Sorting/Filter tools configured for All Time archives.")}
+            onClick={() => alert("功能待上线")}
           >
             <span>All Time</span>
           </button>
@@ -194,7 +196,7 @@ export default function LibraryView({
           <button
             id="btn-all-speakers-filter"
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#f2ede6] text-sm text-[#1d1c18] font-bold rounded-lg border border-[#e7bcbb]/30 hover:bg-[#e6e2db] transition-all cursor-pointer border-0 outline-none"
-            onClick={() => alert("Currently viewing all speaker profiles.")}
+            onClick={() => alert("功能待上线")}
           >
             <span>All Speakers</span>
           </button>
@@ -231,7 +233,7 @@ export default function LibraryView({
             {!isRecording ? (
               <button
                 id="btn-start-recording-inner"
-                onClick={startRecording}
+                onClick={() => alert("功能待上线")}
                 className="bg-[#f62440] hover:bg-[#bb0028] text-white font-semibold px-6 py-3 rounded-lg flex items-center gap-2.5 transition-all shadow-sm active:scale-98 cursor-pointer border-0 outline-none"
               >
                 <Mic size={18} />
@@ -283,7 +285,7 @@ export default function LibraryView({
 
           {/* Sync Status Card */}
           <div 
-            onClick={handleSyncClick}
+            onClick={() => alert("功能待上线")}
             className="bg-[#ffdad6]/20 hover:bg-[#ffdad6]/35 transition-all text-[#bf0029] border border-[#ffb4a8] rounded-xl p-4 flex items-center justify-between cursor-pointer"
           >
             <div className="flex flex-col">
@@ -470,7 +472,7 @@ export default function LibraryView({
 
           <div
             id="btn-analyze-logs"
-            onClick={onAnalyzeLogs}
+            onClick={() => alert("功能待上线")}
             className="bg-[#f9f3ea] hover:bg-[#f2ede6] cursor-pointer border border-[#e7bcbb]/60 border-dashed rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all group"
           >
             <div className="w-10 h-10 bg-[#f62440]/10 text-[#f62440] group-hover:scale-105 transition-all rounded-full flex items-center justify-center">
