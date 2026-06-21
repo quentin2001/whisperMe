@@ -5,7 +5,12 @@ export default function SettingsView({
   configData,
   handleConfigChange,
   handleSaveConfig,
-  onResetData
+  onResetData,
+  promptData,
+  setPromptData,
+  promptSaveStatus,
+  handleSavePrompt,
+  handleResetPrompt
 }) {
   const [language, setLanguage] = useState("zh-CN");
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -187,6 +192,82 @@ export default function SettingsView({
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Card: LLM Prompt Template Settings */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
+              <div className="flex items-center justify-between pb-4 border-b border-[#e7bcbb]/20">
+                <div className="flex items-center gap-2">
+                  <Terminal size={18} className="text-[#bf0029]" />
+                  <h3 className="text-lg font-bold text-[#1d1c18]">总结 Prompt 模板</h3>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetPrompt}
+                    className="px-3 py-1.5 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none"
+                  >
+                    ↩️ 恢复默认
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePrompt}
+                    disabled={promptSaveStatus === "saving"}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none ${
+                      promptSaveStatus === "saved"
+                        ? "bg-[#d1e7dd] text-[#0f5132]"
+                        : promptSaveStatus === "error"
+                        ? "bg-[#f8d7da] text-[#842029]"
+                        : "bg-[#f62440] hover:bg-[#bb0028] text-white"
+                    }`}
+                  >
+                    {promptSaveStatus === "saving" ? "⏳ 保存中..." : promptSaveStatus === "saved" ? "✅ 已保存" : promptSaveStatus === "error" ? "❌ 保存失败" : "💾 保存 Prompt"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Base Prompt */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">
+                  🔒 防幻觉守则 / 基础指令 (Base Prompt)
+                </label>
+                <p className="text-xs text-[#5d5a55]/80 font-medium">
+                  注入给大模型的核心行为准则（防止脑补/幻觉）。数据块（转录文本、评论等）会自动注入在本段与 Action Prompt 之间。
+                </p>
+                <textarea
+                  value={promptData?.base_prompt || ""}
+                  onChange={(e) => setPromptData(prev => ({ ...prev, base_prompt: e.target.value }))}
+                  rows={8}
+                  className="w-full bg-white border border-[#e7bcbb]/40 rounded-lg p-3 text-sm font-mono text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] resize-y min-h-[160px]"
+                  placeholder="输入基础 Prompt（角色定义、防幻觉规则等）..."
+                />
+              </div>
+
+              {/* Action Prompt */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">
+                  📋 输出格式指令 (Action Prompt)
+                </label>
+                <p className="text-xs text-[#5d5a55]/80 font-medium">
+                  定义总结报告的具体输出章节与格式（章节结构、评级维度等）。这部分出现在数据块之后。
+                </p>
+                <textarea
+                  value={promptData?.action_prompt || ""}
+                  onChange={(e) => setPromptData(prev => ({ ...prev, action_prompt: e.target.value }))}
+                  rows={10}
+                  className="w-full bg-white border border-[#e7bcbb]/40 rounded-lg p-3 text-sm font-mono text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] resize-y min-h-[220px]"
+                  placeholder="输入输出格式 Prompt（要求的章节、格式、评级等）..."
+                />
+              </div>
+
+              {/* Layout schema visual helper */}
+              <div className="p-3.5 bg-[#f9f3ea]/50 border border-[#e7bcbb]/30 rounded-lg text-xs text-[#5d3f3e] leading-relaxed">
+                💡 <b>最终 Prompt 拼接顺序：</b>
+                <code className="block mt-1 font-mono text-[11px] text-[#bf0029] select-all">
+                  [Base Prompt] → [播客元数据 + 评论 + 转录文本（自动注入）] → [Action Prompt]
+                </code>
+              </div>
             </div>
 
             {/* Card 3: System Notifications */}
