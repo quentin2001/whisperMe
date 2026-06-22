@@ -658,6 +658,10 @@ export default function PodcastDetailView({
     };
   });
 
+  const displayTitle = activeTask.title || "Untitled Session";
+  const displayStatus = activeTask.status === "completed" ? "Completed" : "In Progress";
+  const commentsList = activeTask.metadata?.comments || [];
+
   return (
     <div id="session-detail-view" ref={containerRef} className="flex-1 flex flex-col h-screen font-sans bg-[#fef9f2] relative">
       
