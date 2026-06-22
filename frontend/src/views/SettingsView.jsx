@@ -70,7 +70,9 @@ export default function SettingsView({
   setPromptData,
   promptSaveStatus,
   handleSavePrompt,
-  handleResetPrompt
+  handleResetPrompt,
+  onCheckVersion,
+  checkingVersion
 }) {
   const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -616,9 +618,26 @@ export default function SettingsView({
                     : `v${versionInfo?.current_version || "1.0.0"}`
                   }
                 </span>
-                <span className="text-[10px] text-[#5d3f3e]/40 font-semibold group-hover:text-[#f62440]/80 transition-all flex items-center gap-0.5">
-                  {versionInfo?.has_update ? t("查看更新说明 ↗", "Changelog ↗") : t("访问项目 ↗", "Visit Project ↗")}
-                </span>
+                
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onCheckVersion(true); // 传入 true 代表强制跳过缓存，向 GitHub 重新请求
+                  }}
+                  className="text-[10px] text-[#bf0029] hover:underline bg-transparent border-0 cursor-pointer font-bold mt-1 flex items-center gap-1 select-none outline-none"
+                  disabled={checkingVersion}
+                >
+                  {checkingVersion ? (
+                    <>
+                      <Loader2 size={10} className="animate-spin text-[#bf0029]" />
+                      <span>{t("检查中...", "Checking...")}</span>
+                    </>
+                  ) : (
+                    <span>{t("检查更新", "Check Updates")}</span>
+                  )}
+                </button>
               </div>
             </a>
           </div>

@@ -93,17 +93,38 @@ export default function App() {
   const audioPlayerRef = useRef(null);
   const activeTaskRef = useRef(null);
 
-  const fetchVersion = async () => {
+  const [checkingVersion, setCheckingVersion] = useState(false);
+  const fetchVersion = async (force = false) => {
+    setCheckingVersion(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/version/check`);
+      const url = `${BACKEND_URL}/api/version/check` + (force ? "?force=true" : "");
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         if (data && data.current_version) {
           setVersionInfo(data);
+          if (force) {
+            if (data.has_update) {
+              alert(t(
+                `发现新版本 v${data.latest_version}！已为您在设置页面顶部载入更新日志。`,
+                `New version v${data.latest_version} found! Changelog has been loaded at the top of Settings.`
+              ));
+            } else {
+              alert(t("当前已是最新版本！", "You are already on the latest version!"));
+            }
+          }
         }
       }
     } catch (e) {
       console.error("无法获取软件版本信息:", e);
+      if (force) {
+        alert(t(
+          "检测更新失败，请稍后重试（可能触发了 GitHub API 速率限制）。",
+          "Failed to check updates, please try again later (GitHub API rate limit might be exceeded)."
+        ));
+      }
+    } finally {
+      setCheckingVersion(false);
     }
   };
 
@@ -510,6 +531,8 @@ export default function App() {
                 promptSaveStatus={promptSaveStatus}
                 handleSavePrompt={handleSavePrompt}
                 handleResetPrompt={handleResetPrompt}
+                onCheckVersion={fetchVersion}
+                checkingVersion={checkingVersion}
                 t={t}
               />
             )}
