@@ -345,3 +345,7 @@ def extract_speakers(summary_md, next_kws):
     host = re.sub(r'^[\-\*\s]+', '', host).strip()
     guest = re.sub(r'^[\-\*\s]+', '', guest).strip()
     return host, guest
+
+# 全局单例，方便热更新和导入
+notifier = PodcastNotifier()
+

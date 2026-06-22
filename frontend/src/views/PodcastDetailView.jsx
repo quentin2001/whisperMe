@@ -650,11 +650,11 @@ export default function PodcastDetailView({
     return {
       id: p.id || `p-${idx}`,
       speaker: displaySpeaker,
-      timeStart: formatTime(p.start),
-      timeEnd: formatTime(p.end),
-      text: p.text,
-      start_time: p.start,
-      end_time: p.end
+      timeStart: formatTime(p.start_time),
+      timeEnd: formatTime(p.end_time),
+      text: p.content || "",
+      start_time: p.start_time,
+      end_time: p.end_time
     };
   });
 
