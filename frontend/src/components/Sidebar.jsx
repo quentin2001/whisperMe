@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Library, Sliders, Settings, Cpu } from "lucide-react";
+import { Library, Sliders, Settings, Cpu, Bell } from "lucide-react";
 
 export default function Sidebar({
   currentTab,
@@ -8,6 +8,7 @@ export default function Sidebar({
   onShowLogsTrigger,
   perfData,
   versionInfo,
+  isConfigInvalid,
   t
 }) {
   // Live simulated system stats that fluctuate slightly to feel alive and realistic!
@@ -109,6 +110,9 @@ export default function Sidebar({
             <div className="flex items-center gap-3">
               <Settings size={18} className="text-[#bf0029]" />
               <span className="text-[15px]">{t("系统设置", "Settings")}</span>
+              {isConfigInvalid && (
+                <Bell size={14} className="text-[#f62440] animate-bell-shake fill-[#f62440]" />
+              )}
             </div>
             {versionInfo?.has_update && (
               <span className="w-2.5 h-2.5 rounded-full bg-[#f62440] border border-white animate-pulse" />

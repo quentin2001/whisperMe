@@ -401,6 +401,24 @@ export default function App() {
     setLogs(updatedLogs);
   };
 
+  const isConfigInvalid = () => {
+    if (!configData) return true;
+    if (!configData.ffmpeg_path || !configData.ffmpeg_bin_dir) return true;
+    
+    if (configData.asr_mode === "local") {
+      if (!configData.local_whisper_model_path || !configData.hf_token) return true;
+    } else if (configData.asr_mode === "online") {
+      if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return true;
+    }
+    
+    if (configData.summary_mode === "local") {
+      if (!configData.ollama_url || !configData.ollama_model) return true;
+    } else if (configData.summary_mode === "online") {
+      if (!configData.online_summary_base_url || !configData.online_summary_model || !configData.online_summary_api_key) return true;
+    }
+    return false;
+  };
+
   const handleResetData = () => {
     localStorage.removeItem("whisperme_logs");
     setLogs(initialLogs);
@@ -414,6 +432,7 @@ export default function App() {
       {/* Persistent Left Menu Sidebar */}
       <Sidebar
         versionInfo={versionInfo}
+        isConfigInvalid={isConfigInvalid()}
         currentTab={
           activeTab === "dashboard"
             ? "library"

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe } from "lucide-react";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,38 +22,28 @@ function SettingsDropdown({ value, options, onChange }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between bg-white border p-2.5 rounded-lg text-sm font-semibold text-[#1d1c18] transition-all text-left outline-none cursor-pointer ${
-          isOpen 
-            ? "border-[#f62440] ring-1 ring-[#f62440]" 
-            : "border-[#e7bcbb]/40 hover:border-[#f62440]/50"
-        }`}
+        className="w-full bg-[#fef9f2]/40 hover:bg-[#fef9f2]/80 border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] flex justify-between items-center transition-colors text-left"
       >
-        <span className="truncate">{selectedOption.label}</span>
-        <ChevronDown size={16} className={`text-[#5d3f3e]/60 transition-transform duration-200 ${isOpen ? "rotate-180 text-[#f62440]" : ""}`} />
+        <span>{selectedOption?.label}</span>
+        <ChevronDown size={16} className={`text-[#5d3f3e]/60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-
+      
       {isOpen && (
-        <div className="absolute left-0 mt-1 w-full bg-white border border-[#e7bcbb]/40 rounded-lg shadow-lg z-50 py-0 overflow-hidden animate-fade-in">
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer border-0 outline-none block ${
-                  active 
-                    ? "bg-[#f62440] text-white" 
-                    : "text-[#5d3f3e] bg-transparent hover:bg-[#ffdad6]/40 hover:text-[#f62440]"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+        <div className="absolute z-50 w-full mt-1.5 bg-white border border-[#e7bcbb]/40 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-fade-in">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-sm text-[#1d1c18] hover:bg-[#f2ede6] transition-colors flex items-center justify-between text-left font-semibold cursor-pointer border-0 bg-transparent"
+            >
+              <span>{option.label}</span>
+              {option.value === value && <Check size={14} className="text-[#bf0029]" />}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -76,6 +66,18 @@ export default function SettingsView({
 }) {
   const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [isFlashing, setIsFlashing] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsFlashing(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const getHighlightClass = (val) => {
+    return isFlashing && (!val || String(val).trim() === "") ? "highlight-flash" : "";
+  };
 
   return (
     <div id="settings-view-section" className="flex-1 overflow-y-auto w-full">
@@ -145,7 +147,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.local_whisper_model_path || ""}
                       onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.local_whisper_model_path)}`}
                       placeholder="/path/to/whisper/models/large-v3.bin"
                     />
                   </div>
@@ -155,7 +157,7 @@ export default function SettingsView({
                       type="password"
                       value={configData.hf_token || ""}
                       onChange={(e) => handleConfigChange("hf_token", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.hf_token)}`}
                       placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
                   </div>
@@ -171,7 +173,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.online_base_url || ""}
                       onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_base_url)}`}
                       placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1", "Example: https://token-plan-sgp.xiaomimimo.com/v1 or https://api.openai.com/v1")}</span>
@@ -182,7 +184,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.online_model || ""}
                       onChange={(e) => handleConfigChange("online_model", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_model)}`}
                       placeholder="mimo-v2.5-asr"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：mimo-v2.5-asr 或 whisper-1", "Example: mimo-v2.5-asr or whisper-1")}</span>
@@ -193,7 +195,7 @@ export default function SettingsView({
                       type="password"
                       value={configData.online_api_key || ""}
                       onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key you requested from your ASR service provider")}</span>
@@ -231,7 +233,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.ollama_url || ""}
                       onChange={(e) => handleConfigChange("ollama_url", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ollama_url)}`}
                       placeholder="http://localhost:11434"
                     />
                   </div>
@@ -241,7 +243,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.ollama_model || ""}
                       onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ollama_model)}`}
                       placeholder="qwen2.5:7b-instruct"
                     />
                   </div>
@@ -257,7 +259,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.online_summary_base_url || ""}
                       onChange={(e) => handleConfigChange("online_summary_base_url", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_summary_base_url)}`}
                       placeholder="https://api.openai.com/v1"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
@@ -268,7 +270,7 @@ export default function SettingsView({
                       type="text"
                       value={configData.online_summary_model || ""}
                       onChange={(e) => handleConfigChange("online_summary_model", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_summary_model)}`}
                       placeholder="gpt-4o-mini"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
@@ -279,7 +281,7 @@ export default function SettingsView({
                       type="password"
                       value={configData.online_summary_api_key || ""}
                       onChange={(e) => handleConfigChange("online_summary_api_key", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_summary_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     />
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
@@ -488,12 +490,12 @@ export default function SettingsView({
 
               {/* FFmpeg Executable Path */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg 执行文件路径", "FFmpeg Executable Path")}</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg 执行文件路径", "FFmpeg Executable Path")}<span className="text-[#f62440] ml-1">*</span></label>
                 <input
                   type="text"
                   value={configData.ffmpeg_path || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)}
-                  className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                  className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ffmpeg_path)}`}
                   placeholder={t("C:\\ffmpeg\\bin\\ffmpeg.exe 或 /opt/homebrew/bin/ffmpeg", "C:\\ffmpeg\\bin\\ffmpeg.exe or /opt/homebrew/bin/ffmpeg")}
                 />
                 <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin\\ffmpeg.exe，Mac 示例：/opt/homebrew/bin/ffmpeg", "Example for Windows: C:\\ffmpeg\\bin\\ffmpeg.exe, for Mac: /opt/homebrew/bin/ffmpeg")}</span>
@@ -501,28 +503,15 @@ export default function SettingsView({
 
               {/* FFmpeg Bin Directory */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg Bin 目录", "FFmpeg Bin Directory")}</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg Bin 目录", "FFmpeg Bin Directory")}<span className="text-[#f62440] ml-1">*</span></label>
                 <input
                   type="text"
                   value={configData.ffmpeg_bin_dir || ""}
                   onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)}
-                  className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+                  className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ffmpeg_bin_dir)}`}
                   placeholder={t("C:\\ffmpeg\\bin 或 /opt/homebrew/bin", "C:\\ffmpeg\\bin or /opt/homebrew/bin")}
                 />
                 <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin，Mac 示例：/opt/homebrew/bin", "Example for Windows: C:\\ffmpeg\\bin, for Mac: /opt/homebrew/bin")}</span>
-              </div>
-
-              {/* Language Preference */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("语言首选项", "Language Preference")}</label>
-                <SettingsDropdown
-                  value={configData.language || "en"}
-                  onChange={(val) => handleConfigChange("language", val)}
-                  options={[
-                    { value: "zh-CN", label: t("简体中文 (ZH-CN)", "CHINESE (ZH-CN)") },
-                    { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
-                  ]}
-                />
               </div>
 
               {/* Auto Save Toggle */}
@@ -551,6 +540,26 @@ export default function SettingsView({
 
           {/* Right Column: Database details */}
           <div className="flex flex-col gap-6">
+            {/* Language Preference Card */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 text-[#bf0029]">
+                <Globe size={16} />
+                <h3 className="font-bold text-sm text-[#1d1c18]">{t("系统语言设置", "System Language Preference")}</h3>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("语言选择", "Select Language")}</label>
+                <SettingsDropdown
+                  value={configData.language || "en"}
+                  onChange={(val) => handleConfigChange("language", val)}
+                  options={[
+                    { value: "zh-CN", label: t("简体中文 (ZH-CN)", "CHINESE (ZH-CN)") },
+                    { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
+                  ]}
+                />
+              </div>
+            </div>
+
             {/* Storage Cache Panel */}
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
               <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">

@@ -102,3 +102,35 @@ input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:f
   transform-origin: center;
 }
 
+/* Bell shaking animation */
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0); }
+  10%, 90% { transform: rotate(10deg); }
+  20%, 80% { transform: rotate(-10deg); }
+  30%, 50%, 70% { transform: rotate(14deg); }
+  40%, 60% { transform: rotate(-14deg); }
+}
+
+.animate-bell-shake {
+  animation: bellShake 1.4s ease-in-out infinite;
+  transform-origin: top center;
+  display: inline-block;
+}
+
+/* Required fields flash animation */
+@keyframes requiredHighlight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(246, 36, 64, 0);
+    border-color: rgba(231, 188, 187, 0.4);
+  }
+  25%, 75% {
+    box-shadow: 0 0 0 4px rgba(246, 36, 64, 0.35);
+    border-color: #f62440;
+    background-color: rgba(246, 36, 64, 0.03);
+  }
+}
+
+.highlight-flash {
+  animation: requiredHighlight 1.5s ease-in-out 2;
+}
+
