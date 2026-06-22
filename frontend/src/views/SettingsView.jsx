@@ -140,7 +140,7 @@ export default function SettingsView({
               {configData.asr_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 Whisper 模型路径", "Local Model Path")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.local_whisper_model_path || ""}
@@ -150,7 +150,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("HF Token (人声分割分段)", "HF Token (Diarization)")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("HF Token (人声分割分段)", "HF Token (Diarization)")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="password"
                       value={configData.hf_token || ""}
@@ -166,7 +166,7 @@ export default function SettingsView({
               {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 接口基础地址", "API Base URL")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 接口基础地址", "API Base URL")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.online_base_url || ""}
@@ -177,7 +177,7 @@ export default function SettingsView({
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1", "Example: https://token-plan-sgp.xiaomimimo.com/v1 or https://api.openai.com/v1")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型标识符 (Model ID)", "Model ID")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型标识符 (Model ID)", "Model ID")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.online_model || ""}
@@ -188,7 +188,7 @@ export default function SettingsView({
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：mimo-v2.5-asr 或 whisper-1", "Example: mimo-v2.5-asr or whisper-1")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 密钥 (API Key)", "API Key")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 密钥 (API Key)", "API Key")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="password"
                       value={configData.online_api_key || ""}
@@ -226,7 +226,7 @@ export default function SettingsView({
               {configData.summary_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 API 接口地址", "Local API URL")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("本地 API 接口地址", "Local API URL")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.ollama_url || ""}
@@ -236,7 +236,7 @@ export default function SettingsView({
                     />
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型 ID", "Model ID")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型 ID", "Model ID")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.ollama_model || ""}
@@ -252,7 +252,7 @@ export default function SettingsView({
               {configData.summary_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线 API 基础地址", "Online API Base URL")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线 API 基础地址", "Online API Base URL")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.online_summary_base_url || ""}
@@ -263,7 +263,7 @@ export default function SettingsView({
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线大模型 ID", "Online Model ID")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("在线大模型 ID", "Online Model ID")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="text"
                       value={configData.online_summary_model || ""}
@@ -274,7 +274,7 @@ export default function SettingsView({
                     <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API Key", "API Key")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API Key", "API Key")}<span className="text-[#f62440] ml-1">*</span></label>
                     <input
                       type="password"
                       value={configData.online_summary_api_key || ""}
