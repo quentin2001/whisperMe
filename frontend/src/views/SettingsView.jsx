@@ -61,6 +61,7 @@ function SettingsDropdown({ value, options, onChange }) {
 }
 
 export default function SettingsView({
+  versionInfo,
   configData,
   handleConfigChange,
   handleSaveConfig,
@@ -81,6 +82,32 @@ export default function SettingsView({
           <h2 className="text-4xl font-extrabold tracking-tight text-[#1d1c18] font-display">{t("设置", "Settings")}</h2>
           <p className="text-sm text-[#5d5a55]/80 mt-1 font-medium">{t("精细化配置音频处理阈值及神经网络转录引擎大模型参数。", "Fine-tune acoustic processing thresholds and neural transcription engine models.")}</p>
         </div>
+
+        {versionInfo?.has_update && (
+          <div className="mb-6 p-4 bg-[#ffdad6]/40 border border-[#ffb4a8]/50 rounded-xl flex items-start gap-3 animate-fade-in">
+            <ShieldAlert size={18} className="text-[#bf0029] mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-bold text-sm text-[#1d1c18] flex items-center gap-2">
+                {t("发现新版本 whisperMe 可用！", "A new version of whisperMe is available!")}
+                <span className="text-[10px] bg-[#f62440] text-white px-2 py-0.5 rounded-full font-mono uppercase font-extrabold tracking-wider animate-pulse">
+                  v{versionInfo.latest_version}
+                </span>
+              </h4>
+              <p className="text-xs text-[#5d5a55] mt-1 font-semibold leading-relaxed">
+                {t("您当前正在使用", "You are running")} <span className="font-mono font-bold">v{versionInfo.current_version}</span>。
+                {versionInfo.release_notes ? `${t("更新内容：", "What's new: ")} ${versionInfo.release_notes}` : t("推荐您立即升级以获得最新特性和 Bug 修复。", "We recommend upgrading to enjoy new features and bug fixes.")}
+              </p>
+              <a 
+                href={versionInfo.release_url} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-[#bf0029] hover:underline"
+              >
+                {t("前往 GitHub 下载与升级 ↗", "Upgrade on GitHub ↗")}
+              </a>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
@@ -563,7 +590,7 @@ export default function SettingsView({
 
             {/* GitHub Repo & Version Info */}
             <a
-              href="https://github.com/quentin2001/whisperMe"
+              href={versionInfo?.has_update ? versionInfo.release_url : "https://github.com/quentin2001/whisperMe"}
               target="_blank"
               rel="noopener noreferrer"
               style={{ textDecoration: 'none' }}
@@ -579,11 +606,18 @@ export default function SettingsView({
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <span className="bg-[#ffdad6]/40 text-[#b81a1a] text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border border-[#ffb4a8]/30 font-mono">
-                  v1.0.0
+                <span className={`text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border font-mono ${
+                  versionInfo?.has_update 
+                    ? "bg-[#ffdad6] text-[#b81a1a] border-[#ffb4a8] animate-pulse" 
+                    : "bg-[#f2ede6]/60 text-[#5d5a55] border-[#e7bcbb]/30"
+                }`}>
+                  {versionInfo?.has_update 
+                    ? `${t("有新版本", "UPDATE")} v${versionInfo.latest_version}` 
+                    : `v${versionInfo?.current_version || "1.0.0"}`
+                  }
                 </span>
                 <span className="text-[10px] text-[#5d3f3e]/40 font-semibold group-hover:text-[#f62440]/80 transition-all flex items-center gap-0.5">
-                  {t("访问项目 ↗", "Visit Project ↗")}
+                  {versionInfo?.has_update ? t("查看更新说明 ↗", "Changelog ↗") : t("访问项目 ↗", "Visit Project ↗")}
                 </span>
               </div>
             </a>

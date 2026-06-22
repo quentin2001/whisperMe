@@ -30,6 +30,13 @@ export default function App() {
   const [volume, setVolume] = useState(0.8);
 
   const [perfData, setPerfData] = useState(null);
+  const [versionInfo, setVersionInfo] = useState({
+    current_version: "1.0.0",
+    latest_version: "1.0.0",
+    has_update: false,
+    release_url: "https://github.com/quentin2001/whisperMe/releases",
+    release_notes: ""
+  });
 
   const [configData, setConfigData] = useState({
     ffmpeg_path: "",
@@ -85,6 +92,20 @@ export default function App() {
   const fileInputRef = useRef(null);
   const audioPlayerRef = useRef(null);
   const activeTaskRef = useRef(null);
+
+  const fetchVersion = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/version/check`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.current_version) {
+          setVersionInfo(data);
+        }
+      }
+    } catch (e) {
+      console.error("无法获取软件版本信息:", e);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
@@ -214,6 +235,7 @@ export default function App() {
   useEffect(() => {
     fetchTasks();
     fetchConfig();
+    fetchVersion();
     fetchPrompt();
     fetchPerformance();
     const interval = setInterval(fetchTasks, 4000);
@@ -370,6 +392,7 @@ export default function App() {
     <div id="application-layout-frame" className="flex h-screen w-screen overflow-hidden bg-[#fef9f2]">
       {/* Persistent Left Menu Sidebar */}
       <Sidebar
+        versionInfo={versionInfo}
         currentTab={
           activeTab === "dashboard"
             ? "library"
@@ -477,6 +500,7 @@ export default function App() {
 
             {activeTab === "config" && (
               <SettingsView 
+                versionInfo={versionInfo}
                 configData={configData}
                 handleConfigChange={handleConfigChange}
                 handleSaveConfig={handleSaveConfig}

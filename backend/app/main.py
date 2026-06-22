@@ -10,7 +10,8 @@ from app.config import (
     config, 
     save_config, 
     SHORT_DOWNLOADS_DIR, 
-    SHORT_TRANSCRIPTS_DIR
+    SHORT_TRANSCRIPTS_DIR,
+    CURRENT_VERSION
 )
 from app.database import db
 from app.core.downloader import PodcastDownloader
@@ -19,7 +20,7 @@ from app.core.summarizer import PodcastSummarizer
 from app.core.notifier import PodcastNotifier
 from app.core.queue_manager import queue_manager
 from app.core.prompt_manager import load_prompt, save_prompt
-app = FastAPI(title="whisperMe Local Podcast Processor", version="1.0.0")
+app = FastAPI(title="whisperMe Local Podcast Processor", version=CURRENT_VERSION)
 
 # 配置 CORS 跨域请求（前端 Vite 运行在 5173，后端运行在 8000）
 app.add_middleware(
@@ -1322,6 +1323,95 @@ def refresh_metadata(task_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"刷新元数据失败: {str(e)}")
+
+import urllib.request
+import json
+import time
+from threading import Thread
+
+# 内存级版本缓存，防 GitHub API 频限与加载延迟
+VERSION_CHECK_CACHE = {
+    "last_checked": 0.0,
+    "latest_version": None,
+    "has_update": False,
+    "release_url": "https://github.com/quentin2001/whisperMe/releases",
+    "release_notes": ""
+}
+
+def parse_version_tuple(v_str: str) -> list:
+    try:
+        # 去掉 'v' 前缀并分割
+        cleaned = v_str.strip().lower().lstrip('v').split('-')[0]
+        return [int(p) for p in cleaned.split('.') if p.isdigit()]
+    except Exception:
+        return [0, 0, 0]
+
+def fetch_latest_release_worker():
+    global VERSION_CHECK_CACHE
+    try:
+        url = "https://api.github.com/repos/quentin2001/whisperMe/releases/latest"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "whisperMe-Updater-FastAPI"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                tag_name = data.get("tag_name", "").strip()
+                html_url = data.get("html_url", "https://github.com/quentin2001/whisperMe/releases")
+                body = data.get("body", "")
+                
+                if tag_name:
+                    local_t = parse_version_tuple(CURRENT_VERSION)
+                    remote_t = parse_version_tuple(tag_name)
+                    has_update = remote_t > local_t
+                    
+                    VERSION_CHECK_CACHE.update({
+                        "latest_version": tag_name,
+                        "has_update": has_update,
+                        "release_url": html_url,
+                        "release_notes": body,
+                        "last_checked": time.time()
+                    })
+                    return
+    except Exception as e:
+        # 网络超时、未发布 Release (404) 等情况，执行优雅降级，静默失败
+        print(f"[Version Check] Graceful fallback. Error fetching from GitHub: {str(e)}")
+        
+    # 发生异常或没有 Release 时，将最新版本等同于本地版本，避免报错
+    VERSION_CHECK_CACHE.update({
+        "latest_version": CURRENT_VERSION,
+        "has_update": False,
+        "last_checked": time.time() # 记录时间避免短时间内重复尝试
+    })
+
+def trigger_version_check():
+    thread = Thread(target=fetch_latest_release_worker)
+    thread.daemon = True
+    thread.start()
+
+@app.get("/api/version/check")
+def check_software_version():
+    global VERSION_CHECK_CACHE
+    # 缓存过期判定：未检查过，或者距离上次检查超过 12 小时 (43200 秒)
+    if VERSION_CHECK_CACHE["latest_version"] is None or (time.time() - VERSION_CHECK_CACHE["last_checked"] > 43200):
+        trigger_version_check()
+        
+        # 如果是初次加载，主线程稍作阻塞等待 (最多 1.5 秒)，让前端首屏能拿到真实数据
+        if VERSION_CHECK_CACHE["latest_version"] is None:
+            wait_start = time.time()
+            while time.time() - wait_start < 1.5:
+                if VERSION_CHECK_CACHE["latest_version"] is not None:
+                    break
+                time.sleep(0.05)
+                
+    return {
+        "current_version": CURRENT_VERSION,
+        "latest_version": VERSION_CHECK_CACHE["latest_version"] or CURRENT_VERSION,
+        "has_update": VERSION_CHECK_CACHE["has_update"],
+        "release_url": VERSION_CHECK_CACHE["release_url"],
+        "release_notes": VERSION_CHECK_CACHE["release_notes"]
+    }
 
 @app.get("/api/config")
 def get_global_config():

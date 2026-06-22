@@ -199,3 +199,7 @@ SHORT_LOCAL_WHISPER_MODEL_PATH = get_short_path_name(LOCAL_WHISPER_MODEL_PATH)
 SHORT_DOWNLOADS_DIR = get_short_path_name(DOWNLOADS_DIR)
 SHORT_TRANSCRIPTS_DIR = get_short_path_name(TRANSCRIPTS_DIR)
 STORAGE_BASE = storage_base
+
+# ==================== 📦 软件版本定义 ====================
+CURRENT_VERSION = "1.0.0"
+

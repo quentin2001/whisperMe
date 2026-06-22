@@ -7,6 +7,7 @@ export default function Sidebar({
   onNewSessionTrigger,
   onShowLogsTrigger,
   perfData,
+  versionInfo,
   t
 }) {
   // Live simulated system stats that fluctuate slightly to feel alive and realistic!
@@ -52,10 +53,17 @@ export default function Sidebar({
                 </linearGradient>
               </defs>
               <path d="M 25 135 C 35 135, 40 65, 50 65 C 60 65, 65 135, 75 135 C 85 135, 90 80, 100 80 C 110 80, 115 135, 125 135 C 135 135, 140 65, 150 65 C 160 65, 165 135, 175 135" 
-                    fill="none" stroke="url(#wmGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
+                     fill="none" stroke="url(#wmGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display">whisperMe</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-[#1d1c18] font-display">whisperMe</h1>
+            {versionInfo?.has_update && (
+              <span className="text-[9px] font-extrabold bg-[#f62440] text-white px-1.5 py-0.5 rounded-full select-none tracking-normal leading-none animate-pulse">
+                NEW
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Top Divider */}
@@ -92,14 +100,19 @@ export default function Sidebar({
           <button
             id="tab-btn-settings"
             onClick={() => onTabChange("settings")}
-            className={`w-full py-2.5 px-3.5 rounded-lg flex items-center gap-3 font-semibold transition-all cursor-pointer border-0 outline-none text-left ${
+            className={`w-full py-2.5 px-3.5 rounded-lg flex items-center justify-between font-semibold transition-all cursor-pointer border-0 outline-none text-left ${
               currentTab === "settings"
                 ? "bg-[#f2ede6] text-[#1d1c18]"
                 : "text-[#5d3f3e]/70 hover:bg-[#f2ede6]/50 hover:text-[#1d1c18] bg-transparent"
             }`}
           >
-            <Settings size={18} className="text-[#bf0029]" />
-            <span className="text-[15px]">{t("系统设置", "Settings")}</span>
+            <div className="flex items-center gap-3">
+              <Settings size={18} className="text-[#bf0029]" />
+              <span className="text-[15px]">{t("系统设置", "Settings")}</span>
+            </div>
+            {versionInfo?.has_update && (
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f62440] border border-white animate-pulse" />
+            )}
           </button>
         </nav>
       </div>
