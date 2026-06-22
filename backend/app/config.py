@@ -68,7 +68,9 @@ def load_config():
         "enable_llm_semantic_sewing": False,
         "webhook_url": "",
         "custom_storage_dir": "",
-        "language": "en"
+        "language": "en",
+        "enable_auto_cleanup": False,
+        "cleanup_threshold_days": 30
     }
 
     if not CONFIG_FILE_PATH.exists():

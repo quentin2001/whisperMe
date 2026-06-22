@@ -183,11 +183,99 @@ def background_perf_monitor():
         # 睡眠 4 秒后继续下一次抓取，完全独立于接口请求频率
         time.sleep(4)
 
+def run_auto_cleanup():
+    from datetime import datetime
+    import os
+    from app.config import load_config
+    
+    current_cfg = load_config()
+    if not current_cfg.get("enable_auto_cleanup", False):
+        return
+        
+    threshold_days = int(current_cfg.get("cleanup_threshold_days", 30))
+    print(f"🧹 [Auto Cleanup] Starting audio file check. Threshold: {threshold_days} days.")
+    
+    try:
+        all_tasks = db.get_all_tasks()
+        now = datetime.now()
+        cleaned_count = 0
+        
+        for task in all_tasks:
+            audio_url = task.get("audio_url")
+            if not audio_url:
+                continue
+                
+            created_at_str = task.get("created_at")
+            if not created_at_str:
+                continue
+                
+            try:
+                # 解析创建时间
+                cleaned_date_str = created_at_str
+                if "+" in cleaned_date_str:
+                    cleaned_date_str = cleaned_date_str.split("+")[0]
+                elif "-" in cleaned_date_str and "T" in cleaned_date_str and len(cleaned_date_str) > 19:
+                    cleaned_date_str = cleaned_date_str[:19]
+                    
+                created_dt = datetime.strptime(cleaned_date_str[:19], "%Y-%m-%dT%H:%M:%S")
+                age_days = (now - created_dt).days
+                
+                if age_days >= threshold_days:
+                    filename = os.path.basename(audio_url)
+                    
+                    # 检查音频文件是否被其他更晚创建的任务共享
+                    other_tasks = [t for t in all_tasks if t.get("id") != task["id"]]
+                    is_shared_with_younger = False
+                    for ot in other_tasks:
+                        ot_audio = ot.get("audio_url")
+                        if ot_audio and os.path.basename(ot_audio) == filename:
+                            ot_created = ot.get("created_at")
+                            if ot_created:
+                                if "+" in ot_created:
+                                    ot_created = ot_created.split("+")[0]
+                                ot_dt = datetime.strptime(ot_created[:19], "%Y-%m-%dT%H:%M:%S")
+                                if (now - ot_dt).days < threshold_days:
+                                    is_shared_with_younger = True
+                                    break
+                                    
+                    if not is_shared_with_younger:
+                        local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+                        if os.path.exists(local_file_path):
+                            try:
+                                os.remove(local_file_path)
+                                print(f"🗑️ [Auto Cleanup] Cleaned up old audio file: {local_file_path}")
+                            except Exception as e:
+                                print(f"⚠️ [Auto Cleanup] Failed to delete file: {e}")
+                                
+                    # 重置该任务的音频 URL 缓存
+                    db.update_task(task["id"], audio_url="")
+                    cleaned_count += 1
+            except Exception as parse_err:
+                print(f"⚠️ [Auto Cleanup] Error processing task {task.get('id')} date: {parse_err}")
+                
+        if cleaned_count > 0:
+            print(f"🧹 [Auto Cleanup] Done. Cleaned up {cleaned_count} audio files.")
+    except Exception as e:
+        print(f"❌ [Auto Cleanup] Error checking tasks: {e}")
+
+def background_auto_cleanup_loop():
+    """后台独立线程，启动 5 秒后及此后每隔 1 小时自动执行一次音频清理检测"""
+    time.sleep(5)
+    while True:
+        try:
+            run_auto_cleanup()
+        except Exception as e:
+            print(f"⚠️ [Auto Cleanup Thread Error] {e}")
+        time.sleep(3600)
+
 @app.on_event("startup")
 def startup_event():
     # 0. 启动后台独立性能监控线程
     threading.Thread(target=background_perf_monitor, daemon=True).start()
     print("✅ [STARTUP] 独立后台性能监控哨兵已上线！")
+    # 0.5 启动自动音频清理检查线程
+    threading.Thread(target=background_auto_cleanup_loop, daemon=True).start()
+    print("✅ [STARTUP] 独立后台音频文件自动清理哨兵已上线！")
     # 1. 启动队列管理器并绑定管道处理器
     queue_manager.start(run_podcast_pipeline)
     

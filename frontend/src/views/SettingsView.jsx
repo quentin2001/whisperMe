@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle } from "lucide-react";
+import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2 } from "lucide-react";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -573,6 +573,47 @@ export default function SettingsView({
                 <ShieldAlert size={14} />
                 <span>{t("重置工作区数据库", "Reset Workspace to Defaults")}</span>
               </button>
+            </div>
+
+            {/* Audio Auto-Cleanup Panel */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 animate-fade-in">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 text-[#bf0029]">
+                <Trash2 size={16} />
+                <h3 className="font-bold text-sm text-[#1d1c18]">{t("自动清理音频", "Audio Auto-Cleanup")}</h3>
+              </div>
+              
+              <p className="text-xs text-[#5d5a55] leading-relaxed font-medium">
+                {t("自动删除本地缓存的播客音频源文件以节省硬盘空间。对应的文本转录和 AI 总结报告将完好保留。", "Automatically delete downloaded podcast audio files to free up disk space. Transcripts and AI summaries will be fully preserved.")}
+              </p>
+
+              {/* Toggle Switch */}
+              <div className="flex items-center justify-between p-3.5 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/20">
+                <div>
+                  <h4 className="font-bold text-xs text-[#1d1c18]">{t("启用自动清理", "Enable Auto-Cleanup")}</h4>
+                  <p className="text-[#5d5a55] text-[10px] mt-0.5">{t("开启后将定时清除过期音频。", "Regularly clean up expired audio files.")}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={configData.enable_auto_cleanup || false}
+                  onChange={(e) => handleConfigChange("enable_auto_cleanup", e.target.checked)}
+                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
+                />
+              </div>
+
+              {/* Threshold Dropdown */}
+              {configData.enable_auto_cleanup && (
+                <div className="flex flex-col gap-2 animate-fade-in">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#5d5a55]">{t("清理时效周期", "Cleanup Threshold")}</label>
+                  <SettingsDropdown
+                    value={configData.cleanup_threshold_days || 30}
+                    onChange={(val) => handleConfigChange("cleanup_threshold_days", Number(val))}
+                    options={[
+                      { value: 7, label: t("超过 7 天", "Older than 7 days") },
+                      { value: 30, label: t("超过 30 天 (1个月)", "Older than 30 days (1 month)") }
+                    ]}
+                  />
+                </div>
+              )}
             </div>
 
             {/* API Secret panel guide instructions */}
