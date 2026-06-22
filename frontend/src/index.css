@@ -86,3 +86,19 @@ input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:f
 .font-mono {
   font-family: "Geist Mono", monospace;
 }
+
+/* Premium Audio visualizer wave animation */
+@keyframes audioWave {
+  0%, 100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-audio-wave {
+  animation: audioWave 1.2s ease-in-out infinite;
+  transform-origin: center;
+}
+

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { 
   Search, SlidersHorizontal, Mic, Square, Cloud, Play, 
-  Download, Trash2, BarChart3, Database, Plus, Calendar
+  Download, Trash2, BarChart3, Database, Plus, Calendar, FastForward
 } from "lucide-react";
 
 const formatDateToYYYYMMDD = (dateInput) => {
@@ -12,6 +12,274 @@ const formatDateToYYYYMMDD = (dateInput) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}/${month}/${day}`;
+};
+
+export const AmenBreakWidget = () => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
+  const [bpm, setBpm] = useState(103); // 一开始以 0.75 倍速展示 (137.14 * 0.75 ≈ 103)
+  const [activeStep, setActiveStep] = useState(-1);
+  
+  // 音频引擎与 Buffer 引用
+  const audioCtxRef = useRef(null);
+  const masterGainRef = useRef(null);
+  const audioBufferRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  
+  const isPressingRef = useRef(false);
+  const bpmRef = useRef(102.85); // 0.75倍速基准
+  const nextNoteTimeRef = useRef(0);
+  const currentStepRef = useRef(0);
+  const timerIDRef = useRef(null);
+  const pressStartTimeRef = useRef(0);
+
+  // 页面加载时自动预加载并解码真实的 Amen Break 音频片断
+  useEffect(() => {
+    const loadAudio = async () => {
+      try {
+        const response = await fetch("/amen_break_sliced.wav");
+        const arrayBuffer = await response.arrayBuffer();
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const tempCtx = new AudioContext();
+        const decoded = await tempCtx.decodeAudioData(arrayBuffer);
+        audioBufferRef.current = decoded;
+        tempCtx.close();
+      } catch (err) {
+        console.error("Failed to load Amen Break audio file:", err);
+      }
+    };
+    loadAudio();
+    return () => {
+      if (timerIDRef.current) clearTimeout(timerIDRef.current);
+    };
+  }, []);
+
+  // 初始化或获取音频上下文
+  const getAudioContext = useCallback(() => {
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioContext();
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0; // 默认静音
+      masterGain.connect(ctx.destination);
+      
+      audioCtxRef.current = ctx;
+      masterGainRef.current = masterGain;
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return { ctx: audioCtxRef.current, masterGain: masterGainRef.current };
+  }, []);
+
+  // 启动真实的 Amen Break 循环播放
+  const startLoop = useCallback(() => {
+    const { ctx, masterGain } = getAudioContext();
+    if (!ctx || !audioBufferRef.current) return;
+
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.stop();
+      } catch (e) {}
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    source.loop = true;
+    source.loopStart = 0;
+    source.loopEnd = 7.00; // 4个Bar的标准Amen Break循环点，约7.0秒
+
+    // 设置初始播放速率，以 137.14 BPM 为基准
+    source.playbackRate.value = bpmRef.current / 137.14;
+
+    source.connect(masterGain);
+    source.start(0);
+    sourceNodeRef.current = source;
+  }, [getAudioContext]);
+
+  // 停止循环播放
+  const stopLoop = useCallback(() => {
+    if (sourceNodeRef.current) {
+      const source = sourceNodeRef.current;
+      setTimeout(() => {
+        try {
+          source.stop();
+        } catch (e) {}
+      }, 1000); // 在渐出结束后停止源节点
+      sourceNodeRef.current = null;
+    }
+  }, []);
+
+  // 音序器核心调度逻辑 (仅用于视觉上在正确的时间点点亮步骤，保持与音乐速率一致)
+  const scheduleNote = useCallback(() => {
+    const { ctx } = getAudioContext();
+    if (!ctx) return;
+
+    while (nextNoteTimeRef.current < ctx.currentTime + 0.1) {
+      const step = currentStepRef.current;
+      
+      // 更新视觉状态
+      setActiveStep(step);
+
+      // 计算 16 分音符的时间步长 (60s / BPM / 4)
+      const secondsPerBeat = 60.0 / bpmRef.current;
+      nextNoteTimeRef.current += 0.25 * secondsPerBeat;
+      currentStepRef.current = (step + 1) % 16;
+    }
+    
+    timerIDRef.current = setTimeout(scheduleNote, 25);
+  }, [getAudioContext]);
+
+  // 处理物理交互 (按下/松开)
+  const handlePointerDown = (e) => {
+    e.preventDefault(); 
+    setIsPressing(true);
+    isPressingRef.current = true;
+    pressStartTimeRef.current = Date.now();
+    
+    const { ctx, masterGain } = getAudioContext();
+    if (!ctx) return;
+    
+    // 开启音频样本循环
+    startLoop();
+    
+    // 平滑渐入
+    masterGain.gain.cancelScheduledValues(ctx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, ctx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.15);
+
+    // 重置音序器时钟并启动视觉扫描
+    if (timerIDRef.current === null) {
+      currentStepRef.current = 0;
+      nextNoteTimeRef.current = ctx.currentTime;
+      scheduleNote();
+    }
+  };
+
+  const handlePointerUp = () => {
+    setIsPressing(false);
+    isPressingRef.current = false;
+    
+    if (audioCtxRef.current && masterGainRef.current) {
+      const ctx = audioCtxRef.current;
+      const gainNode = masterGainRef.current;
+      
+      // 平滑渐出
+      gainNode.gain.cancelScheduledValues(ctx.currentTime);
+      gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+    }
+
+    // 渐出后停止音频源与音序器扫描
+    stopLoop();
+    setTimeout(() => {
+      if (!isPressingRef.current) {
+        clearTimeout(timerIDRef.current);
+        timerIDRef.current = null;
+        setActiveStep(-1);
+      }
+    }, 1000);
+  };
+
+  // 处理按压时的加速逻辑
+  useEffect(() => {
+    let animationFrameId;
+    
+    const updateLoop = () => {
+      if (isPressingRef.current) {
+        const pressDuration = Date.now() - pressStartTimeRef.current;
+        
+        if (pressDuration < 1200) {
+          // 前 1.2 秒：保持 0.75 倍速 (约 103 BPM)
+          bpmRef.current = 102.85;
+        } else if (pressDuration >= 1200 && pressDuration < 2400) {
+          // 1.2秒 到 2.4秒：非常平滑地过渡到 1.0 倍速 (137.14 BPM)
+          const ratio = (pressDuration - 1200) / 1200; // 1.2秒的漫长过渡
+          bpmRef.current = 102.85 + (137.14 - 102.85) * ratio;
+        } else if (pressDuration >= 2400 && pressDuration < 3600) {
+          // 2.4秒 到 3.6秒：稳稳停在原速 1.0 倍速 (137.14 BPM) 享受原声
+          bpmRef.current = 137.14;
+        } else {
+          // 3.6秒之后：开始极其平缓地加速，最高至 220 BPM (经典 Jungle 速度)
+          // 每次增量从 0.07 降低至 0.025，使提速感受极其顺滑温和
+          bpmRef.current = Math.min(bpmRef.current + 0.025, 220);
+        }
+        
+        setBpm(Math.round(bpmRef.current));
+        if (sourceNodeRef.current) {
+          sourceNodeRef.current.playbackRate.value = bpmRef.current / 137.14;
+        }
+      } else {
+        // 松开时缓降回最初的 0.75 倍速 (102.85 BPM)
+        bpmRef.current = Math.max(bpmRef.current - 1.2, 102.85);
+        setBpm(Math.round(bpmRef.current));
+        if (sourceNodeRef.current) {
+          sourceNodeRef.current.playbackRate.value = bpmRef.current / 137.14;
+        }
+      }
+      
+      animationFrameId = requestAnimationFrame(updateLoop);
+    };
+    
+    updateLoop();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  return (
+    <div 
+      className={`
+        relative overflow-hidden bg-transparent w-full
+        transition-all duration-300 ease-out select-none cursor-pointer
+        ${isPressing ? 'scale-[0.98]' : 'scale-100'}
+      `}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        if (isPressing) handlePointerUp();
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onContextMenu={(e) => e.preventDefault()} // 防止移动端长按弹出菜单
+    >
+      {/* 内部 Padding 容器 */}
+      <div className="py-2 px-0.5 relative z-10 flex flex-col h-full justify-center min-h-[40px]">
+        {/* 16步进 音序器网格 */}
+        <div className="flex justify-between items-center h-8 w-full gap-1">
+          {(() => {
+            const stepHeights = [
+              'h-7', 'h-3', 'h-5', 'h-2',
+              'h-6', 'h-4', 'h-3', 'h-2',
+              'h-6', 'h-3', 'h-5', 'h-4',
+              'h-7', 'h-4', 'h-6', 'h-3'
+            ];
+            return Array.from({ length: 16 }).map((_, index) => {
+              const isActive = activeStep === index;
+              return (
+                <div 
+                  key={index}
+                  className={`
+                    w-1.5 rounded-full transition-all duration-[70ms] origin-center
+                    ${stepHeights[index]}
+                    ${!isHovered && !isPressing ? 'bg-[#e4dfd5]' : ''} 
+                    ${isHovered && !isPressing ? 'bg-[#c5b092]' : ''}
+                    ${isPressing && isActive ? 'bg-[#f62440] shadow-[0_0_8px_rgba(246,36,64,0.6)] scale-y-110 z-10' : ''}
+                    ${isPressing && !isActive ? 'bg-[#f1ded9] animate-audio-wave' : ''}
+                  `}
+                  style={isPressing && !isActive ? { animationDelay: `${(index % 6) * 0.12}s` } : {}}
+                />
+              );
+            });
+          })()}
+        </div>
+      </div>
+      
+      {/* 长按时的背景光晕特效 */}
+      <div 
+        className={`absolute inset-0 bg-[#f62440]/3 transition-opacity duration-500 pointer-events-none ${isPressing ? 'opacity-100' : 'opacity-0'}`} 
+      />
+    </div>
+  );
 };
 
 export default function LibraryView({
@@ -411,6 +679,9 @@ export default function LibraryView({
                 <span className="text-lg font-extrabold text-[#1d1c18] font-mono">{totalHoursFormatted}</span>
               </div>
             </div>
+          </div>
+          <div className="mt-4">
+            <AmenBreakWidget />
           </div>
         </div>
 
