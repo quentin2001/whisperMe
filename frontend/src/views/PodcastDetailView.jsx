@@ -382,18 +382,32 @@ function ShownotesRenderer({ text, onTimeJump }) {
 }
 
 // ==================== 🎙️ Comment Item Bubble Renderer ====================
+function renderCommentText(text, onTimeJump) {
+  if (!text) return "";
+  
+  // Match timestamps optionally surrounded by brackets or parentheses
+  const regex = /(\[?\d{1,2}:\d{2}(?::\d{2})?\]?|\(?\d{1,2}:\d{2}(?::\d{2})?\)?)/g;
+  const parts = text.split(regex);
+  
+  return parts.map((part, i) => {
+    const cleanTime = part.replace(/[\[\]\(\)]/g, "");
+    if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(cleanTime)) {
+      return (
+        <button
+          key={i}
+          onClick={() => onTimeJump(parseTimestampToSeconds(cleanTime))}
+          className="px-1.5 py-0.5 mx-0.5 bg-[#ffdad6]/60 hover:bg-[#f62440] text-[#bf0029] hover:text-white rounded-md text-[10px] font-mono font-bold transition-all border-0 outline-none cursor-pointer inline-flex items-center"
+        >
+          {cleanTime}
+        </button>
+      );
+    }
+    return parseInlineMarkdown(part);
+  });
+}
+
 function CommentItemRenderer({ comment, onTimeJump, t }) {
   const text = comment.content || comment.text || "";
-  const timeRegex = /(?:\[|\()(\d{1,2}:\d{2})(?:\]|\))/;
-  const match = text.match(timeRegex);
-  
-  let timestamp = null;
-  let cleanText = text;
-  
-  if (match) {
-    timestamp = match[1];
-    cleanText = text.replace(match[0], "").trim().replace(/^[:：\-—\s]+/, "");
-  }
   
   return (
     <div className="border border-[#e7bcbb]/30 p-4 rounded-xl bg-white hover:border-[#f62440]/30 shadow-2xs hover:shadow-xs transition-all select-text">
@@ -410,16 +424,8 @@ function CommentItemRenderer({ comment, onTimeJump, t }) {
       
       {/* Content bubble */}
       <div className="flex items-start gap-3">
-        {timestamp && (
-          <button
-            onClick={() => onTimeJump(parseTimestampToSeconds(timestamp))}
-            className="px-2 py-1 bg-[#ffdad6]/60 hover:bg-[#f62440] text-[#bf0029] hover:text-white rounded-md text-[10px] font-mono font-bold transition-all border-0 outline-none cursor-pointer shrink-0 mt-0.5"
-          >
-            [{timestamp}]
-          </button>
-        )}
         <div className="flex-1 bg-[#f9f3ea]/20 border border-[#e7bcbb]/20 p-3 rounded-lg text-xs text-[#1d1c18] font-semibold leading-relaxed break-words whitespace-normal">
-          {parseInlineMarkdown(cleanText)}
+          {renderCommentText(text, onTimeJump)}
         </div>
       </div>
     </div>
