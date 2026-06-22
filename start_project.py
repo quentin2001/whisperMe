@@ -99,8 +99,9 @@ try:
     # 主线程保持运行状态
     while True:
         time.sleep(1)
-        # 如果两个进程都意外结束了，则退出脚本
-        if backend_process.poll() is not None and frontend_process.poll() is not None:
+        # 如果任意服务意外挂掉，执行清理并退出脚本，以便外层批处理脚本自动重启
+        if backend_process.poll() is not None or frontend_process.poll() is not None:
+            cleanup(None, None)
             break
 except KeyboardInterrupt:
     cleanup(None, None)

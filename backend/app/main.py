@@ -1271,13 +1271,10 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=404, detail="任务不存在")
         
     audio_url = task.get("audio_url")
-    if not audio_url:
-        raise HTTPException(status_code=400, detail="任务没有关联的音频文件名")
-        
-    filename = os.path.basename(audio_url)
-    local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+    filename = os.path.basename(audio_url) if audio_url else None
+    local_file_path = os.path.join(SHORT_DOWNLOADS_DIR, filename) if filename else None
     
-    if os.path.exists(local_file_path):
+    if local_file_path and os.path.exists(local_file_path):
         return {"success": True, "message": "音频文件已存在，无需重新下载"}
         
     # 在数据库中初始化修复状态和进度
@@ -1293,14 +1290,20 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
                 
             local_path, metadata = downloader.download_url_audio(task['url'], progress_callback=restore_progress_callback)
             
-            # 如果下载后的文件名和数据库记录的不一致，则将其重命名
             downloaded_filename = os.path.basename(local_path)
-            if downloaded_filename != filename:
+            # 如果之前有文件名且不一致，重命名为原来的文件名，否则直接使用新下载的文件名
+            if filename and downloaded_filename != filename:
                 downloaded_expected_path = os.path.join(SHORT_DOWNLOADS_DIR, downloaded_filename)
                 expected_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
-                shutil.move(downloaded_expected_path, expected_path)
-            print(f"✅ [LOG] 音频文件修复重新下载成功: {filename}")
-            db.update_task(task_id, restoring=False, restore_progress=100.0)
+                if os.path.exists(downloaded_expected_path):
+                    shutil.move(downloaded_expected_path, expected_path)
+                final_filename = filename
+            else:
+                final_filename = downloaded_filename
+                
+            new_audio_url = f"/audio/{final_filename}"
+            print(f"✅ [LOG] 音频文件修复重新下载成功: {final_filename}")
+            db.update_task(task_id, audio_url=new_audio_url, restoring=False, restore_progress=100.0)
         except Exception as e:
             print(f"❌ [LOG] 音频文件修复重新下载失败: {e}")
             db.update_task(task_id, restoring=False, restore_progress=0.0)

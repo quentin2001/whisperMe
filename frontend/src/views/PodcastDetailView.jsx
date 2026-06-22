@@ -350,6 +350,7 @@ export default function PodcastDetailView({
   const [editingSpeakerId, setEditingSpeakerId] = useState(null);
   const [editingSpeakerName, setEditingSpeakerName] = useState("");
   const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
+  const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
 
   const containerRef = useRef(null);
   const activeBubbleRef = useRef(null);
@@ -392,6 +393,27 @@ export default function PodcastDetailView({
       alert(t("通信出错：", "Communication error: ") + err.message);
     } finally {
       setIsSavingSpeaker(false);
+    }
+  };
+
+  const handleRedownloadAudio = async () => {
+    setIsTriggeringRestore(true);
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/redownload`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        if (onRefreshTask) {
+          onRefreshTask();
+        }
+      } else {
+        alert(t("启动音频重新下载失败，请重试。", "Failed to trigger audio re-download. Please try again."));
+      }
+    } catch (err) {
+      console.error("Error triggering redownload:", err);
+      alert(t("启动音频重新下载时发生网络错误。", "Network error triggering audio re-download."));
+    } finally {
+      setIsTriggeringRestore(false);
     }
   };
 
@@ -751,89 +773,134 @@ export default function PodcastDetailView({
           <div className="hidden sm:block overflow-hidden">
             <h4 className="font-bold text-xs text-[#1d1c18] font-display max-w-[200px] truncate">{displayTitle}</h4>
             <p className="text-[10px] font-semibold text-[#f62440] uppercase tracking-wider mt-0.5 animate-pulse">
-              {isPlaying ? t("解码播放中", "Active Playback Decoding") : t("播放空闲", "Playback Idle")}
+              {!activeTask.audio_url
+                ? (activeTask.restoring ? t("音频重新下载中...", "Re-downloading Audio") : t("音频已被清理", "Audio Cleaned Up"))
+                : (isPlaying ? t("解码播放中", "Active Playback Decoding") : t("播放空闲", "Playback Idle"))}
             </p>
           </div>
         </div>
 
-        {/* Center: Play controllers and timeline waveform scale */}
-        <div className="flex-1 max-w-2xl flex flex-col items-center gap-2">
-          {/* Timeline and timeline indicators */}
-          <div className="w-full flex items-center gap-3">
-            <span className="text-xs font-mono font-bold text-[#bf0029]">
-              {formatTime(currentTime)}
-            </span>
+        {/* Center: Play controllers or Re-download panel */}
+        {!activeTask.audio_url ? (
+          <div className="flex-1 max-w-2xl flex items-center justify-between bg-[#fef9f2]/60 border border-[#e7bcbb]/40 rounded-xl px-6 py-2.5 shadow-xs">
+            <div className="flex items-center gap-3 flex-1 mr-4">
+              <span className="text-lg">🗑️</span>
+              <div className="text-left flex-1">
+                <p className="text-xs font-bold text-[#1d1c18]">
+                  {activeTask.restoring 
+                    ? t("正在从原始地址重新下载音频文件...", "Re-downloading audio file from source...") 
+                    : t("音频文件已被自动清理以节省硬盘空间", "Audio file has been auto-cleaned to save disk space")}
+                </p>
+                {activeTask.restoring && (
+                  <div className="w-full max-w-md bg-[#f2ede6] h-1.5 rounded-full overflow-hidden mt-1.5 relative">
+                    <div 
+                      className="bg-[#f62440] h-full transition-all duration-300" 
+                      style={{ width: `${activeTask.restore_progress || 0}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
             
-            {/* Range seeker bar */}
-            <div className="flex-1 relative flex items-center">
-              <input
-                type="range"
-                min={0}
-                max={Math.max(1, duration || 0)}
-                value={currentTime || 0}
-                onChange={handleProgressChange}
-                className="w-full accent-[#f62440] h-1.5 bg-[#f2ede6] rounded-lg cursor-pointer appearance-none"
-              />
+            <div>
+              {activeTask.restoring ? (
+                <span className="text-xs font-mono font-bold text-[#f62440] animate-pulse whitespace-nowrap">
+                  {typeof activeTask.restore_progress === 'number' ? activeTask.restore_progress.toFixed(1) : "0.0"}%
+                </span>
+              ) : (
+                <button
+                  onClick={handleRedownloadAudio}
+                  disabled={isTriggeringRestore}
+                  className="px-4 py-1.5 bg-[#f62440] hover:bg-[#bb0028] disabled:opacity-50 text-white font-bold rounded-lg text-xs shadow-xs hover:shadow-md cursor-pointer border-0 outline-none transition-all whitespace-nowrap"
+                >
+                  {isTriggeringRestore ? t("启动中...", "Starting...") : t("重新下载音频", "Re-download Audio")}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 max-w-2xl flex flex-col items-center gap-2">
+            {/* Timeline and timeline indicators */}
+            <div className="w-full flex items-center gap-3">
+              <span className="text-xs font-mono font-bold text-[#bf0029]">
+                {formatTime(currentTime)}
+              </span>
+              
+              {/* Range seeker bar */}
+              <div className="flex-1 relative flex items-center">
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(1, duration || 0)}
+                  value={currentTime || 0}
+                  onChange={handleProgressChange}
+                  className="w-full accent-[#f62440] h-1.5 bg-[#f2ede6] rounded-lg cursor-pointer appearance-none"
+                />
+              </div>
+
+              <span className="text-xs font-mono font-bold text-[#5d5a55]">
+                {formatTime(duration)}
+              </span>
             </div>
 
-            <span className="text-xs font-mono font-bold text-[#5d5a55]">
-              {formatTime(duration)}
-            </span>
+            {/* Playback action buttons */}
+            <div className="flex items-center gap-5">
+              <button
+                onClick={handleStepBack}
+                className="p-1.5 hover:bg-[#f2ede6] rounded text-[#926e6d] hover:text-[#1d1c18] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              >
+                <SkipBack size={15} />
+              </button>
+
+              <button
+                onClick={togglePlay}
+                className="w-10 h-10 bg-[#f62440] hover:bg-[#bb0028] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none"
+              >
+                {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
+              </button>
+
+              <button
+                onClick={handleStepForward}
+                className="p-1.5 hover:bg-[#f2ede6] rounded text-[#926e6d] hover:text-[#1d1c18] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              >
+                <SkipForward size={15} />
+              </button>
+            </div>
           </div>
-
-          {/* Playback action buttons */}
-          <div className="flex items-center gap-5">
-            <button
-              onClick={handleStepBack}
-              className="p-1.5 hover:bg-[#f2ede6] rounded text-[#926e6d] hover:text-[#1d1c18] transition-all cursor-pointer border-0 outline-none bg-transparent"
-            >
-              <SkipBack size={15} />
-            </button>
-
-            <button
-              onClick={togglePlay}
-              className="w-10 h-10 bg-[#f62440] hover:bg-[#bb0028] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none"
-            >
-              {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
-            </button>
-
-            <button
-              onClick={handleStepForward}
-              className="p-1.5 hover:bg-[#f2ede6] rounded text-[#926e6d] hover:text-[#1d1c18] transition-all cursor-pointer border-0 outline-none bg-transparent"
-            >
-              <SkipForward size={15} />
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Right side controllers */}
-        <div className="w-1/4 flex items-center justify-end gap-3 font-semibold text-xs">
-          {/* Play speed selector rate */}
-          <button
-            onClick={handleSpeedToggle}
-            className="px-2.5 py-1 bg-[#f2ede6] text-[#5d3f3e] rounded-md border border-[#e7bcbb]/30 active:scale-98 transition-all cursor-pointer border-0 outline-none"
-          >
-            {t("语速", "Speed")} {playbackRate.toFixed(1)}x
-          </button>
+        <div className="w-1/4 flex items-center justify-end gap-3 font-semibold text-xs animate-fade-in">
+          {activeTask.audio_url && (
+            <>
+              {/* Play speed selector rate */}
+              <button
+                onClick={handleSpeedToggle}
+                className="px-2.5 py-1 bg-[#f2ede6] text-[#5d3f3e] rounded-md border border-[#e7bcbb]/30 active:scale-98 transition-all cursor-pointer border-0 outline-none"
+              >
+                {t("语速", "Speed")} {playbackRate.toFixed(1)}x
+              </button>
 
-          {/* Volume bars and state */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={toggleMute}
-              className="p-1 text-[#926e6d] hover:text-[#1d1c18] cursor-pointer border-0 outline-none bg-transparent"
-            >
-              {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step="0.05"
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeInput}
-              className="w-20 accent-[#f62440] h-1 bg-[#f2ede6] rounded-lg cursor-pointer"
-            />
-          </div>
+              {/* Volume bars and state */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={toggleMute}
+                  className="p-1 text-[#926e6d] hover:text-[#1d1c18] cursor-pointer border-0 outline-none bg-transparent"
+                >
+                  {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeInput}
+                  className="w-20 accent-[#f62440] h-1 bg-[#f2ede6] rounded-lg cursor-pointer"
+                />
+              </div>
+            </>
+          )}
         </div>
       </footer>
 

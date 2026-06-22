@@ -273,7 +273,7 @@ export default function App() {
       fetchTaskDetail(activeTaskId);
       const detailInterval = setInterval(() => {
         const tObj = activeTaskRef.current;
-        if (tObj && (tObj.status === "downloading" || tObj.status === "transcribing" || tObj.status === "summarizing")) {
+        if (tObj && (tObj.status === "downloading" || tObj.status === "transcribing" || tObj.status === "summarizing" || tObj.restoring)) {
           fetchTaskDetail(activeTaskId, true);
         }
       }, 3000);
