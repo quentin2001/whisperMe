@@ -25,14 +25,24 @@ def dict_factory(cursor, row):
 
 class LocalDatabase:
     def __init__(self):
-        self.lock = threading.Lock()
-        self.conn = sqlite3.connect(DB_FILE_PATH, check_same_thread=False)
-        self.conn.row_factory = dict_factory
+        self._local = threading.local()
+        self.write_lock = threading.Lock()
         self._init_db()
         self._migrate_if_needed()
 
+    @property
+    def conn(self):
+        if not hasattr(self._local, "conn"):
+            conn = sqlite3.connect(DB_FILE_PATH, check_same_thread=False)
+            conn.row_factory = dict_factory
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA foreign_keys=ON;")
+            conn.execute("PRAGMA busy_timeout=30000;")
+            self._local.conn = conn
+        return self._local.conn
+
     def _init_db(self):
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             # tasks table
             c.execute('''CREATE TABLE IF NOT EXISTS tasks (
@@ -133,7 +143,7 @@ class LocalDatabase:
 
     def _migrate_if_needed(self):
         """侦测旧版 JSON 文件并无缝迁移至 SQLite"""
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("SELECT COUNT(*) as count FROM tasks")
             count = c.fetchone()["count"]
@@ -301,53 +311,83 @@ class LocalDatabase:
 
     # ==================== TASKS ====================
     def get_all_tasks(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            # 不取 transcript、speaker_embeddings 等大字段以保证列表渲染极速
-            c.execute('''SELECT id, url, asr_mode, summary_mode, title, podcast_name, status, 
-                         progress, created_at, error_message, obsidian_synced, image_url, 
-                         restoring, restore_progress, audio_url, metadata 
-                         FROM tasks ORDER BY created_at DESC''')
-            rows = c.fetchall()
-            tasks_list = []
-            for r in rows:
-                meta = r.get("metadata", {})
-                if isinstance(meta, str):
-                    try: meta = json.loads(meta)
-                    except: meta = {}
-                # 重组为前端期望的格式
-                r["like_count"] = meta.get("like_count", 0)
-                r["comment_count"] = meta.get("comment_count", 0)
-                # Ensure boolean conversion
-                r["obsidian_synced"] = bool(r["obsidian_synced"])
-                r["restoring"] = bool(r["restoring"])
-                r["duration"] = meta.get("duration", "00:00")
-                r["metadata"] = {
-                    "pub_date": meta.get("pub_date", ""),
-                    "source": meta.get("source", ""),
-                    "duration": meta.get("duration", "00:00")
-                }
-                tasks_list.append(r)
-            return tasks_list
+        c = self.conn.cursor()
+        # 不取 transcript、speaker_embeddings 等大字段以保证列表渲染极速
+        c.execute('''SELECT id, url, asr_mode, summary_mode, title, podcast_name, status, 
+                     progress, created_at, error_message, obsidian_synced, image_url, 
+                     restoring, restore_progress, audio_url, metadata 
+                     FROM tasks ORDER BY created_at DESC''')
+        rows = c.fetchall()
+        tasks_list = []
+        for r in rows:
+            meta = r.get("metadata", {})
+            if isinstance(meta, str):
+                try: meta = json.loads(meta)
+                except: meta = {}
+            # 重组为前端期望的格式
+            r["like_count"] = meta.get("like_count", 0)
+            r["comment_count"] = meta.get("comment_count", 0)
+            # Ensure boolean conversion
+            r["obsidian_synced"] = bool(r["obsidian_synced"])
+            r["restoring"] = bool(r["restoring"])
+            r["duration"] = meta.get("duration", "00:00")
+            r["metadata"] = {
+                "pub_date": meta.get("pub_date", ""),
+                "source": meta.get("source", ""),
+                "duration": meta.get("duration", "00:00")
+            }
+            tasks_list.append(r)
+        return tasks_list
 
     def get_task(self, task_id: str) -> dict:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
-            row = c.fetchone()
-            if row:
-                # SQLite driver returns dict because of row_factory
-                # Boolean fields
-                row["obsidian_synced"] = bool(row["obsidian_synced"])
-                row["restoring"] = bool(row["restoring"])
-                # Inject duration at root
-                meta = row.get("metadata") or {}
-                if isinstance(meta, str):
-                    try: meta = json.loads(meta)
-                    except: meta = {}
-                row["duration"] = meta.get("duration", "00:00")
-                return row
-            return None
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
+        row = c.fetchone()
+        if row:
+            # SQLite driver returns dict because of row_factory
+            # Boolean fields
+            row["obsidian_synced"] = bool(row["obsidian_synced"])
+            row["restoring"] = bool(row["restoring"])
+            # Inject duration at root
+            meta = row.get("metadata") or {}
+            if isinstance(meta, str):
+                try: meta = json.loads(meta)
+                except: meta = {}
+            row["duration"] = meta.get("duration", "00:00")
+            return row
+        return None
+
+    def get_next_pending_task(self) -> dict:
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM tasks WHERE status='pending' ORDER BY created_at ASC LIMIT 1")
+        row = c.fetchone()
+        if row:
+            row["obsidian_synced"] = bool(row["obsidian_synced"])
+            row["restoring"] = bool(row["restoring"])
+            meta = row.get("metadata") or {}
+            if isinstance(meta, str):
+                try: meta = json.loads(meta)
+                except: meta = {}
+            row["duration"] = meta.get("duration", "00:00")
+            return row
+        return None
+
+    def get_task_queue_position(self, task_id: str, current_task_id: str = None) -> int:
+        if current_task_id == task_id:
+            return 0
+            
+        c = self.conn.cursor()
+        c.execute("SELECT created_at, status FROM tasks WHERE id=?", (task_id,))
+        target = c.fetchone()
+        if not target:
+            return -1
+        
+        if target["status"] != "pending":
+            return -1
+            
+        c.execute("SELECT COUNT(*) as cnt FROM tasks WHERE status='pending' AND created_at < ?", (target["created_at"],))
+        row = c.fetchone()
+        return row["cnt"] + 1 if row else -1
 
     def add_task(self, task_id: str, url: str, asr_mode: str = "local", summary_mode: str = "local") -> dict:
         new_task = {
@@ -380,14 +420,14 @@ class LocalDatabase:
             "speaker_mappings": {},
             "speaker_embeddings": {}
         }
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             self._insert_task_internal(c, new_task)
             self.conn.commit()
         return new_task
 
     def update_task(self, task_id: str, **kwargs):
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
             row = c.fetchone()
@@ -414,7 +454,7 @@ class LocalDatabase:
             return updated_row
 
     def delete_task(self, task_id: str) -> bool:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("DELETE FROM tasks WHERE id=?", (task_id,))
             if c.rowcount > 0:
@@ -432,20 +472,19 @@ class LocalDatabase:
 
     # ==================== PARAGRAPHS ====================
     def get_paragraphs_by_podcast(self, podcast_id: str) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM paragraphs WHERE podcast_id=?", (podcast_id,))
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM paragraphs WHERE podcast_id=?", (podcast_id,))
+        return c.fetchall()
 
     def delete_paragraphs_by_podcast(self, podcast_id: str):
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("DELETE FROM paragraphs WHERE podcast_id=?", (podcast_id,))
             self.conn.commit()
 
     def add_paragraphs(self, paragraphs: list[dict]):
         if not paragraphs: return
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             for p in paragraphs:
                 self._insert_paragraph_internal(c, p)
@@ -462,18 +501,16 @@ class LocalDatabase:
              insight.get("created_at", datetime.now().isoformat())))
 
     def get_all_insights(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM insights WHERE status != 'DELETED' ORDER BY created_at DESC")
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM insights WHERE status != 'DELETED' ORDER BY created_at DESC")
+        return c.fetchall()
 
     def get_insights_for_review(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            now = datetime.now().isoformat()
-            # 简化逻辑，获取 active 的 insight 并按需要复习的时间排，或者随机取3-5个
-            c.execute("SELECT * FROM insights WHERE status = 'ACTIVE' ORDER BY RANDOM() LIMIT 5")
-            return c.fetchall()
+        c = self.conn.cursor()
+        now = datetime.now().isoformat()
+        # 简化逻辑，获取 active 的 insight 并按需要复习的时间排，或者随机取3-5个
+        c.execute("SELECT * FROM insights WHERE status = 'ACTIVE' ORDER BY RANDOM() LIMIT 5")
+        return c.fetchall()
 
     def create_insight(self, insight: dict) -> dict:
         import uuid
@@ -481,14 +518,14 @@ class LocalDatabase:
             insight["id"] = str(uuid.uuid4())
         if "created_at" not in insight:
             insight["created_at"] = datetime.now().isoformat()
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             self._insert_insight_internal(c, insight)
             self.conn.commit()
             return insight
 
     def update_insight(self, insight_id: str, **kwargs) -> dict:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("SELECT * FROM insights WHERE id=?", (insight_id,))
             row = c.fetchone()
@@ -503,7 +540,7 @@ class LocalDatabase:
             return c.fetchone()
 
     def delete_insight(self, insight_id: str) -> bool:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("UPDATE insights SET status = 'DELETED' WHERE id=?", (insight_id,))
             if c.rowcount > 0:
@@ -513,25 +550,22 @@ class LocalDatabase:
 
     # ==================== CARDS ====================
     def get_all_cards(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM cards")
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM cards")
+        return c.fetchall()
 
     def get_cards_by_podcast(self, podcast_id: str) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM cards WHERE podcast_id=?", (podcast_id,))
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM cards WHERE podcast_id=?", (podcast_id,))
+        return c.fetchall()
 
     def get_card(self, card_id: str) -> dict:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM cards WHERE id=?", (card_id,))
-            return c.fetchone()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM cards WHERE id=?", (card_id,))
+        return c.fetchone()
 
     def create_card(self, card: dict) -> dict:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             # 避免同一段落重复沉淀
             pid = card.get("paragraph_id")
@@ -543,7 +577,7 @@ class LocalDatabase:
             return card
 
     def update_card(self, card_id: str, **kwargs) -> dict:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("SELECT * FROM cards WHERE id=?", (card_id,))
             row = c.fetchone()
@@ -558,7 +592,7 @@ class LocalDatabase:
             return c.fetchone()
 
     def delete_card(self, card_id: str) -> bool:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("DELETE FROM cards WHERE id=?", (card_id,))
             if c.rowcount > 0:
@@ -571,13 +605,12 @@ class LocalDatabase:
 
     # ==================== LINKS ====================
     def get_all_links(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM links")
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM links")
+        return c.fetchall()
 
     def create_link(self, link: dict) -> dict:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             # 检查双向连接是否已存在
             c.execute('''SELECT * FROM links 
@@ -600,7 +633,7 @@ class LocalDatabase:
                 return link
 
     def delete_link(self, link_id: str) -> bool:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("DELETE FROM links WHERE id=?", (link_id,))
             if c.rowcount > 0:
@@ -610,13 +643,12 @@ class LocalDatabase:
 
     # ==================== BOARDS ====================
     def get_all_boards(self) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute("SELECT * FROM boards ORDER BY created_at ASC")
-            return c.fetchall()
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM boards ORDER BY created_at ASC")
+        return c.fetchall()
 
     def create_board(self, board_id: str, name: str) -> dict:
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             board = {
                 "id": board_id,
@@ -629,29 +661,28 @@ class LocalDatabase:
             return board
 
     def get_cards_by_board(self, board_id: str) -> list[dict]:
-        with self.lock:
-            c = self.conn.cursor()
-            c.execute('''
-                SELECT c.*, bc.pos_x as bc_pos_x, bc.pos_y as bc_pos_y
-                FROM cards c
-                JOIN board_cards bc ON c.id = bc.card_id
-                WHERE bc.board_id = ?
-            ''', (board_id,))
-            rows = c.fetchall()
-            for r in rows:
-                r["pos_x"] = r.pop("bc_pos_x")
-                r["pos_y"] = r.pop("bc_pos_y")
-            return rows
+        c = self.conn.cursor()
+        c.execute('''
+            SELECT c.*, bc.pos_x as bc_pos_x, bc.pos_y as bc_pos_y
+            FROM cards c
+            JOIN board_cards bc ON c.id = bc.card_id
+            WHERE bc.board_id = ?
+        ''', (board_id,))
+        rows = c.fetchall()
+        for r in rows:
+            r["pos_x"] = r.pop("bc_pos_x")
+            r["pos_y"] = r.pop("bc_pos_y")
+        return rows
 
     def add_card_to_board(self, board_id: str, card_id: str, pos_x: float = 0.0, pos_y: float = 0.0):
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("INSERT OR IGNORE INTO board_cards (board_id, card_id, pos_x, pos_y) VALUES (?, ?, ?, ?)",
                       (board_id, card_id, pos_x, pos_y))
             self.conn.commit()
 
     def update_board_card_position(self, board_id: str, card_id: str, pos_x: float, pos_y: float):
-        with self.lock:
+        with self.write_lock:
             c = self.conn.cursor()
             c.execute("UPDATE board_cards SET pos_x=?, pos_y=? WHERE board_id=? AND card_id=?",
                       (pos_x, pos_y, board_id, card_id))

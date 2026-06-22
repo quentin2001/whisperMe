@@ -40,64 +40,80 @@ def get_short_path_name(long_name_path):
     except Exception: 
         return str(long_name_path)
 
+# ==================== Pydantic 配置模型校验 ====================
+from pydantic import BaseModel, Field
+
+class AppConfigModel(BaseModel):
+    ffmpeg_path: str = "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe"
+    ffmpeg_bin_dir: str = "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin"
+    local_whisper_model_path: str = "c:\\Users\\asd\\Desktop\\whisper\\model_large_v3"
+    local_whisper_model_size: str = "large-v3"
+    local_model_idle_timeout: int = 300
+    hf_token: str = ""
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b-instruct"
+    smtp_server: str = "smtp.qq.com"
+    smtp_port: int = 465
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
+    notification_email: str = ""
+    enable_win_notification: bool = True
+    enable_email_notification: bool = False
+    asr_mode: str = "online"
+    online_api_key: str = ""
+    online_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
+    online_model: str = "mimo-v2.5-asr"
+    summary_mode: str = "online"
+    online_summary_api_key: str = ""
+    online_summary_base_url: str = "https://api.openai.com/v1"
+    online_summary_model: str = "gpt-4o-mini"
+    enable_llm_semantic_sewing: bool = False
+    webhook_url: str = ""
+    custom_storage_dir: str = ""
+    language: str = "en"
+    enable_auto_cleanup: bool = False
+    cleanup_threshold_days: int = 30
+
 # 加载全局配置文件
-def load_config():
-    default_config = {
-        "ffmpeg_path": "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe",
-        "ffmpeg_bin_dir": "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin",
-        "local_whisper_model_path": "c:\\Users\\asd\\Desktop\\whisper\\model_large_v3",
-        "hf_token": "",
-        "ollama_url": "http://localhost:11434",
-        "ollama_model": "qwen2.5:7b-instruct",
-        "smtp_server": "smtp.qq.com",
-        "smtp_port": 465,
-        "smtp_username": "",
-        "smtp_password": "",
-        "smtp_sender": "",
-        "notification_email": "",
-        "enable_win_notification": True,
-        "enable_email_notification": False,
-        "asr_mode": "online",
-        "online_api_key": "",
-        "online_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
-        "online_model": "mimo-v2.5-asr",
-        "summary_mode": "online",
-        "online_summary_api_key": "",
-        "online_summary_base_url": "https://api.openai.com/v1",
-        "online_summary_model": "gpt-4o-mini",
-        "enable_llm_semantic_sewing": False,
-        "webhook_url": "",
-        "custom_storage_dir": "",
-        "language": "en",
-        "enable_auto_cleanup": False,
-        "cleanup_threshold_days": 30
-    }
+def load_config() -> dict:
+    default_config = AppConfigModel().model_dump()
 
     if not CONFIG_FILE_PATH.exists():
         with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
             json.dump(default_config, f, ensure_ascii=False, indent=2)
         return default_config
     
-    with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
-        loaded = json.load(f)
-
-    # 合并缺失的默认配置
-    changed = False
-    for k, v in default_config.items():
-        if k not in loaded:
-            loaded[k] = v
-            changed = True
-            
-    if changed:
-        with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(loaded, f, ensure_ascii=False, indent=2)
-            
-    return loaded
+    try:
+        with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        # 使用 Pydantic 进行类型与默认值补全校验
+        validated = AppConfigModel.model_validate(loaded)
+        validated_dict = validated.model_dump()
+        
+        # 检查是否有新增字段需要回写
+        if len(loaded) != len(validated_dict):
+            with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                json.dump(validated_dict, f, ensure_ascii=False, indent=2)
+                
+        return validated_dict
+    except Exception as e:
+        print(f"⚠️ [CONFIG] 配置文件解析异常，将使用默认配置: {e}")
+        return default_config
 
 # 更新全局配置文件
-def save_config(new_config):
-    with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(new_config, f, ensure_ascii=False, indent=2)
+def save_config(new_config: dict):
+    try:
+        # 保存前进行 Pydantic 校验
+        validated = AppConfigModel.model_validate(new_config)
+        validated_dict = validated.model_dump()
+        with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(validated_dict, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"❌ [CONFIG] 配置文件校验并保存失败: {e}")
+        # 退避保存原生字典
+        with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(new_config, f, ensure_ascii=False, indent=2)
 
 config = load_config()
 

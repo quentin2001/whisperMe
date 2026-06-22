@@ -18,37 +18,36 @@ graph TB
     end
 
     subgraph Backend ["⚙️ Backend (FastAPI + Uvicorn)"]
-        E[main.py — API 路由 & 业务逻辑]
-        F[config.py — 全局配置加载 / 环境焊接 / 外部路径挂载]
-        G[database.py — SQLite 关系数据库]
-        H[core/downloader.py — 播客下载器]
-        I[core/transcriber.py — 语音转录器]
-        J[core/summarizer.py — LLM 总结器]
-        K[core/notifier.py — 通知推送器]
-        L[core/queue_manager.py — FIFO 任务队列]
-        M[core/prompt_manager.py — Prompt 模板管理]
+        E[main.py — App 挂载与分发外壳]
+        F[config.py — 全局配置与 BaseModel 校验]
+        G[database.py — SQLite 并发 WAL 数据库]
+        H[routers/ — 路由层 tasks/config/system/boards]
+        I[core/pipeline.py — 流水线调度核心]
+        J[core/speaker.py — 声纹匹配与智能推理]
+        K[core/transcriber.py — ASR 识别引擎 (常驻 VRAM 缓存)]
+        L[core/downloader.py — 音频下载器]
+        M[core/summarizer.py — LLM 总结器]
+        N[core/queue_manager.py — SQLite 任务队列管理器]
     end
 
     subgraph Storage ["💾 本地存储"]
-        N[config.json — 全局配置文件]
-        O[whisperMe.db — SQLite 数据库]
-        P[speaker_fingerprints.json — 声纹指纹库]
-        Q[prompt.json — AI 总结 Prompt 模板]
-        R[downloads/ — 原始音频文件]
-        S[transcripts/ — 转录结果 JSON (外部存储/临时)]
+        O[config.json — 全局配置文件]
+        P[whisperMe.db — SQLite 数据库]
+        Q[speaker_fingerprints.json — 声纹指纹库]
+        R[prompt.json — AI 总结 Prompt 模板]
+        S[downloads/ — 原始音频文件]
     end
 
-    A -->|HTTP REST| E
-    E --> G
-    E --> H
-    E --> I
-    E --> J
-    E --> K
-    E --> L
-    F --> N
-    G --> O
-    H --> R
-    I --> S
+    A -->|HTTP REST| H
+    H --> G
+    H --> N
+    N --> G
+    N --> I
+    I --> G
+    I --> L
+    I --> K
+    I --> M
+    I --> J
 ```
 
 ---
@@ -74,17 +73,25 @@ whisperMe/
 │   ├── requirements.txt       # Python 依赖清单
 │   └── app/
 │       ├── __init__.py
-│       ├── config.py          # 全局配置 & 环境防御层
-│       ├── database.py        # SQLite 数据库控制层
-│       ├── main.py            # FastAPI 路由 & 业务管道
+│       ├── config.py          # 全局配置 BaseModel 校验
+│       ├── database.py        # SQLite 数据库控制层 (WAL 并发模式)
+│       ├── main.py            # FastAPI App 挂载与分发外壳
 │       ├── prompt.json        # 内部 Prompt 备份
+│       ├── routers/           # 模块化路由层
+│       │   ├── __init__.py
+│       │   ├── tasks.py       # 任务管理 API
+│       │   ├── config.py      # 系统设置 API
+│       │   ├── system.py      # 系统状态 & 性能 API
+│       │   └── boards.py      # 知识卡片 & 看板 API
 │       └── core/
 │           ├── downloader.py      # 小宇宙 / Bilibili 下载器
-│           ├── transcriber.py     # Whisper / MiMo ASR 转录器
+│           ├── transcriber.py     # Whisper / MiMo ASR 转录引擎 (VRAM 缓存)
 │           ├── summarizer.py      # Ollama / 在线 LLM 总结器
 │           ├── notifier.py        # 邮件 & Windows 桌面通知
-│           ├── queue_manager.py   # FIFO 后台任务队列
-│           └── prompt_manager.py  # Prompt 模板 IO
+│           ├── queue_manager.py   # SQLite 驱动后台持久队列
+│           ├── prompt_manager.py  # Prompt 模板 IO
+│           ├── speaker.py         # 声纹识别与智能推理核心
+│           └── pipeline.py        # 流水线作业调度核心
 │
 ├── frontend/
 │   ├── package.json
@@ -111,7 +118,7 @@ whisperMe/
 └── docs/                      # 项目文档
 ```
 
----��器
+---��器
 │           ├── summarizer.py      # Ollama / 在线 LLM 总结器
 │           ├── notifier.py        # 邮件 & Windows 桌面通知
 │           ├── queue_manager.py   # FIFO 后台任务队列
@@ -140,76 +147,42 @@ whisperMe/
 
 ## 3. 后端核心模块
 
-### 3.1 config.py — 全局配置 & 环境防御层
+### 3.1 config.py — 全局配置与 BaseModel 校验
+*   **配置校验与补齐**：升级使用 Pydantic v2 `BaseModel` 对全局配置文件 `config.json` 进行严苛的类型与默认值补齐校验，消除外部 `pydantic-settings` 依赖，杜绝缺失或非法配置导致启动崩溃。
+*   **环境防御机制**：包含四层"钢铁防御"机制，专门解决 Windows 本地部署下的路径和兼容性问题：
+    1.  NumPy 2.0 向后兼容性补焊（修复 `np.NaN`、`np.float`）。
+    2.  重写控制台标准流 `stdout` / `stderr` 编码为标准 UTF-8，规避中文报错。
+    3.  自动提取 venv 中 NVIDIA DLL (cuBLAS/cuDNN) 并动态注入 Path。
+    4.  转换 TEMP/TMP/HOME 等环境变量至英文短路径沙盒（8.3 短路径转换），规避中文字符集报错。
+*   **HuggingFace 动态 Patch**：根据 `hf_token` 配置自动切换官方源或 hf-mirror.com 镜像源。
 
-配置模块包含四层"钢铁防御"机制，专门解决 Windows 环境下的兼容性问题：
+### 3.2 routers/ — 模块化 API 控制器层
+路由结构解耦，子接口在主模块中通过挂载 `APIRouter` 注册：
+*   **tasks.py (任务管理 API)**：负责播客任务的增删改查、重新下载、物理文件清理、智能命名保存以及重生成总结等核心生命周期逻辑。新增 `POST /api/tasks/{task_id}/cancel` 中断及取消逻辑。
+*   **config.py (配置设置 API)**：负责读取、修改并回写全局 `config.json`，以及 Prompt 推送词模板的读取和热修改。
+*   **system.py (系统状态 API)**：负责本地硬件信息（CPU、RAM、GPU、VRAM）实时拉取，支持版本检测及性能哨兵后台调度。
+*   **boards.py (看板卡片 API)**：负责知识段落、脑洞对撞机、连线链接、复习卡片、看板布局的全套 CRUD 及艾宾浩斯复习曲线算法。
 
-| 防御层 | 用途 |
-|--------|------|
-| 🛡️ 层 0 | NumPy 2.0 向后兼容性补焊 (`np.NaN`, `np.float` 等) |
-| 🛡️ 层 1 | 强制重写控制台 stdout/stderr 编码为 UTF-8 |
-| 🛡️ 层 2 | 提取 venv 中 NVIDIA DLL 路径 (cuBLAS/cuDNN) 并注入 PATH |
-| 🛡️ 层 3 | 将 TEMP/TMP/HOME 等环境变量指向本地英文短路径沙盒，规避中文路径报错 |
+### 3.3 core/ — 核心业务处理管道
+后端服务分离出两大核心作业模块：
+*   **pipeline.py (流水线调度核心)**：负责将播客的下载 -> 音频 Mono/16kHz 预处理 -> 声纹分割 (PyAnnote) -> 语音转录 (Whisper) -> 语义段落聚合 (Semantic Chunking) -> 声纹命名识别 -> LLM 深度总结 (Ollama/在线) -> 桌面/邮件推送这一整套作业过程组装成原子流水线，并包含实时的 `check_cancelled` 取消检查。
+*   **speaker.py (声纹与大模型推理核心)**：
+  - **自适应噪音过滤**：预清洗无意义的短语气助词，直接跳过大模型，降低运行成本。
+  - **历史声纹 Cosine 相似度匹配**：自动比对 `speaker_fingerprints.json` 余弦相似度，秒级识别老熟人姓名。
+  - **大模型简介与指征匹配**：对剩余未知 SPEAKER，通过大模型读取简介和对话上下文，做黄金交叉 Shownotes 拼写交叉验证，智能推断出本集在场发言人真实姓名。
+*   **transcriber.py (ASR 转录引擎)**：
+  - **在线模式零 AI 库导入**：在线 ASR 模式下，系统启动彻底延迟并规避 `torch`、`faster_whisper` 和 `pyannote` 导入，极大提升启动耗时。
+  - **ModelCacheManager 单例缓存**：本地模式下，常驻缓存已加载 of `WhisperModel` 实例，大幅消除转录冷启动重新读盘时间。
+  - **显存/内存自动释放 (TTL/LRU)**：支持 `local_model_idle_timeout`，模型闲置超时后自动清空 PyTorch CUDA 缓存并进行 GC。
+*   **downloader.py**：多网页自适应抓取引擎，包含 httpx (有/无代理) -> curl.exe (有/无代理) 4 级自适应，保障网络穿透。
+*   **summarizer.py**：双模式总结 (本地 Ollama/在线 OpenAI)，内置 Doh DNS Bypass 功能直连抗劫持。
+*   **notifier.py**：邮件与 Windows 桌面通知。
+*   **queue_manager.py**：SQLite 驱动的持久化 FIFO 后台任务队列，能在服务崩溃/重启后断点自动续传。
 
-此外，还包含 **HuggingFace Hub 动态 Patch**：根据是否配置了有效 `hf_token` 自动切换官方源 / 国内镜像站。
-
-### 3.2 main.py — API 路由
-
-| 端点 | 方法 | 功能 |
-|------|------|------|
-| `/api/tasks` | GET | 获取全部任务列表 |
-| `/api/tasks` | POST | 创建新任务（URL 下载） |
-| `/api/tasks/{id}` | GET | 获取单任务详情 |
-| `/api/tasks/{id}` | DELETE | 删除任务及关联文件 |
-| `/api/upload` | POST | 上传本地音频文件 |
-| `/api/performance` | GET | 获取实时系统性能指标（CPU/RAM/GPU/VRAM） |
-| `/api/tasks/{id}/redownload` | POST | 重新下载任务音频 |
-| `/api/tasks/{id}/speaker/rename` | POST | 重命名说话人 |
-| `/api/tasks/{id}/summary/regenerate` | POST | 重新生成 AI 总结报告 |
-| `/api/tasks/{id}/metadata/refresh` | POST | 刷新任务元数据 |
-| `/api/config` | GET/POST | 读取/更新全局配置 |
-| `/api/prompt` | GET/POST | 读取/更新 Prompt 模板 |
-| `/api/paragraphs` | GET | 获取段落列表（认知沙盒用） |
-| `/api/cards/create` | POST | 创建 Anki 闪光卡片 |
-| `/api/cards` | GET | 获取全部卡片 |
-| `/api/cards/due` | GET | 获取到期待复习卡片 |
-| `/api/cards/{id}/review` | POST | 提交卡片复习结果 |
-| `/api/cards/collider` | GET | AI 碰撞器·随机抽取卡片 |
-| `/api/links` | GET/POST | 知识链接管理 |
-| `/audio/{file}` | Static | 静态文件挂载，提供音频播放 |
-
-### 3.3 core/ — 核心处理管道
-
-播客处理遵循一条 **FIFO 异步管道**：
-
-```mermaid
-graph LR
-    Q[queue_manager] --> D[downloader]
-    D --> T[transcriber]
-    T --> S[summarizer]
-    S --> N[notifier]
-```
-
-- **downloader.py**：支持小宇宙 FM 和 Bilibili 两个源，使用 `httpx` + `yt-dlp` + `FFmpeg` 进行音频提取。
-  - **小宇宙播客主页自动识别**：输入 `/podcast/` 节目链接时，后台能够自动通过多套抓取策略请求并解析获取最新单集的 URL。
-  - **4 级自适应网页抓取**：按顺序回溯尝试 `httpx (有代理)` -> `httpx (无代理直连)` -> `curl (有代理)` -> `curl (直连 + DoH 解析域名绑定)`，有效穿透本地代理软件的各种黑洞/异常配置状态。
-- **transcriber.py**：双模式转录 — 本地 `faster-whisper` (GPU/CPU) / 在线 `MiMo ASR` API；集成 `pyannote.audio` 进行声纹分段与说话人识别。
-  - **DoH DNS Bypass 直连注入**：包含 `doh_dns_bypass` 环境变量上下文管理器，在 Clash TUN/Fake-IP 劫持导致 SSL 连接 EOF 报错时，通过 AliDNS/Doh.pub 查询公网真实 IP 并临时注入 `socket.getaddrinfo`，配合静态 IP 兜底，保障在线 ASR API 100% 连通。
-  - **LLM 说话人推断兜底**：当声纹识别未能匹配到明确角色而产生 `UNKNOWN_SPEAKER` 时，在段落重组阶段通过大模型读取上下文对话语义，推断并补齐相应的说话人角色。
-- **summarizer.py**：双模式总结 — 本地 `Ollama/LM Studio` / 在线 `OpenAI 兼容 API`。同样集成了 `doh_dns_bypass` 直连备用逻辑，用于绕过有缺陷的代理服务直接请求在线 LLM API。
-- **notifier.py**：支持 Windows 桌面气泡推送和 SMTP 邮件通知（可独立开关）
-- **queue_manager.py**：FIFO 后台任务排队，显存不足时自动降级至 CPU
-
-### 3.4 database.py — 数据持久化
-
-使用 SQLite 关系型数据库 (`whisperMe.db`) 作为持久化存储层，提供高效的数据读写和关系查询。其核心设计包括：
-- **自动向后兼容与无损迁移**：系统启动时，若检测到旧的 `tasks_db.json` 文件存在，会自动读取所有历史任务、段落、卡片及链接数据，无损写入 SQLite 数据库各表，随后将原文件备份为 `tasks_db.json.bak`。
-- **4 张核心表结构**：包含 `tasks`、`paragraphs`、`cards` 和 `links` 表。
-- **复杂字段自动序列化**：对 ASR 文本、说话人映射、下载元数据等复杂嵌套 JSON 数据，在写入数据库时自动序列化为 JSON 字符串，读取时自动反序列化为 Python 字典/列表。
-- **线程安全的数据库锁**：由于本地运行时存在 API 并发请求与后台任务队列的写冲突，内部设计了全局线程排它锁 (`threading.Lock`)。
-- **挂载外部路径**：配合系统设置，`whisperMe.db` 和下载的音频文件均可在外置指定的存储基准目录 (`storage_base`) 下存储，极其适合单独打包成绿色小应用。
-
----
+### 3.4 database.py — SQLite WAL 数据持久化 (高并发读写)
+*   **线程隔离连接池**：使用 `threading.local` 为每一个后台工作线程 and Web 请求线程建立专属的 `sqlite3.Connection` 实例，从根本上隔离了连接争抢。
+*   **并发 WAL (Write-Ahead Logging) 模式**：通过 PRAGMA 开启 WAL，全面支持读写并行。面板加载与卡片拉取请求时完全零锁阻塞，响应敏捷。
+*   **Busy Timeout 与外键级联**：开启 `PRAGMA foreign_keys = ON;` 级联删除，设置 `PRAGMA busy_timeout = 30000;` 智能等待繁忙写入锁，并在 Python 端使用 `write_lock` 序列化写操作，规避死锁。
 
 ## 4. 前端架构
 
@@ -307,12 +280,14 @@ sequenceDiagram
 
 | 决策 | 理由 |
 |------|------|
-| SQLite 关系数据库 | 无需复杂部署（单文件 db 驱动），从根本上解决海量播客与卡片下 JSON 大文件读写导致的 I/O 卡顿，并实现多线程安全锁定与无损向下迁移 |
-| 8.3 短路径转换 | 规避 Windows 中文用户名导致的 C++ 底层库路径报错 |
-| HuggingFace 镜像自动切换 | 国内用户无需配置代理即可下载 PyAnnote 模型 |
+| SQLite WAL + 线程隔离连接池 | 解决多线程读写下的 I/O 并发卡顿。通过 WAL 模式支持读写并行，去除读锁限制，提供秒级面板渲染，配合 30s `busy_timeout` 与外键级联确保数据一致性 |
+| 延迟加载 (Lazy Loading) 机制 | 彻底重写 ASR 导入逻辑。在在线 ASR 模式下不载入 `torch` 等庞大依赖，实现零 AI 运行库的超轻量启动，利于 SaaS 低成本快速发布 |
+| 显存常驻与 TTL 自动释放 | `ModelCacheManager` 单例缓存 WhisperModel 解决本地转录时重复加载模型的 I/O 痛点，支持超时自动释放 GPU 显存，对低配主机的多任务稳定性友好 |
+| 8.3 短路径转换 | 规避 Windows 中文用户名或含有空格的路径导致的 C++ 底层库（FFmpeg/Faster-Whisper）报错 |
+| HuggingFace 镜像自动切换 | 国内用户无需配置代理即可下载 PyAnnote/Embedding 模型 |
 | 显存熔断降级 | GPU 内存不足时自动切换至 CPU 模式，避免 OOM 崩溃 |
 | 单文件 SPA (App.jsx) | 减少组件间通信复杂度，适合快速迭代的个人项目 |
-| FIFO 任务队列 | 避免多任务并发时显存竞争，保证稳定性 |
+| SQLite 驱动持久化任务队列 | 将原有内存 FIFO 队列升级为数据库驱动，支持断电重启自动恢复续传，并引入全局 Pipeline 取消/中断路由与物理大文件清理机制 |
 | 双模式 ASR/LLM | 支持纯离线和云端 API 两种模式，灵活适配不同场景 |
 | DoH & 4级自适应抓取 | 规避本地 Clash TUN/Fake-IP 导致的 DNS 劫持与 SSL 连接阻线，实现 100% 网络自愈 |
 

@@ -1,12 +1,14 @@
 import os
 import sys
-import torch
 import subprocess
 import socket
+import threading
+import time
 from urllib.parse import urlparse
 from contextlib import contextmanager
 import httpx
 from app.config import (
+    config,
     SHORT_LOCAL_WHISPER_MODEL_PATH, 
     HF_TOKEN, 
     get_short_path_name,
@@ -96,6 +98,90 @@ def doh_dns_bypass(url: str):
             socket.getaddrinfo = original_getaddrinfo
     else:
         yield
+
+
+class ModelCacheManager:
+    def __init__(self):
+        self.cached_model = None
+        self.model_path = None
+        self.device = None
+        self.compute_type = None
+        self.last_used_time = 0.0
+        self.lock = threading.Lock()
+        self._watcher_thread = None
+        self.running = False
+
+    def start_watcher(self):
+        with self.lock:
+            if self.running:
+                return
+            self.running = True
+            self._watcher_thread = threading.Thread(target=self._watch_idle, daemon=True)
+            self._watcher_thread.start()
+            print("⚙️ [LOG] WhisperModel VRAM/内存闲置回收监控线程已启动。")
+
+    def _watch_idle(self):
+        while self.running:
+            time.sleep(10)
+            with self.lock:
+                if self.cached_model is not None:
+                    timeout = int(config.get("local_model_idle_timeout", 300))
+                    if time.time() - self.last_used_time > timeout:
+                        print(f"🧹 [LOG] WhisperModel 闲置超时 ({timeout}s)，自动释放显存/内存...")
+                        self.cached_model = None
+                        self.model_path = None
+                        self.device = None
+                        self.compute_type = None
+                        
+                        import gc
+                        import sys
+                        gc.collect()
+                        if 'torch' in sys.modules:
+                            import torch
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                                print("🧹 [LOG] 已清空 PyTorch CUDA 显存缓存")
+
+    def get_model(self, model_path_or_size: str, device: str, compute_type: str):
+        self.start_watcher()
+        with self.lock:
+            if (self.cached_model is not None and 
+                self.model_path == model_path_or_size and 
+                self.device == device and 
+                self.compute_type == compute_type):
+                print("🎯 [LOG] 命中 WhisperModel 内存常驻缓存，复用已有实例！")
+                self.last_used_time = time.time()
+                return self.cached_model
+
+            print(f"🚀 [LOG] 正在加载 Whisper 模型: {model_path_or_size} (设备: {device.upper()} | 精度: {compute_type})")
+            from faster_whisper import WhisperModel
+            
+            try:
+                # 尝试以 local_files_only=True 加载本地配置路径
+                model = WhisperModel(
+                    model_path_or_size, 
+                    device=device, 
+                    compute_type=compute_type, 
+                    local_files_only=True
+                )
+            except Exception as e:
+                # 如果失败，可能是 HuggingFace model 标识符，尝试在线加载
+                print(f"⚠️ [LOG] 从本地加载模型失败: {e}。尝试从 Hugging Face 在线下载并载入...")
+                model = WhisperModel(
+                    model_path_or_size,
+                    device=device,
+                    compute_type=compute_type,
+                    local_files_only=False
+                )
+
+            self.cached_model = model
+            self.model_path = model_path_or_size
+            self.device = device
+            self.compute_type = compute_type
+            self.last_used_time = time.time()
+            return model
+
+model_cache_manager = ModelCacheManager()
 
 
 class WhisperSegmentDummy:
@@ -442,7 +528,6 @@ class PodcastTranscriber:
             # 本地转录模式
             short_wav_path = get_short_path_name(os.path.abspath(wav_path))
             import torch
-            from faster_whisper import WhisperModel
             
             # 动态显存监控与资源控制
             device_to_use = self.device
@@ -460,17 +545,25 @@ class PodcastTranscriber:
                 except Exception as mem_ex:
                     print(f"⚠️ [LOG] 获取 GPU 显存失败: {mem_ex}")
 
-            print(f"🚀 [LOG] 正在以 {device_to_use.upper()} 模式加载 Whisper 模型: {SHORT_LOCAL_WHISPER_MODEL_PATH}")
-            
-            # 载入本地大模型，使用选定的 device 与 precision
-            model = WhisperModel(
-                SHORT_LOCAL_WHISPER_MODEL_PATH, 
-                device=device_to_use, 
-                compute_type=compute_type_to_use, 
-                local_files_only=True
+            # 解析选定的本地模型大小规格
+            MODEL_SIZE_MAPPING = {
+                "large-v3": "Systran/faster-whisper-large-v3",
+                "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
+                "medium": "Systran/faster-whisper-medium",
+                "small": "Systran/faster-whisper-small",
+            }
+            model_size = config.get("local_whisper_model_size", "large-v3")
+            model_path_or_size = SHORT_LOCAL_WHISPER_MODEL_PATH
+            if not model_path_or_size or not os.path.exists(model_path_or_size):
+                model_path_or_size = MODEL_SIZE_MAPPING.get(model_size, model_size)
+
+            model = model_cache_manager.get_model(
+                model_path_or_size,
+                device=device_to_use,
+                compute_type=compute_type_to_use
             )
             
-            print("✨ [LOG] Whisper 模型已成功载入显存！开始高效转汉字...")
+            print("✨ [LOG] Whisper 模型已就绪！开始高效转汉字...")
             whisper_segments_raw, info = model.transcribe(
                 short_wav_path, 
                 beam_size=5, 

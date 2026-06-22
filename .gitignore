@@ -55,3 +55,6 @@ Thumbs.db
 logs/
 *.bak
 *.db
+*.db-shm
+*.db-wal
+

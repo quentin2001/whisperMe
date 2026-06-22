@@ -1,5 +1,16 @@
 # whisperMe — 变更日志 (Changelog)
 
+## Session `a6a6c8c6` — 2026-06-22 ~ 2026-06-23
+
+### 🚀 后端架构重构与高并发优化
+*   **API 模块化拆分**：将臃肿的 `main.py`（2200+行）重构成清晰的 APIRouter 模块，按领域拆分出 `tasks.py`、`config.py`、`system.py`、`boards.py`。
+*   **核心服务与控制层解耦**：抽取 `app/core/speaker.py` 负责声纹比对、Shownotes 交叉检验、LLM 智能匹配与自动重命名逻辑；抽取 `app/core/pipeline.py` 负责整套音画转录、语义聚合与 LLM 总结的流水线调度逻辑，使 `main.py` 仅作为轻量级 "分发外壳" (Shell)。
+*   **零外部 AI 依赖极速启动**：重构了 `transcriber.py` 并取消顶部的全局 `import torch` 等大库引用。当 ASR 选择为在线模式（如 SaaS 部署）时，彻底豁免载入本地 AI 库，大幅降低服务器冷启动消耗和内存开销。
+*   **Model Cache 显存常驻与 TTL 释放**：内置 `ModelCacheManager` 单例缓存 WhisperModel 避免本地模式下的重复读盘耗时，并支持 `local_model_idle_timeout` 超时自动释放 VRAM 显存并进行 gc 垃圾回收；支持本地模型规格（如 `large-v3-turbo`、`medium`）的自适应选择与在线下载载入。
+*   **SQLite 高并发 WAL 与线程隔离**：支持 PRAGMA WAL 模式实现高并发读写；使用 `threading.local` 构筑独立的线程连接池，移除所有只读查询中的 Python 并发锁，大幅提升面板列表与卡片看析的响应性能，同时配合 busy_timeout 与 write_lock 锁定写事务。
+*   **零依赖标准日志与 Pydantic 校验**：新建 `logger.py` 利用 Python 内置 `logging` 模块实现彩色控制台输出与滚动物理日志，替换 `loguru` 依赖；升级 `config.py` 改用 Pydantic v2 模型对 `config.json` 自动补齐类型校验，替换 `pydantic-settings` 依赖。
+*   **持久化队列与安全取消**：支持 SQLite 驱动的排队状态恢复，并对接 `POST /api/tasks/{task_id}/cancel` 任务中断接口，支持在删除或主动取消正在运行的任务时进行强行安全中断并清理物理临时大文件。
+
 > 按会话 (Session) 分组记录，最新在前。
 
 ---
