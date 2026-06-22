@@ -135,6 +135,69 @@ function MarkdownRenderer({ text, t }) {
 
     if (line === "") continue;
 
+    // Horizontal divider
+    if (line === "---") {
+      renderedElements.push(
+        <hr key={i} className="border-t border-[#e7bcbb]/45 my-6" />
+      );
+      continue;
+    }
+
+    // Timing stats metrics card collector
+    if (line.includes("分析用时统计") || line.includes("Duration Statistics")) {
+      let timingLines = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j].trim();
+        if (nextLine.startsWith("#") || nextLine === "---") {
+          break;
+        }
+        if (nextLine !== "") {
+          timingLines.push(nextLine);
+        }
+        j++;
+      }
+      i = j - 1;
+      
+      renderedElements.push(
+        <div key={`timing-${i}`} className="bg-[#f9f3ea]/45 border border-[#e7bcbb]/50 rounded-xl p-5 my-6 flex flex-col gap-3 shadow-2xs max-w-md animate-fade-in select-text">
+          <div className="flex items-center gap-2 border-b border-[#e7bcbb]/25 pb-2 text-[#bf0029] font-bold text-xs tracking-wider">
+            <span>⏱️</span>
+            <span>{t("转录与分析耗时统计", "Processing Duration Statistics")}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 text-xs font-semibold text-[#5d3f3e]">
+            {timingLines.map((tLine, tIdx) => {
+              let clean = tLine.replace(/^[:：\-—\*\s]+/, "").trim();
+              if (clean.includes("总计耗时") || clean.includes("Total Time") || clean.includes("Total duration")) {
+                const parts = clean.split(":");
+                const label = parts[0].replace(/\*\*/g, "").trim();
+                const durationVal = parts.slice(1).join(":").replace(/\*\*/g, "").trim();
+                return (
+                  <div key={tIdx} className="flex justify-between items-center border-t border-[#e7bcbb]/30 pt-2.5 mt-1.5 font-bold text-[#f62440] text-[13px]">
+                    <span>{label}</span>
+                    <span>{durationVal}</span>
+                  </div>
+                );
+              }
+              const parts = clean.split(":");
+              if (parts.length >= 2) {
+                const key = parts[0].replace(/\*\*/g, "").trim();
+                const val = parts.slice(1).join(":").replace(/\*\*/g, "").trim();
+                return (
+                  <div key={tIdx} className="flex justify-between items-center text-[11px]">
+                    <span className="text-[#5d5a55]">{key}</span>
+                    <span className="font-mono text-[#1d1c18] font-bold">{val}</span>
+                  </div>
+                );
+              }
+              return <div key={tIdx} className="text-[#1d1c18]">{clean}</div>;
+            })}
+          </div>
+        </div>
+      );
+      continue;
+    }
+
     // Header 2
     if (line.startsWith("## ")) {
       renderedElements.push(
@@ -288,8 +351,8 @@ function ShownotesRenderer({ text, onTimeJump }) {
                   <span className="font-mono text-xs w-12 text-[#bf0029] font-bold group-hover:underline">
                     [{item.timestamp}]
                   </span>
-                  <div className="flex-1 h-9 bg-white border border-[#e7bcbb]/30 flex items-center px-4 rounded-lg group-hover:border-[#f62440] group-hover:bg-[#ffdad6]/10 transition-all">
-                    <p className="text-xs font-semibold text-[#1d1c18] truncate">
+                  <div className="flex-1 min-h-[2.25rem] py-2 bg-white border border-[#e7bcbb]/30 flex items-center px-4 rounded-lg group-hover:border-[#f62440] group-hover:bg-[#ffdad6]/10 transition-all">
+                    <p className="text-xs font-semibold text-[#1d1c18] break-words whitespace-normal">
                       {item.text ? parseInlineMarkdown(item.text) : "Timeline Event"}
                     </p>
                   </div>
@@ -314,6 +377,51 @@ function ShownotesRenderer({ text, onTimeJump }) {
           </p>
         );
       })}
+    </div>
+  );
+}
+
+// ==================== 🎙️ Comment Item Bubble Renderer ====================
+function CommentItemRenderer({ comment, onTimeJump, t }) {
+  const text = comment.content || comment.text || "";
+  const timeRegex = /(?:\[|\()(\d{1,2}:\d{2})(?:\]|\))/;
+  const match = text.match(timeRegex);
+  
+  let timestamp = null;
+  let cleanText = text;
+  
+  if (match) {
+    timestamp = match[1];
+    cleanText = text.replace(match[0], "").trim().replace(/^[:：\-—\s]+/, "");
+  }
+  
+  return (
+    <div className="border border-[#e7bcbb]/30 p-4 rounded-xl bg-white hover:border-[#f62440]/30 shadow-2xs hover:shadow-xs transition-all select-text">
+      {/* Top row: author avatar & likes */}
+      <div className="flex justify-between items-center mb-3 text-xs">
+        <span className="font-bold text-[#1d1c18] flex items-center gap-1.5 select-none">
+          <span className="w-5 h-5 rounded-full bg-[#f62440]/10 flex items-center justify-center text-[10px] text-[#f62440] font-bold">👤</span>
+          {comment.author || t("匿名听众", "Anonymous Listener")}
+        </span>
+        <span className="font-mono text-[#bf0029] font-bold flex items-center gap-1 select-none">
+          ❤️ {comment.likes ?? 0}
+        </span>
+      </div>
+      
+      {/* Content bubble */}
+      <div className="flex items-start gap-3">
+        {timestamp && (
+          <button
+            onClick={() => onTimeJump(parseTimestampToSeconds(timestamp))}
+            className="px-2 py-1 bg-[#ffdad6]/60 hover:bg-[#f62440] text-[#bf0029] hover:text-white rounded-md text-[10px] font-mono font-bold transition-all border-0 outline-none cursor-pointer shrink-0 mt-0.5"
+          >
+            [{timestamp}]
+          </button>
+        )}
+        <div className="flex-1 bg-[#f9f3ea]/20 border border-[#e7bcbb]/20 p-3 rounded-lg text-xs text-[#1d1c18] font-semibold leading-relaxed break-words whitespace-normal">
+          {parseInlineMarkdown(cleanText)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -542,20 +650,16 @@ export default function PodcastDetailView({
     return {
       id: p.id || `p-${idx}`,
       speaker: displaySpeaker,
-      timeStart: formatTime(p.start_time),
-      timeEnd: formatTime(p.end_time),
-      text: p.content || "",
-      start_time: p.start_time,
-      end_time: p.end_time
+      timeStart: formatTime(p.start),
+      timeEnd: formatTime(p.end),
+      text: p.text,
+      start_time: p.start,
+      end_time: p.end
     };
   });
 
-  const displayTitle = activeTask.title || "Untitled Session";
-  const displayStatus = activeTask.status === "completed" ? "Completed" : "In Progress";
-  const commentsList = activeTask.metadata?.comments || [];
-
   return (
-    <div id="session-detail-view" ref={containerRef} className="flex-1 flex flex-col h-screen font-sans bg-[#fef9f2] relative select-none">
+    <div id="session-detail-view" ref={containerRef} className="flex-1 flex flex-col h-screen font-sans bg-[#fef9f2] relative">
       
       {/* Mouse dragging cover shield */}
       {isDragging && (
@@ -651,7 +755,11 @@ export default function PodcastDetailView({
                     <p className="font-mono text-xs text-[#bf0029] font-bold mb-1.5 hover:underline">
                       {p.timeStart} — {p.timeEnd}
                     </p>
-                    <h4 className="font-bold text-xs text-[#5d3f3e] uppercase mb-1">{p.speaker}</h4>
+                    <div className="mb-2.5">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#f62440]/8 text-[#bf0029] font-bold text-[10px] tracking-wider uppercase select-none">
+                        👤 {p.speaker}
+                      </span>
+                    </div>
                     <p className="text-[#1d1c18] text-[15px] leading-relaxed select-text font-medium">
                       {p.text}
                     </p>
@@ -710,9 +818,9 @@ export default function PodcastDetailView({
           <div className="flex-1 overflow-y-auto px-8 py-8 flex flex-col gap-6 custom-scrollbar">
             {detailSubTab === "summary" && (
               <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs select-text animate-fade-in">
-                <div className="flex items-center gap-2 mb-4 text-[#bf0029] select-none">
-                  <Sparkles size={16} fill="#bf0029" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
+                <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/30 mb-5 text-[#bf0029] select-none">
+                  <Sparkles size={18} className="text-[#bf0029]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[#1d1c18] font-display">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
                 </div>
                 
                 {/* Custom Markdown renderer rendering entire summary including metrics */}
@@ -721,32 +829,26 @@ export default function PodcastDetailView({
             )}
 
             {detailSubTab === "shownotes" && (
-              <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in">
-                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
+              <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
+                <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/30 mb-5 text-[#bf0029] select-none">
+                  <FileText size={18} className="text-[#bf0029]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[#1d1c18] font-display">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
+                </div>
                 <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} />
               </div>
             )}
 
             {detailSubTab === "comments" && (
-              <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in">
-                <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#5d5a55] mb-4 pb-2 border-b border-[#e7bcbb]/20">{t("听众热门评论", "Hot Listener Comments")}</h3>
+              <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
+                <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/30 mb-5 text-[#bf0029] select-none">
+                  <MessageSquare size={18} className="text-[#bf0029]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[#1d1c18] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
+                </div>
                 
                 <div className="flex flex-col gap-4">
                   {commentsList.length > 0 ? (
                     commentsList.map((comment, cIdx) => (
-                      <div key={cIdx} className="border border-[#e7bcbb]/30 p-4 rounded-xl bg-[#fef9f2]/40 hover:border-[#f62440]/30 transition-all">
-                        <div className="flex justify-between items-center mb-2 text-xs">
-                          <span className="font-bold text-[#1d1c18] flex items-center gap-1.5 select-none">
-                            👤 {comment.author || t("匿名听众", "Anonymous Listener")}
-                          </span>
-                          <span className="font-mono text-[#bf0029] font-bold flex items-center gap-1 select-none">
-                            ❤️ {comment.likes ?? 0}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[#5d3f3e] leading-relaxed whitespace-pre-wrap">
-                          <ShownotesRenderer text={comment.content || comment.text} onTimeJump={jumpToTimeSeconds} />
-                        </div>
-                      </div>
+                      <CommentItemRenderer key={cIdx} comment={comment} onTimeJump={jumpToTimeSeconds} t={t} />
                     ))
                   ) : (
                     <div className="border-2 border-dashed border-[#e7bcbb]/40 p-8 text-center rounded-xl select-none">
