@@ -143,7 +143,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setTasks(data);
+          setTasks(data.filter(t => t && t.id));
         }
       }
     } catch (e) {

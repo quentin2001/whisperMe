@@ -326,8 +326,8 @@ function parseShownotesToBlocks(text) {
   return blocks;
 }
 
-function ShownotesRenderer({ text, onTimeJump }) {
-  if (!text) return <p className="text-xs text-[#5d3f3e]/60">本单集暂无节目简介所示时间轴。</p>;
+function ShownotesRenderer({ text, onTimeJump, t }) {
+  if (!text) return <p className="text-xs text-[#5d3f3e]/60">{t ? t("本单集暂无节目简介所示时间轴。", "No shownotes available for this episode.") : "No shownotes available."}</p>;
 
   const blocks = parseShownotesToBlocks(text);
   const headerRegex = /^(?:#+\s+|[一二三四五六七八九十]+[、.]|[0-9]+\.|part\s*\d|【|🎙️|⏳|📅|💡|📌|「|『)/i;
@@ -665,7 +665,8 @@ export default function PodcastDetailView({
   });
 
   const displayTitle = activeTask.title || "Untitled Session";
-  const displayStatus = activeTask.status === "completed" ? "Completed" : "In Progress";
+  const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing" };
+  const displayStatus = statusMap[activeTask.status] || "In Progress";
   const commentsList = activeTask.metadata?.comments || [];
 
   return (
@@ -844,7 +845,7 @@ export default function PodcastDetailView({
                   <FileText size={18} className="text-[#bf0029]" />
                   <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[#1d1c18] font-display">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
                 </div>
-                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} />
+                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} t={t} />
               </div>
             )}
 

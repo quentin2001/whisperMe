@@ -103,6 +103,9 @@ def get_program_detail(program_id: str) -> Optional[dict]:
         "radio_id": program.get("radio", {}).get("id", ""),
         "pub_date": "",
         "song_id": song_id,
+        "liked_count": program.get("likedCount", 0),
+        "comment_count": program.get("commentCount", 0),
+        "share_count": program.get("shareCount", 0),
     }
 
 
@@ -171,8 +174,8 @@ def _to_standard_metadata(info: dict) -> dict:
         "podcast_name": info.get("radio_name", ""),
         "audio_url": info.get("audio_url", ""),
         "shownotes": info.get("description", ""),
-        "like_count": 0,
-        "comment_count": 0,
+        "like_count": info.get("liked_count", 0),
+        "comment_count": info.get("comment_count", 0),
         "comments": [],
         "image_url": info.get("cover", ""),
         "source": "netease_podcast",

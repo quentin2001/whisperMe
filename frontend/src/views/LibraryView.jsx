@@ -399,12 +399,12 @@ export default function LibraryView({
       title: task.title || `Session ${index + 1}`,
       date: task.date || parsedDate,
       time: task.time || parsedTime,
-      duration: task.duration || "00:00",
+      duration: task.duration || "--:--",
       status: uiStatus,
       speaker: task.speaker || "V. Valerius",
       thumbnail: task.image_url || task.thumbnail || defaultThumbs[index % defaultThumbs.length],
       tags: Array.isArray(task.tags) && task.tags.length > 0 ? task.tags : ["Acoustic", "AI Workstation"],
-      progress: task.progress || 82,
+      progress: task.progress ?? 0,
       rawTask: task
     };
   });
@@ -762,11 +762,12 @@ export default function LibraryView({
                 <div className="flex items-center gap-3.5">
                   {/* Square Program Cover Image */}
                   <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-[#e7bcbb]/30 bg-[#f2ede6]/50 relative">
-                    <img 
-                      src={session.thumbnail} 
-                      alt="" 
+                    <img
+                      src={session.thumbnail}
+                      alt=""
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; }}
                     />
                     {session.status === 'IN_PROGRESS' && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
