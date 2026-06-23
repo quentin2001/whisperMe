@@ -429,13 +429,27 @@ export default function SettingsView({
             </div>
 
 
-            <button
-              onClick={handleSaveConfig}
-              className="w-full mt-2 bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs border-0 outline-none cursor-pointer"
-            >
-              <Save size={16} />
-              <span>{t("保存配置表", "Save Configuration")}</span>
-            </button>
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={handleSaveConfig}
+                className="flex-1 bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs border-0 outline-none cursor-pointer"
+              >
+                <Save size={16} />
+                <span>{t("保存配置表", "Save Configuration")}</span>
+              </button>
+              <div className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e7bcbb]/40 rounded-lg">
+                <span className="text-xs font-bold text-[#5d5a55] whitespace-nowrap">{t("自动保存", "Auto-Save")}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoSaveEnabled}
+                  onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer border-0 outline-none ${autoSaveEnabled ? "bg-[#f62440]" : "bg-[#d4cfc7]"}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${autoSaveEnabled ? "translate-x-4.5" : "translate-x-1"}`} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Database details */}
@@ -524,13 +538,6 @@ export default function SettingsView({
                     </div>
                   </div>
                 )}
-              </div>
-              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30 mt-2">
-                <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">Auto-Save Changes</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">Auto-save when config changes.</p>
-                </div>
-                <input type="checkbox" checked={autoSaveEnabled} onChange={(e) => setAutoSaveEnabled(e.target.checked)} className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer" />
               </div>
             </div>
 
