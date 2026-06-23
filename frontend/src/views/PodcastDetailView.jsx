@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw, 
+import {
+  Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
-  MessageSquare, History, Calendar, FileText, Users
+  MessageSquare, History, Calendar, FileText, Users, ExternalLink
 } from "lucide-react";
 
 // ==================== 📝 Inline Markdown Parser ====================
@@ -696,6 +696,17 @@ export default function PodcastDetailView({
               <span className="bg-[#f0e2b7] text-[#554428] text-[10px] font-extrabold tracking-widest px-2.5 py-0.5 rounded-sm uppercase">
                 {displayStatus}
               </span>
+              {activeTask.url && (
+                <a
+                  href={activeTask.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={t("打开原始播客链接", "Open original podcast link")}
+                  className="p-1.5 hover:bg-[#f2ede6] rounded-lg transition-all text-[#8a8580] hover:text-[#1d1c18]"
+                >
+                  <ExternalLink size={15} />
+                </a>
+              )}
             </div>
           </div>
         </div>

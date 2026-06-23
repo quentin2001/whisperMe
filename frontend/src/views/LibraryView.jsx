@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { 
-  Search, SlidersHorizontal, Mic, Square, Cloud, Play, 
-  Download, Trash2, BarChart3, Database, Plus, Calendar, FastForward
+import {
+  Search, SlidersHorizontal, Mic, Square, Cloud, Play,
+  Trash2, BarChart3, Database, Plus, Calendar, FastForward, ExternalLink
 } from "lucide-react";
 
 const formatDateToYYYYMMDD = (dateInput) => {
@@ -844,15 +844,16 @@ export default function LibraryView({
                     >
                       <Play size={14} />
                     </button>
-                    <button
-                      className="p-1.5 hover:bg-[#f2ede6]/50 rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        alert(t(`正在下载音频文件: ${session.title}`, `Downloading complete acoustic wave file for: ${session.title}`));
-                      }}
+                    <a
+                      href={session.rawTask.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={t("打开原始播客链接", "Open original podcast link")}
+                      className="p-1.5 hover:bg-[#f2ede6]/50 rounded-full transition-all text-[#8a8580] hover:text-[#1d1c18]"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <Download size={14} />
-                    </button>
+                      <ExternalLink size={14} />
+                    </a>
                     <button
                       className="p-1.5 hover:bg-[#ffdad6]/50 hover:text-[#f62440] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
                       onClick={(e) => {
