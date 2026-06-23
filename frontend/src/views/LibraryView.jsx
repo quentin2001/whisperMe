@@ -533,7 +533,7 @@ export default function LibraryView({
           formData.append("file", audioBlob, `mic_record_${Date.now()}.wav`);
           formData.append("asr_mode", "local");
 
-          const response = await fetch("http://127.0.0.1:8000/api/upload", {
+          const response = await fetch("http://127.0.0.1:8001/api/upload", {
             method: "POST",
             body: formData
           });

@@ -72,7 +72,7 @@ export default function SettingsView({
 
   const recheckFfmpeg = () => {
     setFfmpegStatus(null);
-    const API = "http://127.0.0.1:8000";
+    const API = "http://127.0.0.1:8001";
     const p = configData?.ffmpeg_path?.trim();
     const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
     fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
@@ -86,7 +86,7 @@ export default function SettingsView({
   }, []);
 
   useEffect(() => {
-    const API = "http://127.0.0.1:8000";
+    const API = "http://127.0.0.1:8001";
     const p = configData?.ffmpeg_path?.trim();
     const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
     fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));

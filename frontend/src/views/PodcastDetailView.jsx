@@ -487,7 +487,7 @@ export default function PodcastDetailView({
     if (!newName.trim()) return;
     setIsSavingSpeaker(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/speaker/rename`, {
+      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/speaker/rename`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -518,7 +518,7 @@ export default function PodcastDetailView({
     const targetName = activeTask.speaker_mappings?.[targetId] || targetId;
     if (!confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tasks/speakers/merge`, {
+      const res = await fetch(`http://127.0.0.1:8001/api/tasks/speakers/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_name: sourceName, target_name: targetName }),
@@ -527,7 +527,7 @@ export default function PodcastDetailView({
         // Also rename in this task's mappings
         const mappings = { ...activeTask.speaker_mappings };
         mappings[sourceId] = targetName;
-        const renameRes = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/speaker/rename`, {
+        const renameRes = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/speaker/rename`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ speaker_id: sourceId, new_name: targetName }),
@@ -548,7 +548,7 @@ export default function PodcastDetailView({
     const speakerName = activeTask.speaker_mappings?.[speakerId] || speakerId;
     if (!confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tasks/speakers/forget`, {
+      const res = await fetch(`http://127.0.0.1:8001/api/tasks/speakers/forget`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: speakerName }),
@@ -567,7 +567,7 @@ export default function PodcastDetailView({
   const handleRedownloadAudio = async () => {
     setIsTriggeringRestore(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/redownload`, {
+      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/redownload`, {
         method: "POST"
       });
       if (res.ok) {
@@ -701,7 +701,7 @@ export default function PodcastDetailView({
   const triggerAIAnalysis = async () => {
     setAnalyzing(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/summarize`, {
+      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/summarize`, {
         method: "POST"
       });
       if (res.ok) {
