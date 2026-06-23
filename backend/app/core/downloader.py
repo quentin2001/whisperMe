@@ -282,6 +282,95 @@ class PodcastDownloader:
                 
         return current_url
 
+    def _is_rss_compatible_url(self, url: str) -> bool:
+        """判断 URL 是否为 Apple Podcasts / RSS / Pocket Casts / Overcast 链接"""
+        rss_indicators = [
+            "podcasts.apple.com",
+            "itunes.apple.com",
+            "pca.st",
+            "pocketcasts.com",
+            "overcast.fm",
+        ]
+        for indicator in rss_indicators:
+            if indicator in url:
+                return True
+        # 检查是否像 RSS URL
+        rss_patterns = [r'\.xml$', r'\.rss$', r'/feed/?$', r'/rss/?$', r'feeds?\.']
+        url_lower = url.lower().split('?')[0]
+        for pattern in rss_patterns:
+            if re.search(pattern, url_lower):
+                return True
+        return False
+
+    def _download_file_with_fallback(self, url: str, local_path: str, progress_callback=None):
+        """使用 4 级 fallback 策略下载文件"""
+        import time as _time
+        downloaded = False
+
+        # 1. httpx 代理
+        try:
+            print(f"[LOG] 尝试 httpx 代理下载...")
+            with httpx.Client(timeout=300.0, trust_env=True, follow_redirects=True) as client:
+                with client.stream("GET", url, headers={"User-Agent": "whisperMe/1.0"}) as resp:
+                    if resp.status_code == 200:
+                        total = int(resp.headers.get("content-length", 0))
+                        downloaded_bytes = 0
+                        with open(local_path, "wb") as f:
+                            for chunk in resp.iter_bytes(chunk_size=8192):
+                                f.write(chunk)
+                                downloaded_bytes += len(chunk)
+                                if progress_callback and total > 0:
+                                    progress_callback(min(95.0, (downloaded_bytes / total) * 95.0))
+                        downloaded = True
+        except Exception as e:
+            print(f"[LOG] httpx 代理下载失败: {e}")
+
+        # 2. httpx 直连 (DoH)
+        if not downloaded:
+            try:
+                print(f"[LOG] 尝试 httpx 直连 (DoH) 下载...")
+                with doh_dns_bypass(url):
+                    with httpx.Client(timeout=300.0, trust_env=False, follow_redirects=True) as client:
+                        with client.stream("GET", url, headers={"User-Agent": "whisperMe/1.0"}) as resp:
+                            if resp.status_code == 200:
+                                with open(local_path, "wb") as f:
+                                    for chunk in resp.iter_bytes(chunk_size=8192):
+                                        f.write(chunk)
+                                downloaded = True
+            except Exception as e:
+                print(f"[LOG] httpx 直连下载失败: {e}")
+
+        # 3. curl 代理
+        if not downloaded:
+            try:
+                print(f"[LOG] 尝试 curl 代理下载...")
+                cmd = ["curl.exe", "-L", "-o", get_short_path_name(local_path), "-s", "--max-time", "300", url]
+                res = subprocess.run(cmd, capture_output=True, timeout=310)
+                if res.returncode == 0 and os.path.exists(local_path):
+                    downloaded = True
+            except Exception as e:
+                print(f"[LOG] curl 代理下载失败: {e}")
+
+        # 4. curl DoH 直连
+        if not downloaded:
+            try:
+                print(f"[LOG] 尝试 curl DoH 直连下载...")
+                real_ip = resolve_host_via_doh(urlparse(url).hostname)
+                if real_ip:
+                    cmd = ["curl.exe", "-L", "-o", get_short_path_name(local_path), "-s",
+                           "--max-time", "300", "--resolve",
+                           f"{urlparse(url).hostname}:443:{real_ip}", url]
+                    res = subprocess.run(cmd, capture_output=True, timeout=310)
+                    if res.returncode == 0 and os.path.exists(local_path):
+                        downloaded = True
+            except Exception as e:
+                print(f"[LOG] curl DoH 下载失败: {e}")
+
+        if not downloaded:
+            raise Exception("所有下载方式均失败")
+        if progress_callback:
+            progress_callback(100.0)
+
     def parse_metadata(self, url: str) -> dict:
         """
         仅抓取并解析链接元数据而不下载音频文件
@@ -337,6 +426,16 @@ class PodcastDownloader:
                     "image_url": view_info.get("pic", ""),
                     "source": "bilibili_private"
                 }
+
+        # 判断是否为 Apple Podcasts / RSS Feed / Pocket Casts / Overcast
+        elif self._is_rss_compatible_url(url):
+            from app.core.rss_parser import resolve_podcast_url
+            metadata = resolve_podcast_url(url)
+            if metadata and metadata.get("audio_url"):
+                return metadata
+            # RSS 解析失败，fallback 到 yt-dlp
+            print(f"[LOG] RSS/Apple Podcasts 解析失败，尝试 yt-dlp 兜底...")
+
         else:
             # 使用 yt-dlp 抓取通用媒体信息 (不下载)
             ydl_opts = {
@@ -908,6 +1007,28 @@ class PodcastDownloader:
             if progress_callback:
                 progress_callback(100.0)
             return local_filename, metadata
+
+        # Apple Podcasts / RSS Feed / Pocket Casts / Overcast
+        elif self._is_rss_compatible_url(url):
+            from app.core.rss_parser import resolve_podcast_url
+            rss_metadata = resolve_podcast_url(url)
+            if rss_metadata and rss_metadata.get("audio_url"):
+                audio_url = rss_metadata["audio_url"]
+                local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+                if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                    print(f"[LOG] RSS 音频缓存命中: {local_filename}")
+                    rss_metadata["duration"] = self.get_audio_duration_str(local_filename)
+                    if progress_callback:
+                        progress_callback(100.0)
+                    return local_filename, rss_metadata
+
+                print(f"[LOG] 正在从 RSS Feed 下载音频: {audio_url}")
+                self._download_file_with_fallback(audio_url, local_filename, progress_callback)
+                rss_metadata["duration"] = self.get_audio_duration_str(local_filename)
+                return local_filename, rss_metadata
+
+            print(f"[LOG] RSS 下载失败，尝试 yt-dlp 兜底...")
+
         else:
             local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
             if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
