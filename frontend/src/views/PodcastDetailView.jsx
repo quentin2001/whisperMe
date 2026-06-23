@@ -890,9 +890,20 @@ export default function PodcastDetailView({
         
         {/* Left: session audio details */}
         <div className="w-1/4 flex items-center gap-3">
-          <div className="w-11 h-11 bg-[#f62440] rounded-lg flex flex-col justify-center items-center text-white font-bold tracking-tight shadow-sm shrink-0">
-            <span className="text-[10px] uppercase font-mono tracking-wide leading-none">V3</span>
-            <span className="text-xs uppercase font-sans tracking-tight leading-none mt-0.5">Noir</span>
+          <div className="w-11 h-11 bg-[#f62440] rounded-lg overflow-hidden shadow-sm shrink-0">
+            {activeTask.image_url ? (
+              <img
+                src={activeTask.image_url}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight">
+                <span className="text-[10px] uppercase font-mono tracking-wide leading-none">WM</span>
+              </div>
+            )}
           </div>
           <div className="hidden sm:block overflow-hidden">
             <h4 className="font-bold text-xs text-[#1d1c18] font-display max-w-[200px] truncate">{displayTitle}</h4>
