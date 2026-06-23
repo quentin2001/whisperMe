@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw } from "lucide-react";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -566,30 +566,6 @@ export default function SettingsView({
                   ]}
                 />
               </div>
-            </div>
-
-            {/* Storage Cache Panel */}
-            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
-              <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">
-                <Database size={16} />
-                <h3 className="font-bold text-sm text-[#1d1c18]">{t("工作区数据库缓存", "Workspace Database Cache")}</h3>
-              </div>
-              
-              <p className="text-xs text-[#5d5a55] leading-relaxed mb-4 font-medium">
-                {t("所有已录制的音频和生成的AI总结都会保存在浏览器的本地存储库中。", "Recorded tracks and parsed summaries are stored in your browser's persistent key-value namespace.")}
-              </p>
-
-              <button
-                onClick={() => {
-                  if (confirm(t("确定要重置当前工作区和数据库日志吗？所有用户录音及任务记录将被永久删除！", "Reset current sessions and database logs to initial reference state? All user custom recordings will be permanently removed."))) {
-                    onResetData();
-                  }
-                }}
-                className="w-full py-2.5 px-4 rounded-lg bg-[#ffdad6] text-[#b81a1a] hover:bg-[#ffdad6]/80 text-xs font-bold transition-all border border-[#ffb4a8]/50 flex items-center justify-center gap-2 border-0 outline-none cursor-pointer"
-              >
-                <ShieldAlert size={14} />
-                <span>{t("重置工作区数据库", "Reset Workspace to Defaults")}</span>
-              </button>
             </div>
 
             {/* Audio Auto-Cleanup Panel */}
