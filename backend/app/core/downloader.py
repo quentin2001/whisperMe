@@ -302,6 +302,18 @@ class PodcastDownloader:
                 return True
         return False
 
+    def _is_netease_podcast_url(self, url: str) -> bool:
+        """判断是否为网易云音乐播客链接"""
+        return "music.163.com" in url and ("/program" in url or "/radio" in url or "/podcast" in url)
+
+    def _is_ximalaya_url(self, url: str) -> bool:
+        """判断是否为喜马拉雅链接"""
+        return "ximalaya.com" in url or "xima.tv" in url
+
+    def _is_lizhi_url(self, url: str) -> bool:
+        """判断是否为荔枝FM链接"""
+        return "lizhi.fm" in url or "lzfm.com" in url
+
     def _download_file_with_fallback(self, url: str, local_path: str, progress_callback=None):
         """使用 4 级 fallback 策略下载文件"""
         import time as _time
@@ -426,6 +438,30 @@ class PodcastDownloader:
                     "image_url": view_info.get("pic", ""),
                     "source": "bilibili_private"
                 }
+
+        # 判断是否为网易云音乐播客
+        elif self._is_netease_podcast_url(url):
+            from app.core.netease_podcast import resolve_netease_podcast
+            metadata = resolve_netease_podcast(url)
+            if metadata and metadata.get("audio_url"):
+                return metadata
+            print(f"[LOG] 网易云音乐解析失败，尝试 yt-dlp 兜底...")
+
+        # 判断是否为喜马拉雅
+        elif self._is_ximalaya_url(url):
+            from app.core.ximalaya import resolve_ximalaya_podcast
+            metadata = resolve_ximalaya_podcast(url)
+            if metadata and metadata.get("audio_url"):
+                return metadata
+            print(f"[LOG] 喜马拉雅解析失败，尝试 yt-dlp 兜底...")
+
+        # 判断是否为荔枝FM
+        elif self._is_lizhi_url(url):
+            from app.core.lizhi_fm import resolve_lizhi_podcast
+            metadata = resolve_lizhi_podcast(url)
+            if metadata and metadata.get("audio_url"):
+                return metadata
+            print(f"[LOG] 荔枝FM解析失败，尝试 yt-dlp 兜底...")
 
         # 判断是否为 Apple Podcasts / RSS Feed / Pocket Casts / Overcast
         elif self._is_rss_compatible_url(url):
@@ -1007,6 +1043,69 @@ class PodcastDownloader:
             if progress_callback:
                 progress_callback(100.0)
             return local_filename, metadata
+
+        # 网易云音乐播客
+        elif self._is_netease_podcast_url(url):
+            from app.core.netease_podcast import resolve_netease_podcast
+            netease_meta = resolve_netease_podcast(url)
+            if netease_meta and netease_meta.get("audio_url"):
+                audio_url = netease_meta["audio_url"]
+                local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+                if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                    print(f"[LOG] 网易云音乐音频缓存命中: {local_filename}")
+                    netease_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    if progress_callback:
+                        progress_callback(100.0)
+                    return local_filename, netease_meta
+
+                print(f"[LOG] 正在下载网易云音乐音频: {audio_url}")
+                self._download_file_with_fallback(audio_url, local_filename, progress_callback)
+                netease_meta["duration"] = self.get_audio_duration_str(local_filename)
+                return local_filename, netease_meta
+
+            print(f"[LOG] 网易云音乐下载失败，尝试 yt-dlp 兜底...")
+
+        # 喜马拉雅
+        elif self._is_ximalaya_url(url):
+            from app.core.ximalaya import resolve_ximalaya_podcast
+            ximalaya_meta = resolve_ximalaya_podcast(url)
+            if ximalaya_meta and ximalaya_meta.get("audio_url"):
+                audio_url = ximalaya_meta["audio_url"]
+                local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+                if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                    print(f"[LOG] 喜马拉雅音频缓存命中: {local_filename}")
+                    ximalaya_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    if progress_callback:
+                        progress_callback(100.0)
+                    return local_filename, ximalaya_meta
+
+                print(f"[LOG] 正在下载喜马拉雅音频: {audio_url[:80]}")
+                self._download_file_with_fallback(audio_url, local_filename, progress_callback)
+                ximalaya_meta["duration"] = self.get_audio_duration_str(local_filename)
+                return local_filename, ximalaya_meta
+
+            print(f"[LOG] 喜马拉雅下载失败，尝试 yt-dlp 兜底...")
+
+        # 荔枝FM
+        elif self._is_lizhi_url(url):
+            from app.core.lizhi_fm import resolve_lizhi_podcast
+            lizhi_meta = resolve_lizhi_podcast(url)
+            if lizhi_meta and lizhi_meta.get("audio_url"):
+                audio_url = lizhi_meta["audio_url"]
+                local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
+                if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
+                    print(f"[LOG] 荔枝FM音频缓存命中: {local_filename}")
+                    lizhi_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    if progress_callback:
+                        progress_callback(100.0)
+                    return local_filename, lizhi_meta
+
+                print(f"[LOG] 正在下载荔枝FM音频: {audio_url[:80]}")
+                self._download_file_with_fallback(audio_url, local_filename, progress_callback)
+                lizhi_meta["duration"] = self.get_audio_duration_str(local_filename)
+                return local_filename, lizhi_meta
+
+            print(f"[LOG] 荔枝FM下载失败，尝试 yt-dlp 兜底...")
 
         # Apple Podcasts / RSS Feed / Pocket Casts / Overcast
         elif self._is_rss_compatible_url(url):
