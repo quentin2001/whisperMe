@@ -298,9 +298,13 @@ export default function App() {
         body: JSON.stringify({ url: newUrl.trim(), asr_mode: asrMode })
       });
       if (res.status === 200) {
+        const result = await res.json();
         setNewUrl("");
         setIsIngestModalOpen(false);
         fetchTasks();
+        if (result.warning) {
+          alert(result.warning);
+        }
       }
     } catch (e) {
       alert(t("发起任务失败，请检查后端服务是否启动！", "Failed to start task. Please check if the backend service is running!"));
@@ -323,9 +327,14 @@ export default function App() {
         body: formData
       });
       if (res.ok) {
+        const result = await res.json();
         setIsIngestModalOpen(false);
         fetchTasks();
-        alert(t("音频文件导入成功！", "Audio file imported successfully!"));
+        if (result.warning) {
+          alert(result.warning);
+        } else {
+          alert(t("音频文件导入成功！", "Audio file imported successfully!"));
+        }
       } else {
         alert(t("文件上传失败。", "File upload failed."));
       }

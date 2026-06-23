@@ -41,6 +41,19 @@ class RenameSpeakerRequest(BaseModel):
     new_name: str
 
 # --- Helper Functions ---
+def check_low_disk_space():
+    try:
+        from app.config import STORAGE_BASE
+        check_path = STORAGE_BASE if (STORAGE_BASE and os.path.exists(STORAGE_BASE)) else PROJECT_DIR
+        if os.path.exists(check_path):
+            total, used, free = shutil.disk_usage(check_path)
+            # 2.0 GB threshold = 2 * 1024 * 1024 * 1024
+            if free < 2 * 1024 * 1024 * 1024:
+                return f"警告：当前设置中的存储路径或系统盘剩余空间不足 2.0 GB（仅剩 {free / (1024**3):.2f} GB），可能会导致后续播客音频下载或转录失败，请及时清理磁盘！"
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] Failed to check disk space: {e}")
+    return None
+
 def save_speaker_fingerprint(name: str, embedding: list[float]):
     if not name or not embedding:
         return
@@ -123,7 +136,12 @@ def create_task(req: CreateTaskRequest):
     
     # 放入全局单例队列管理器进行排队串行处理，不再直接塞给 background_tasks 并行跑
     queue_manager.add_task(task_id, req.url)
-    return {"task_id": task_id, "status": "pending"}
+    
+    res = {"task_id": task_id, "status": "pending"}
+    warning = check_low_disk_space()
+    if warning:
+        res["warning"] = warning
+    return res
 
 @router.delete("/{task_id}")
 def delete_task(task_id: str):
@@ -365,4 +383,9 @@ def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
     
     # 5. 放入全局单例队列管理器进行排队串行处理
     queue_manager.add_task(task_id, local_path)
-    return {"task_id": task_id, "status": "pending"}
+    
+    res = {"task_id": task_id, "status": "pending"}
+    warning = check_low_disk_space()
+    if warning:
+        res["warning"] = warning
+    return res

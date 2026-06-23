@@ -168,35 +168,15 @@ os.environ["XDG_CACHE_HOME"] = SHORT_HF_CACHE_DIR
 if not os.environ.get("HF_ENDPOINT"):
     os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-# huggingface_hub API 动态 Patch 拦截
-try:
-    import huggingface_hub.constants
-    import huggingface_hub.file_download
-    
-    # Always use the mirror unless the user has overridden the environment endpoint
-    endpoint_url = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
-    huggingface_hub.constants.ENDPOINT = endpoint_url
-    huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE = f"{endpoint_url}/{{repo_id}}/resolve/{{revision}}/{{filename}}"
-        
-    huggingface_hub.constants.HF_HOME = SHORT_HF_CACHE_DIR
-    huggingface_hub.constants.HF_HUB_CACHE = SHORT_HF_CACHE_DIR
-    huggingface_hub.constants.DEFAULT_HF_CACHE_HOME = SHORT_HF_CACHE_DIR
-    huggingface_hub.constants.HF_HUB_DISABLE_SYMLINKS_WARNING = True
-    
-    raw_hf_hub_download = huggingface_hub.file_download.hf_hub_download
-    def patched_hf_hub_download(*args, **kwargs):
-        if 'use_auth_token' in kwargs: 
-            kwargs['token'] = kwargs.pop('use_auth_token')
-        # Only set cache_dir so that the standard cache directory layout (with models--...) is preserved.
-        # DO NOT specify local_dir here as it forces downloading to a flat directory and breaks Pipeline.from_pretrained loading.
-        kwargs['cache_dir'] = SHORT_HF_CACHE_DIR
-        if 'local_dir' in kwargs:
-            kwargs.pop('local_dir')
-        return raw_hf_hub_download(*args, **kwargs)
-    huggingface_hub.hf_hub_download = patched_hf_hub_download
-    huggingface_hub.file_download.hf_hub_download = patched_hf_hub_download
-except Exception:
-    pass
+# huggingface_hub API 动态配置声明
+endpoint_url = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
+os.environ["HF_ENDPOINT"] = endpoint_url
+os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
+os.environ["HF_HUB_CACHE"] = SHORT_HF_CACHE_DIR
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "True"
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN
+
 
 # ==================== 导出全局可用变量 ====================
 FFMPEG_PATH = config.get("ffmpeg_path")

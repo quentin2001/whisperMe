@@ -55,6 +55,42 @@ def run_podcast_pipeline(task_id: str, url: str):
                     "请先启动您的 LM Studio 或 Ollama 服务，或者在【系统设置】中将 AI 总结引擎切换为【在线 OpenAI 兼容 API】。"
                 )
             
+        # Step 0.8: ASR 断点续传/跳过检查
+        existing_paragraphs = db.get_paragraphs_by_podcast(task_id)
+        if existing_paragraphs and len(existing_paragraphs) > 0:
+            print(f"🎯 [LOG] 检测到数据库中任务 {task_id} 已有历史转录段落 ({len(existing_paragraphs)} 段)，直接跳过下载与 ASR 转录，进入 AI 总结重算阶段。")
+            db.update_task(task_id, status="summarizing", progress=80.0)
+            
+            task_metadata = task.get("metadata") or {
+                "title": task.get("title") or "未命名任务",
+                "podcast_name": task.get("podcast_name") or "本地导入",
+                "image_url": task.get("image_url") or "",
+                "like_count": 0,
+                "comment_count": 0,
+                "shownotes": "",
+                "comments": []
+            }
+            merged_transcript = task.get("transcript") or []
+            
+            check_cancelled(task_id)
+            task_summary_mode = task.get("summary_mode", "local")
+            t_summary_start = time.time()
+            summary_report = summarizer.summarize(task_metadata, merged_transcript, summary_mode=task_summary_mode)
+            
+            total_time = time.time() - pipeline_start_time
+            time_report = f"\n\n---\n\n### ⏱️ 分析用时统计 (ASR 断点跳过)\n- **AI 总结**: {time.time() - t_summary_start:.1f} 秒\n- **总计耗时**: {total_time:.1f} 秒\n"
+            summary_report += time_report
+            db.update_task(task_id, summary=summary_report, progress=95.0)
+
+            check_cancelled(task_id)
+            db.update_task(task_id, status="completed", progress=100.0)
+
+            notifier.send_desktop_notification(
+                title="播客 AI 总结生成完成！",
+                message=f"《{task_metadata['title']}》已重新总结成功。"
+            )
+            return
+
         # Step 1: 下载音频与获取元数据
         db.update_task(task_id, status="downloading", progress=10.0)
         

@@ -1,6 +1,21 @@
 import os
 import sys
 import subprocess
+import sys
+
+_original_run = subprocess.run
+def _patched_run(*args, **kwargs):
+    if sys.platform == 'win32' and 'creationflags' not in kwargs:
+        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+    return _original_run(*args, **kwargs)
+subprocess.run = _patched_run
+
+_original_check_output = subprocess.check_output
+def _patched_check_output(*args, **kwargs):
+    if sys.platform == 'win32' and 'creationflags' not in kwargs:
+        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+    return _original_check_output(*args, **kwargs)
+subprocess.check_output = _patched_check_output
 import socket
 import threading
 import time

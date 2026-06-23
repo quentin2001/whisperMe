@@ -538,7 +538,11 @@ export default function LibraryView({
 
           if (response.ok) {
             const result = await response.json();
-            alert(t("麦克风录音上传成功！", "Microphone recording uploaded successfully!"));
+            if (result.warning) {
+              alert(result.warning);
+            } else {
+              alert(t("麦克风录音上传成功！", "Microphone recording uploaded successfully!"));
+            }
             if (typeof onAddNewSession === "function") {
               onAddNewSession({
                 id: result.task_id,

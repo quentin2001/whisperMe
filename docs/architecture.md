@@ -118,31 +118,6 @@ whisperMe/
 └── docs/                      # 项目文档
 ```
 
----��器
-│           ├── summarizer.py      # Ollama / 在线 LLM 总结器
-│           ├── notifier.py        # 邮件 & Windows 桌面通知
-│           ├── queue_manager.py   # FIFO 后台任务队列
-│           └── prompt_manager.py  # Prompt 模板 IO
-│
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│       ├── main.jsx           # React 挂载入口
-│       ├── App.jsx            # 单文件 SPA 主组件 (~5200 行)
-│       ├── App.css            # 辅助样式
-│       ├── index.css          # 核心 CSS / 设计令牌
-│       ├── SlotMachineModal.jsx   # 认知沙盒 — 老虎机模态
-│       └── AiColliderModal.jsx    # AI 碰撞器模态
-│
-├── downloads/                 # 下载的原始音频
-├── transcripts/               # 转录结果 JSON
-├── temp_sandbox/              # 临时沙盒目录
-├── hf_cache_models/           # HuggingFace 模型缓存
-├── models/                    # 本地模型文件
-└── docs/                      # 项目文档
-```
-
 ---
 
 ## 3. 后端核心模块
@@ -199,7 +174,7 @@ whisperMe/
 |----------|------|
 | 播客库 (Dashboard) | 任务列表、状态监控、新增任务 |
 | 任务详情 (Detail) | 剧本对话流、AI 总结报告、Shownotes、说话人管理 |
-| 认知沙盒 (Sandbox) | 段落沉淀、Anki 闪光卡片、老虎机、AI 碰撞器 |
+| 认知沙盒 (Sandbox) | 段落沉淀、Anki 闪光卡片、AI 碰撞器 |
 | 系统设置 (Settings) | 外观主题、ASR/LLM 引擎配置、SMTP 通知配置 |
 
 ### 4.3 国际化 (i18n)
@@ -266,7 +241,7 @@ sequenceDiagram
     U->>F: 选中段落 → 沉淀
     F->>B: POST /api/cards/create
     B-->>F: 返回新卡片
-    U->>F: 进入老虎机/碰撞器
+    U->>F: 进入对撞机
     F->>B: GET /api/cards/collider
     B-->>F: 返回随机卡片组
     U->>F: 复习卡片

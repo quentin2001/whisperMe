@@ -3,6 +3,15 @@ import re
 import json
 import hashlib
 import subprocess
+import sys
+
+_original_run = subprocess.run
+def _patched_run(*args, **kwargs):
+    if sys.platform == 'win32' and 'creationflags' not in kwargs:
+        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+    return _original_run(*args, **kwargs)
+subprocess.run = _patched_run
+
 import httpx
 from bs4 import BeautifulSoup
 import yt_dlp
