@@ -67,6 +67,16 @@ export default function SettingsView({
   const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isFlashing, setIsFlashing] = useState(true);
+  const [ffmpegStatus, setFfmpegStatus] = useState(null);
+  const [showFfmpegAdvanced, setShowFfmpegAdvanced] = useState(false);
+
+  const recheckFfmpeg = () => {
+    setFfmpegStatus(null);
+    const API = "http://127.0.0.1:8000";
+    const p = configData?.ffmpeg_path?.trim();
+    const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
+    fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -74,6 +84,13 @@ export default function SettingsView({
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const API = "http://127.0.0.1:8000";
+    const p = configData?.ffmpeg_path?.trim();
+    const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
+    fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
+  }, [configData?.ffmpeg_path]);
 
   const getHighlightClass = (val) => {
     return isFlashing && (!val || String(val).trim() === "") ? "highlight-flash" : "";
@@ -168,38 +185,70 @@ export default function SettingsView({
               {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 接口基础地址", "API Base URL")}<span className="text-[#f62440] ml-1">*</span></label>
-                    <input
-                      type="text"
-                      value={configData.online_base_url || ""}
-                      onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
-                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_base_url)}`}
-                      placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("ASR Provider", "ASR Provider")}</label>
+                    <SettingsDropdown
+                      value={configData.online_asr_provider || "mimo"}
+                      onChange={(val) => handleConfigChange("online_asr_provider", val)}
+                      options={[
+                        { value: "mimo", label: "MiMo ASR" },
+                        { value: "openai", label: "OpenAI Whisper" },
+                        { value: "funasr", label: "FunASR" },
+                        { value: "custom", label: "Custom HTTP" }
+                      ]}
                     />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：https://token-plan-sgp.xiaomimimo.com/v1 或 https://api.openai.com/v1", "Example: https://token-plan-sgp.xiaomimimo.com/v1 or https://api.openai.com/v1")}</span>
                   </div>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("模型标识符 (Model ID)", "Model ID")}<span className="text-[#f62440] ml-1">*</span></label>
-                    <input
-                      type="text"
-                      value={configData.online_model || ""}
-                      onChange={(e) => handleConfigChange("online_model", e.target.value)}
-                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_model)}`}
-                      placeholder="mimo-v2.5-asr"
-                    />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("样例：mimo-v2.5-asr 或 whisper-1", "Example: mimo-v2.5-asr or whisper-1")}</span>
-                  </div>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API 密钥 (API Key)", "API Key")}<span className="text-[#f62440] ml-1">*</span></label>
-                    <input
-                      type="password"
-                      value={configData.online_api_key || ""}
-                      onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
-                      className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_api_key)}`}
-                      placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    />
-                    <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key you requested from your ASR service provider")}</span>
-                  </div>
+                  {configData.online_asr_provider !== "custom" && (
+                    <>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API Base URL", "API Base URL")}<span className="text-[#f62440] ml-1">*</span></label>
+                        <input type="text" value={configData.online_base_url || ""} onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
+                          className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_base_url)}`}
+                          placeholder={configData.online_asr_provider === "openai" ? "https://api.openai.com/v1" : configData.online_asr_provider === "funasr" ? "http://localhost:10095" : "https://token-plan-sgp.xiaomimimo.com/v1"} />
+                      </div>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("Model ID", "Model ID")}</label>
+                        <input type="text" value={configData.online_model || ""} onChange={(e) => handleConfigChange("online_model", e.target.value)}
+                          className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_model)}`}
+                          placeholder={configData.online_asr_provider === "openai" ? "whisper-1" : "mimo-v2.5-asr"} />
+                      </div>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("API Key", "API Key")}<span className="text-[#f62440] ml-1">*</span></label>
+                        <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
+                          className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.online_api_key)}`}
+                          placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                      </div>
+                    </>
+                  )}
+                  {configData.online_asr_provider === "custom" && (
+                    <>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Endpoint<span className="text-[#f62440] ml-1">*</span></label>
+                        <input type="text" value={configData.custom_asr_endpoint || ""} onChange={(e) => handleConfigChange("custom_asr_endpoint", e.target.value)}
+                          className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.custom_asr_endpoint)}`}
+                          placeholder="https://your-asr-service.com/api/transcribe" />
+                      </div>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Request Body Template</label>
+                        <textarea value={configData.custom_asr_body_template || ""} onChange={(e) => handleConfigChange("custom_asr_body_template", e.target.value)}
+                          className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-mono text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] min-h-[80px] resize-y ${getHighlightClass(configData.custom_asr_body_template)}`}
+                          placeholder={'{"audio": "{{audio_base64}}"}'} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2 animate-fade-in">
+                          <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Response Text Path</label>
+                          <input type="text" value={configData.custom_asr_response_jsonpath || "$.data.text"} onChange={(e) => handleConfigChange("custom_asr_response_jsonpath", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" />
+                        </div>
+                        <div className="flex flex-col gap-2 animate-fade-in">
+                          <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Chunk Duration (s)</label>
+                          <input type="number" value={configData.custom_asr_chunk_duration || 60} onChange={(e) => handleConfigChange("custom_asr_chunk_duration", parseInt(e.target.value) || 60)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">API Key (optional)</label>
+                        <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="sk-xxx" />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -379,155 +428,6 @@ export default function SettingsView({
               </div>
             </div>
 
-            {/* Card 3: System Notifications */}
-            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
-              <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
-                <Bell size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">{t("系统提醒设置", "System Notifications")}</h3>
-              </div>
-
-              {/* Windows Toast Notifications */}
-              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
-                <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("Windows 气泡通知", "Windows Toast Notifications")}</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={configData.enable_win_notification !== false}
-                  onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)}
-                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
-                />
-              </div>
-
-              {/* Email Alerts */}
-              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
-                <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("邮件提醒 (Email Alerts)", "Email Alerts")}</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("任务结束时发送邮件通知（需要配置 SMTP）。", "Send mail alerts (SMTP) when task completes.")}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={configData.enable_email_notification === true}
-                  onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)}
-                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
-                />
-              </div>
-
-              {/* Email Subfields */}
-              {configData.enable_email_notification === true && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e7bcbb]/20 pt-4 animate-fade-in">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("SMTP 服务器", "SMTP Server")}</label>
-                    <input
-                      type="text"
-                      value={configData.smtp_server || ""}
-                      onChange={(e) => handleConfigChange("smtp_server", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="smtp.qq.com"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("端口", "Port")}</label>
-                    <input
-                      type="number"
-                      value={configData.smtp_port || 465}
-                      onChange={(e) => handleConfigChange("smtp_port", Number(e.target.value))}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="465"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("用户名", "Username")}</label>
-                    <input
-                      type="text"
-                      value={configData.smtp_username || ""}
-                      onChange={(e) => handleConfigChange("smtp_username", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="user@example.com"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("密码/授权码", "Password")}</label>
-                    <input
-                      type="password"
-                      value={configData.smtp_password || ""}
-                      onChange={(e) => handleConfigChange("smtp_password", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="••••••••••••••"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("发件邮箱", "Sender Email")}</label>
-                    <input
-                      type="text"
-                      value={configData.smtp_sender || ""}
-                      onChange={(e) => handleConfigChange("smtp_sender", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="sender@example.com"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("收件人邮箱", "Receiver Email")}</label>
-                    <input
-                      type="text"
-                      value={configData.notification_email || ""}
-                      onChange={(e) => handleConfigChange("notification_email", e.target.value)}
-                      className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]"
-                      placeholder="receiver@example.com"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Card 4: Advanced Dependencies */}
-            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
-              <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
-                <Terminal size={18} className="text-[#bf0029]" />
-                <h3 className="text-lg font-bold text-[#1d1c18]">{t("核心运行时依赖路径", "Advanced Dependencies")}</h3>
-              </div>
-
-              {/* FFmpeg Executable Path */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg 执行文件路径", "FFmpeg Executable Path")}<span className="text-[#f62440] ml-1">*</span></label>
-                <input
-                  type="text"
-                  value={configData.ffmpeg_path || ""}
-                  onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)}
-                  className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ffmpeg_path)}`}
-                  placeholder={t("C:\\ffmpeg\\bin\\ffmpeg.exe 或 /opt/homebrew/bin/ffmpeg", "C:\\ffmpeg\\bin\\ffmpeg.exe or /opt/homebrew/bin/ffmpeg")}
-                />
-                <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin\\ffmpeg.exe，Mac 示例：/opt/homebrew/bin/ffmpeg", "Example for Windows: C:\\ffmpeg\\bin\\ffmpeg.exe, for Mac: /opt/homebrew/bin/ffmpeg")}</span>
-              </div>
-
-              {/* FFmpeg Bin Directory */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">{t("FFmpeg Bin 目录", "FFmpeg Bin Directory")}<span className="text-[#f62440] ml-1">*</span></label>
-                <input
-                  type="text"
-                  value={configData.ffmpeg_bin_dir || ""}
-                  onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)}
-                  className={`bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440] ${getHighlightClass(configData.ffmpeg_bin_dir)}`}
-                  placeholder={t("C:\\ffmpeg\\bin 或 /opt/homebrew/bin", "C:\\ffmpeg\\bin or /opt/homebrew/bin")}
-                />
-                <span className="text-xs text-[#5d3f3e]/60 font-medium">{t("Windows 示例：C:\\ffmpeg\\bin，Mac 示例：/opt/homebrew/bin", "Example for Windows: C:\\ffmpeg\\bin, for Mac: /opt/homebrew/bin")}</span>
-              </div>
-
-              {/* Auto Save Toggle */}
-              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30 mt-2">
-                <div>
-                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("自动保存设置更改", "Auto-Save Changes")}</h4>
-                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("当配置输入参数发生变化时自动执行保存操作。", "Automatically trigger save commands when input parameters change.")}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={autoSaveEnabled}
-                  onChange={(e) => setAutoSaveEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer"
-                />
-              </div>
-            </div>
 
             <button
               onClick={handleSaveConfig}
@@ -540,6 +440,100 @@ export default function SettingsView({
 
           {/* Right Column: Database details */}
           <div className="flex flex-col gap-6">
+            {/* Card 3: System Notifications */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
+              <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
+                <Bell size={18} className="text-[#bf0029]" />
+                <h3 className="text-lg font-bold text-[#1d1c18]">{t("系统提醒设置", "System Notifications")}</h3>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
+                <div>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("Windows 气泡通知", "Windows Toast Notifications")}</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
+                </div>
+                <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer" />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30">
+                <div>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">{t("邮件提醒", "Email Alerts")}</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">{t("任务结束时发送邮件通知（需要配置 SMTP）。", "Send mail alerts (SMTP) when task completes.")}</p>
+                </div>
+                <input type="checkbox" checked={configData.enable_email_notification === true} onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)} className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer" />
+              </div>
+              {configData.enable_email_notification === true && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e7bcbb]/20 pt-4 animate-fade-in">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">SMTP Server</label>
+                    <input type="text" value={configData.smtp_server || ""} onChange={(e) => handleConfigChange("smtp_server", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="smtp.qq.com" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Port</label>
+                    <input type="number" value={configData.smtp_port || 465} onChange={(e) => handleConfigChange("smtp_port", Number(e.target.value))} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Username</label>
+                    <input type="text" value={configData.smtp_username || ""} onChange={(e) => handleConfigChange("smtp_username", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="user@example.com" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Password</label>
+                    <input type="password" value={configData.smtp_password || ""} onChange={(e) => handleConfigChange("smtp_password", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="********" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Sender Email</label>
+                    <input type="text" value={configData.smtp_sender || ""} onChange={(e) => handleConfigChange("smtp_sender", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="sender@example.com" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">Receiver Email</label>
+                    <input type="text" value={configData.notification_email || ""} onChange={(e) => handleConfigChange("notification_email", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="receiver@example.com" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Card 4: Core Dependencies */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5">
+              <div className="flex items-center gap-2 pb-4 border-b border-[#e7bcbb]/20">
+                <Terminal size={18} className="text-[#bf0029]" />
+                <h3 className="text-lg font-bold text-[#1d1c18]">Core Dependencies</h3>
+              </div>
+              <div className="flex items-center gap-3 p-4 rounded-lg border border-[#e7bcbb]/30 bg-[#f9f3ea]/20">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${ffmpegStatus?.available ? "bg-green-500" : ffmpegStatus === null ? "bg-yellow-400 animate-pulse" : "bg-red-500"}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-[#1d1c18]">
+                    {ffmpegStatus === null ? "Detecting FFmpeg..." : ffmpegStatus?.available ? `FFmpeg ${ffmpegStatus.version || ""}` : "FFmpeg not found"}
+                  </div>
+                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[#5d5a55]/70 font-mono truncate mt-0.5">{ffmpegStatus.path}</div>}
+                  {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-red-600/80 mt-1">Install: winget install Gyan.FFmpeg</div>}
+                </div>
+                <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[#e7bcbb]/40 text-[#5d5a55] hover:bg-[#f2ede6] transition-colors font-semibold cursor-pointer bg-transparent">Re-detect</button>
+              </div>
+              <div>
+                <button onClick={() => setShowFfmpegAdvanced(!showFfmpegAdvanced)} className="flex items-center gap-1.5 text-xs font-semibold text-[#5d5a55]/70 hover:text-[#5d5a55] transition-colors cursor-pointer bg-transparent border-0 p-0">
+                  <span className={`transition-transform ${showFfmpegAdvanced ? "rotate-90" : ""}`}>&#9654;</span>
+                  Manual path override (advanced)
+                </button>
+                {showFfmpegAdvanced && (
+                  <div className="mt-3 flex flex-col gap-4 animate-fade-in">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">FFmpeg Path</label>
+                      <input type="text" value={configData.ffmpeg_path || ""} onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="Leave empty for auto-detection" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#5d5a55]">FFmpeg Bin Directory</label>
+                      <input type="text" value={configData.ffmpeg_bin_dir || ""} onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)} className="bg-white border border-[#e7bcbb]/40 rounded-lg p-2.5 text-sm font-semibold text-[#1d1c18] focus:outline-none focus:ring-1 focus:ring-[#f62440]" placeholder="Leave empty for auto-detection" />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between p-4 bg-[#f9f3ea]/30 rounded-lg border border-[#e7bcbb]/30 mt-2">
+                <div>
+                  <h4 className="font-bold text-sm text-[#1d1c18]">Auto-Save Changes</h4>
+                  <p className="text-[#5d5a55] text-xs mt-0.5">Auto-save when config changes.</p>
+                </div>
+                <input type="checkbox" checked={autoSaveEnabled} onChange={(e) => setAutoSaveEnabled(e.target.checked)} className="w-4 h-4 rounded border-[#e7bcbb]/60 text-[#f62440] focus:ring-[#f62440] focus:ring-offset-0 bg-[#fef9f2]/40 transition-colors cursor-pointer" />
+              </div>
+            </div>
+
             {/* Language Preference Card */}
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4">
               <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 text-[#bf0029]">

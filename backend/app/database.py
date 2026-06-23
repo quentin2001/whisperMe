@@ -245,6 +245,9 @@ class LocalDatabase:
                                     import re
                                     cmd = [FFMPEG_PATH, "-i", physical_path]
                                     res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
+                                    if res.returncode != 0:
+                                        cmd = ["ffmpeg", "-i", physical_path]
+                                        res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
                                     output = res.stderr or ""
                                     match = re.search(r"Duration:\s*(\d{2}:\d{2}:\d{2})", output)
                                     if match:

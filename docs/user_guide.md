@@ -53,6 +53,61 @@ cp config.example.json config.json
 
 ---
 
+## 网络代理配置
+
+whisperMe 需要同时访问中国网站（小宇宙、Bilibili）和国际服务（Anthropic API、OpenAI API）。如果使用代理软件，需要配置分流规则。
+
+### Clash Verge 分流配置
+
+在 Clash Verge 的 **Profile Enhancement Rules** 中添加以下规则：
+
+```yaml
+prepend:
+  # 中国网站（直连）
+  - DOMAIN-SUFFIX,xiaoyuzhoufm.com,DIRECT
+  - DOMAIN-SUFFIX,bilibili.com,DIRECT
+  - DOMAIN-SUFFIX,bilivideo.com,DIRECT
+  - DOMAIN-SUFFIX,bilivideo.cn,DIRECT
+  - DOMAIN-SUFFIX,hf-mirror.com,DIRECT
+  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
+  - DOMAIN-SUFFIX,xiaomimimo.com,DIRECT
+  - DOMAIN-SUFFIX,alidns.com,DIRECT
+  - DOMAIN-SUFFIX,alicdn.com,DIRECT
+  - IP-CIDR,223.5.5.5/32,DIRECT
+  - DOMAIN-SUFFIX,xmcdn.com,DIRECT
+  - DOMAIN-SUFFIX,xyzcdn.net,DIRECT
+
+append: []
+delete: []
+```
+
+### 域名说明
+
+| 域名 | 用途 | 路由 |
+|------|------|------|
+| `xiaoyuzhoufm.com` | 小宇宙 FM 音频下载 | DIRECT |
+| `bilibili.com` / `bilivideo.com` | Bilibili 视频下载 | DIRECT |
+| `hf-mirror.com` | HuggingFace 中国镜像（模型下载） | DIRECT |
+| `modelscope.cn` | ModelScope 模型下载 | DIRECT |
+| `xiaomimimo.com` | 小米 MiMo ASR（在线语音识别） | DIRECT |
+| `anthropic.com` | Claude Code API | 代理 |
+| `api.openai.com` | OpenAI API | 代理 |
+| `github.com` | 版本更新检查 | 代理 |
+
+### 验证配置
+
+配置完成后，在 Clash Verge 中点击"应用"或重启软件。然后测试：
+
+```bash
+# 测试中国网站（应该直连，速度快）
+curl -I https://www.bilibili.com
+
+# 测试代理网站（应该通过代理）
+curl -I https://api.anthropic.com
+```
+
+---
+
 ## 常见问题 (FAQ)
 
 <details>
@@ -70,7 +125,7 @@ cp config.example.json config.json
 <details>
 <summary><strong>Q: 开了代理软件（Clash / V2Ray）后在线 API 连不上？</strong></summary>
 <br />
-whisperMe 内置了 DoH DNS 直连机制和 4 级自适应代理回溯策略，能自动穿透 Clash TUN / Fake-IP 模式下的 DNS 劫持和 SSL EOF 报错。如果仍有问题，请检查代理软件的规则配置。
+whisperMe 内置了 DoH DNS 直连机制和 4 级自适应代理回溯策略，能自动穿透 Clash TUN / Fake-IP 模式下的 DNS 劫持和 SSL EOF 报错。如果仍有问题，请检查代理软件的规则配置。详细的分流配置请参考上方的<a href="#网络代理配置">网络代理配置</a>章节。
 </details>
 
 <details>

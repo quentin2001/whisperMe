@@ -44,9 +44,9 @@ def get_short_path_name(long_name_path):
 from pydantic import BaseModel, Field
 
 class AppConfigModel(BaseModel):
-    ffmpeg_path: str = "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe"
-    ffmpeg_bin_dir: str = "C:\\Users\\asd\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin"
-    local_whisper_model_path: str = "c:\\Users\\asd\\Desktop\\whisper\\model_large_v3"
+    ffmpeg_path: str = ""
+    ffmpeg_bin_dir: str = ""
+    local_whisper_model_path: str = ""
     local_whisper_model_size: str = "large-v3"
     local_model_idle_timeout: int = 300
     hf_token: str = ""
@@ -61,9 +61,18 @@ class AppConfigModel(BaseModel):
     enable_win_notification: bool = True
     enable_email_notification: bool = False
     asr_mode: str = "online"
+    online_asr_provider: str = "mimo"
     online_api_key: str = ""
     online_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
     online_model: str = "mimo-v2.5-asr"
+    custom_asr_endpoint: str = ""
+    custom_asr_method: str = "POST"
+    custom_asr_headers: str = "{}"
+    custom_asr_body_template: str = ""
+    custom_asr_response_jsonpath: str = "$.data.text"
+    custom_asr_timestamp_jsonpath: str = ""
+    custom_asr_audio_format: str = "mp3"
+    custom_asr_chunk_duration: int = 60
     summary_mode: str = "online"
     online_summary_api_key: str = ""
     online_summary_base_url: str = "https://api.openai.com/v1"
@@ -87,6 +96,18 @@ def load_config() -> dict:
     try:
         with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             loaded = json.load(f)
+
+        # ==================== 自动迁移：旧配置 → online_asr_provider 字段 ====================
+        if "online_asr_provider" not in loaded:
+            base_url = loaded.get("online_base_url", "")
+            if "xiaomimimo.com" in base_url:
+                loaded["online_asr_provider"] = "mimo"
+            elif "openai.com" in base_url:
+                loaded["online_asr_provider"] = "openai"
+            else:
+                loaded["online_asr_provider"] = "mimo"  # 默认 fallback
+            print(f"🔄 [CONFIG] 自动迁移: online_asr_provider → '{loaded['online_asr_provider']}'")
+
         # 使用 Pydantic 进行类型与默认值补全校验
         validated = AppConfigModel.model_validate(loaded)
         validated_dict = validated.model_dump()
@@ -169,6 +190,7 @@ if not os.environ.get("HF_ENDPOINT"):
     os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # huggingface_hub API 动态配置声明
+HF_TOKEN = config.get("hf_token", "").strip()
 endpoint_url = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
 os.environ["HF_ENDPOINT"] = endpoint_url
 os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
@@ -179,10 +201,24 @@ if HF_TOKEN:
 
 
 # ==================== 导出全局可用变量 ====================
-FFMPEG_PATH = config.get("ffmpeg_path")
-FFMPEG_BIN_DIR = config.get("ffmpeg_bin_dir")
+# FFmpeg 自动发现：config 为空时自动检测系统安装
+from app.core.ffmpeg import find_ffmpeg, find_ffmpeg_dir
+FFMPEG_PATH = config.get("ffmpeg_path") or ""
+FFMPEG_BIN_DIR = config.get("ffmpeg_bin_dir") or ""
+if not FFMPEG_PATH or not os.path.isfile(FFMPEG_PATH):
+    _auto_ffmpeg = find_ffmpeg()
+    if _auto_ffmpeg:
+        FFMPEG_PATH = _auto_ffmpeg
+        FFMPEG_BIN_DIR = find_ffmpeg_dir() or ""
+        config["ffmpeg_path"] = FFMPEG_PATH
+        config["ffmpeg_bin_dir"] = FFMPEG_BIN_DIR
+        print(f"[CONFIG] FFmpeg auto-detected: {FFMPEG_PATH}")
+    else:
+        print("[CONFIG WARNING] FFmpeg not found! Some features will not work.")
+else:
+    print(f"[CONFIG] FFmpeg loaded from config: {FFMPEG_PATH}")
+
 LOCAL_WHISPER_MODEL_PATH = config.get("local_whisper_model_path")
-HF_TOKEN = config.get("hf_token", "").strip()
 
 OLLAMA_URL = config.get("ollama_url", "http://localhost:11434")
 OLLAMA_MODEL = config.get("ollama_model", "qwen2.5:7b-instruct")

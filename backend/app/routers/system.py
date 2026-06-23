@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import subprocess
 import shutil
@@ -224,6 +225,62 @@ def trigger_version_check():
 @router.get("/performance")
 def get_performance():
     return SYSTEM_PERF_CACHE
+
+@router.get("/dependencies")
+def check_dependencies(ffmpeg_path: str = None):
+    """检查所有外部依赖的状态，供前端显示依赖健康指示器。
+    ffmpeg_path: 可选，传入时优先检测该路径（用于前端手动指定路径后的即时验证）。
+    """
+    import app.config as _cfg
+    from app.core.ffmpeg import get_ffmpeg_info
+
+    # FFmpeg: 优先使用传入的路径，否则读内存中的模块变量
+    effective_ffmpeg = ffmpeg_path if ffmpeg_path else _cfg.FFMPEG_PATH
+    ffmpeg_info = get_ffmpeg_info(effective_ffmpeg)
+
+    # Hugging Face Token
+    hf_valid = bool(_cfg.HF_TOKEN and len(_cfg.HF_TOKEN) >= 30)
+
+    # Ollama 连通性
+    ollama_ok = False
+    ollama_version = None
+    try:
+        import httpx
+        with httpx.Client(timeout=3.0, trust_env=False) as client:
+            resp = client.get(f"{_cfg.OLLAMA_URL}/api/version")
+            if resp.status_code == 200:
+                ollama_ok = True
+                ollama_version = resp.json().get("version", "")
+    except Exception:
+        pass
+
+    # GPU
+    gpu_info = {"available": False, "name": None, "vram_total": None, "vram_free": None}
+    try:
+        import subprocess as _sp
+        result = _sp.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+            creationflags=0x08000000 if sys.platform == "win32" else 0
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split(",")
+            if len(parts) >= 3:
+                gpu_info = {
+                    "available": True,
+                    "name": parts[0].strip(),
+                    "vram_total": f"{parts[1].strip()} MB",
+                    "vram_free": f"{parts[2].strip()} MB"
+                }
+    except Exception:
+        pass
+
+    return {
+        "ffmpeg": ffmpeg_info,
+        "huggingface": {"token_valid": hf_valid},
+        "ollama": {"available": ollama_ok, "url": _cfg.OLLAMA_URL, "model": _cfg.OLLAMA_MODEL, "version": ollama_version},
+        "gpu": gpu_info
+    }
 
 @router.get("/version/check")
 def check_software_version(force: bool = False):

@@ -1,5 +1,14 @@
 # whisperMe — 变更日志 (Changelog)
 
+## Session `2026-06-23` — 网络代理配置优化
+
+### 🌐 代理分流配置
+*   **Clash Verge 分流规则**：添加 whisperMe 项目所需的中国域名直连规则，包括小宇宙 FM、Bilibili、HuggingFace 镜像、ModelScope、小米 MiMo ASR 等。
+*   **文档更新**：在 `docs/user_guide.md` 中新增"网络代理配置"章节，详细说明分流规则和域名用途。
+*   **CLAUDE.md 更新**：添加网络代理配置信息，便于后续会话了解开发环境。
+
+---
+
 ## Session `a6a6c8c6` — 2026-06-22 ~ 2026-06-23
 
 ### 🚀 后端架构重构与高并发优化

@@ -140,7 +140,19 @@ def background_auto_cleanup_loop():
 
 @app.on_event("startup")
 def startup_event():
-    # 0. 启动后台独立性能监控线程 (来自 routers.system)
+    # 0. 依赖检查
+    from app.core.ffmpeg import get_ffmpeg_info, get_install_hint
+    from app.config import FFMPEG_PATH
+    ffmpeg_info = get_ffmpeg_info(FFMPEG_PATH)
+    if ffmpeg_info["available"]:
+        print(f"[STARTUP] FFmpeg: {ffmpeg_info['version']}")
+        print(f"[STARTUP] FFmpeg path: {ffmpeg_info['path']}")
+    else:
+        print("[STARTUP WARNING] FFmpeg not found!")
+        print(get_install_hint())
+        print("[STARTUP WARNING] Audio download and transcription will not work until FFmpeg is installed.")
+
+    # 0.1 启动后台独立性能监控线程 (来自 routers.system)
     start_system_background_tasks()
     print("✅ [STARTUP] 独立后台性能监控哨兵已上线！")
     

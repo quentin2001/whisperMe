@@ -305,15 +305,17 @@ export default function LibraryView({
   const checkIsConfigured = () => {
     if (!configData) return false;
     
-    // Check FFmpeg
-    if (!configData.ffmpeg_path || !configData.ffmpeg_bin_dir) {
-      return false;
-    }
+    // FFmpeg is auto-detected by backend, no frontend validation needed
     
     // Check ASR
     if (configData.asr_mode === "online") {
-      if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) {
-        return false;
+      const provider = configData.online_asr_provider || "mimo";
+      if (provider === "custom") {
+        if (!configData.custom_asr_endpoint) return false;
+      } else if (provider === "funasr") {
+        if (!configData.online_base_url) return false;
+      } else {
+        if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return false;
       }
     } else {
       // local

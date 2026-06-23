@@ -54,9 +54,18 @@ export default function App() {
     enable_win_notification: true,
     enable_email_notification: false,
     asr_mode: "local",
+    online_asr_provider: "mimo",
     online_api_key: "",
     online_base_url: "",
     online_model: "",
+    custom_asr_endpoint: "",
+    custom_asr_method: "POST",
+    custom_asr_headers: "{}",
+    custom_asr_body_template: "",
+    custom_asr_response_jsonpath: "$.data.text",
+    custom_asr_timestamp_jsonpath: "",
+    custom_asr_audio_format: "mp3",
+    custom_asr_chunk_duration: 60,
     summary_mode: "local",
     online_summary_api_key: "",
     online_summary_base_url: "",
@@ -412,12 +421,20 @@ export default function App() {
 
   const isConfigInvalid = () => {
     if (!configData) return true;
-    if (!configData.ffmpeg_path || !configData.ffmpeg_bin_dir) return true;
-    
+    // FFmpeg is auto-detected, no need to validate on frontend
+
     if (configData.asr_mode === "local") {
       if (!configData.local_whisper_model_path || !configData.hf_token) return true;
     } else if (configData.asr_mode === "online") {
-      if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return true;
+      const provider = configData.online_asr_provider || "mimo";
+      if (provider === "custom") {
+        if (!configData.custom_asr_endpoint) return true;
+      } else if (provider === "funasr") {
+        if (!configData.online_base_url) return true;
+      } else {
+        // mimo / openai
+        if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return true;
+      }
     }
     
     if (configData.summary_mode === "local") {

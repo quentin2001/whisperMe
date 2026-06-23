@@ -29,9 +29,18 @@ class UpdateConfigRequest(BaseModel):
     enable_win_notification: bool
     enable_email_notification: bool = False
     asr_mode: str = "local"
+    online_asr_provider: str = "mimo"
     online_api_key: str = ""
     online_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
     online_model: str = "mimo-v2.5-asr"
+    custom_asr_endpoint: str = ""
+    custom_asr_method: str = "POST"
+    custom_asr_headers: str = "{}"
+    custom_asr_body_template: str = ""
+    custom_asr_response_jsonpath: str = "$.data.text"
+    custom_asr_timestamp_jsonpath: str = ""
+    custom_asr_audio_format: str = "mp3"
+    custom_asr_chunk_duration: int = 60
     summary_mode: str = "local"
     online_summary_api_key: str = ""
     online_summary_base_url: str = "https://api.openai.com/v1"
@@ -45,6 +54,12 @@ class UpdateConfigRequest(BaseModel):
 def get_global_config():
     return load_config_dict()
 
+@router.get("/asr-providers")
+def list_asr_providers():
+    """列出所有可用的 ASR Provider（供前端下拉选择器使用）"""
+    from app.core.asr_providers import list_providers
+    return list_providers()
+
 @router.post("/config")
 def update_global_config(req: UpdateConfigRequest):
     new_cfg = req.dict()
@@ -54,13 +69,30 @@ def update_global_config(req: UpdateConfigRequest):
     for k, v in new_cfg.items():
         config[k] = v
         
-    # 重更新 HF_TOKEN 内存缓存
+    # 热更新内存中的模块级变量
     import app.config
     import app.core.transcriber
-    
+
     new_token = new_cfg.get("hf_token", "").strip()
     app.config.HF_TOKEN = new_token
     app.core.transcriber.HF_TOKEN = new_token
+
+    # 热更新 FFmpeg 路径
+    new_ffmpeg_path = new_cfg.get("ffmpeg_path", "").strip()
+    new_ffmpeg_dir = new_cfg.get("ffmpeg_bin_dir", "").strip()
+    if new_ffmpeg_path:
+        app.config.FFMPEG_PATH = new_ffmpeg_path
+        app.config.FFMPEG_BIN_DIR = new_ffmpeg_dir
+    else:
+        # 用户清空了路径，重新自动检测
+        from app.core.ffmpeg import find_ffmpeg, find_ffmpeg_dir
+        auto = find_ffmpeg()
+        if auto:
+            app.config.FFMPEG_PATH = auto
+            app.config.FFMPEG_BIN_DIR = find_ffmpeg_dir() or ""
+        else:
+            app.config.FFMPEG_PATH = ""
+            app.config.FFMPEG_BIN_DIR = ""
     
     # 重更新 HF_ENDPOINT 环境变量与 huggingface_hub constants
     if new_token and len(new_token) >= 30:

@@ -287,257 +287,33 @@ class PodcastTranscriber:
 
         if asr_mode == "online":
             from app.config import config
-            import math
-            import httpx
-            import base64
-            import re
-            import wave
+            from app.core.asr_providers import get_provider
 
-            online_api_key = config.get("online_api_key", "").strip()
-            online_base_url = config.get("online_base_url", "https://token-plan-sgp.xiaomimimo.com/v1").strip()
-            online_model = config.get("online_model", "mimo-v2.5-asr").strip()
+            provider_name = config.get("online_asr_provider", "mimo")
+            provider = get_provider(provider_name)
 
-            if not online_api_key:
-                raise Exception("在线转录模式已启用，但尚未在系统设置中配置 Mimo API Key，请先配置参数。")
+            print(f"[LOG] Using online ASR provider: {provider.get_display_name()} ({provider_name})")
 
-            # 1. 读取本地标准化音频的总时长，以确定分片逻辑
-            audio_duration = 1.0
-            try:
-                with wave.open(wav_path, "rb") as w:
-                    frames = w.getnframes()
-                    rate = w.getframerate()
-                    audio_duration = frames / float(rate)
-            except Exception as we:
-                print(f"⚠️ [LOG] 读取 WAV 时长失败: {we}")
+            # Provider handles chunking, API calls, and response parsing
+            # Returns standardized format: [{"start": float, "end": float, "text": str}]
+            provider_segments = provider.transcribe(wav_path, diarization_segments, progress_callback)
 
-            print(f"📡 [LOG] 正在使用在线 ASR 模式进行识别。目标 API: {online_base_url} | 模型: {online_model}")
-            print(f"📦 [LOG] 音频总时长: {audio_duration:.2f} 秒")
+            # Convert to WhisperSegmentDummy for downstream compatibility
+            for seg in provider_segments:
+                whisper_segments.append(WhisperSegmentDummy(seg["start"], seg["end"], seg["text"]))
 
-            # 2. 分片处理逻辑 (为了提升时间轴对齐精度，每分片设置为 60.0 秒)
-            chunk_length = 60.0
-            num_chunks = math.ceil(audio_duration / chunk_length)
-            
-            for i in range(num_chunks):
-                start_offset = i * chunk_length
-                slice_duration = min(chunk_length, audio_duration - start_offset)
-                if slice_duration <= 0.1:
-                    continue
-
-                chunk_mp3_path = wav_path.replace(".wav", f"_chunk_{i}.mp3")
-                print(f"✂️ [LOG] 正在提取分片 {i+1}/{num_chunks}: 从 {start_offset:.2f}s 开始，时长 {slice_duration:.2f}s...")
-
+            # Calculate duration
+            if whisper_segments:
+                duration = max(seg.end for seg in whisper_segments)
+            else:
+                import wave as _wave
                 try:
-                    # 使用 FFmpeg 提取对应分片并压缩为 32kbps mono MP3，-ss 放在 -i 之后以确保时间轴切片精确
-                    cmd = [
-                        FFMPEG_PATH, 
-                        '-y', 
-                        '-i', get_short_path_name(wav_path), 
-                        '-ss', str(start_offset),
-                        '-t', str(slice_duration),
-                        '-codec:a', 'libmp3lame', 
-                        '-b:a', '32k', 
-                        '-ac', '1', 
-                        get_short_path_name(chunk_mp3_path)
-                    ]
-                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    if res.returncode != 0 or not os.path.exists(chunk_mp3_path):
-                        print("⚠️ [LOG 警告] 使用指定 FFMPEG_PATH 生成分片失败，尝试全局 ffmpeg 兜底...")
-                        cmd_fallback = [
-                            'ffmpeg', 
-                            '-y', 
-                            '-i', get_short_path_name(wav_path), 
-                            '-ss', str(start_offset),
-                            '-t', str(slice_duration),
-                            '-codec:a', 'libmp3lame', 
-                            '-b:a', '32k', 
-                            '-ac', '1', 
-                            get_short_path_name(chunk_mp3_path)
-                        ]
-                        res_fallback = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        if res_fallback.returncode != 0 or not os.path.exists(chunk_mp3_path):
-                            raise Exception(f"FFmpeg slice creation failed for chunk {i} (含全局兜底尝试): {res_fallback.stderr.decode('utf-8', errors='ignore')}")
+                    with _wave.open(wav_path, "rb") as w:
+                        duration = w.getnframes() / float(w.getframerate())
+                except Exception:
+                    duration = 1.0
 
-                    # 转换为 Base64
-                    with open(chunk_mp3_path, "rb") as f:
-                        audio_base_64 = "data:audio/mp3;base64," + base64.b64encode(f.read()).decode("utf-8")
-
-                    # 物理清理临时分片 MP3 文件
-                    try:
-                        os.remove(chunk_mp3_path)
-                    except Exception:
-                        pass
-
-                    # 发起 API 请求
-                    url = f"{online_base_url.rstrip('/')}/chat/completions"
-                    headers = {
-                        "Authorization": f"Bearer {online_api_key}",
-                        "Content-Type": "application/json"
-                    }
-                    
-                    payload = {
-                        "model": online_model,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "input_audio",
-                                        "input_audio": {
-                                            "data": audio_base_64,
-                                            "format": "mp3"
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-
-                    print(f"⏳ [LOG] 正在发送分片 {i+1}/{num_chunks} 请求到 {url} 并等待转录结果...")
-                    response = None
-                    # 1. 优先使用系统默认代理连接
-                    try:
-                        with httpx.Client(timeout=400.0, trust_env=True) as client:
-                            response = client.post(url, headers=headers, json=payload)
-                            if response.status_code == 200:
-                                print(f"🟢 [LOG] 分片 {i+1} 通过代理请求成功！")
-                    except Exception as e_proxy:
-                        print(f"⚠️ [LOG] ASR 分片 {i+1} 代理请求失败: {e_proxy}。正在尝试直连模式...")
-                        
-                    # 2. 直连模式兜底 (结合 DoH 绕过 Clash 劫持)
-                    if response is None or response.status_code != 200:
-                        try:
-                            with doh_dns_bypass(url):
-                                with httpx.Client(timeout=400.0, trust_env=False) as client:
-                                    response = client.post(url, headers=headers, json=payload)
-                                    if response.status_code == 200:
-                                        print(f"🟢 [LOG] 分片 {i+1} 通过直连(DoH DNS 绕过)请求成功！")
-                        except Exception as e_doh:
-                            print(f"❌ [LOG] ASR 分片 {i+1} 直连(DoH DNS 绕过)请求失败: {e_doh}")
-                        
-                    if response is None or response.status_code != 200:
-                        detail_msg = response.text if response is not None else "无响应"
-                        status_code = response.status_code if response is not None else "未知"
-                        raise Exception(f"在线 ASR API 调用失败，状态码: {status_code}。详情: {detail_msg}")
-                        
-                    resp_data = response.json()
-                    full_text = resp_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                    if not full_text:
-                        print(f"⚠️ [LOG] 分片 {i+1} 返回识别文本为空，跳过该分片")
-                        continue
-
-                    # 3. 将当前分片文本切割成句子，并按比例估算当前分片内部的相对时间戳，并加上 start_offset 转换为全局时间轴
-                    raw_sentences = re.split(r'([。？！；\n])', full_text)
-                    
-                    sentences = []
-                    current_sentence = ""
-                    for item in raw_sentences:
-                        if not item:
-                            continue
-                        if item in ["。", "？", "！", "；", "\n"]:
-                            if current_sentence:
-                                sentences.append(current_sentence + (item if item != "\n" else ""))
-                                current_sentence = ""
-                        else:
-                            current_sentence += item
-                    if current_sentence:
-                        sentences.append(current_sentence)
-                        
-                    sentences = [s.strip() for s in sentences if s.strip()]
-                    if not sentences:
-                        continue
-
-                    # 过滤相邻重复句，防范 ASR 幻觉循环引发的字句重复与时间线漂移
-                    import re
-                    def clean_txt(text):
-                        return re.sub(r'[^\w\s]', '', text).strip()
-                    
-                    deduped_sentences = []
-                    for s in sentences:
-                        if not deduped_sentences:
-                            deduped_sentences.append(s)
-                        else:
-                            if clean_txt(s) != clean_txt(deduped_sentences[-1]):
-                                deduped_sentences.append(s)
-                    sentences = deduped_sentences
-                    if not sentences:
-                        continue
-
-
-                    # 按照声纹分割段（语音活动区间 VAD）对句子进行精准时间轴映射，剔除静音期，彻底解决台词偏斜与漂移
-                    chunk_start = start_offset
-                    chunk_end = start_offset + slice_duration
-                    
-                    active_segs = []
-                    for d in diarization_segments:
-                        # 寻找在当前分片范围内的交叉时间段
-                        s_max = max(d["start"], chunk_start)
-                        e_min = min(d["end"], chunk_end)
-                        if e_min > s_max + 0.1: # 至少重叠 100ms 视为有效说话区间
-                            active_segs.append((s_max, e_min))
-                            
-                    # 将紧邻的说话段（间隔小于 0.5s）或重叠段合并成连续的语音块
-                    active_segs.sort()
-                    merged_segs = []
-                    for seg in active_segs:
-                        if not merged_segs:
-                            merged_segs.append(seg)
-                        else:
-                            last_s, last_e = merged_segs[-1]
-                            curr_s, curr_e = seg
-                            if curr_s - last_e < 0.5: # 紧邻合并
-                                merged_segs[-1] = (last_s, max(last_e, curr_e))
-                            else:
-                                merged_segs.append(seg)
-                                
-                    if not merged_segs:
-                        # 声纹列表为空时退化到全分片映射以保持鲁棒兼容
-                        merged_segs = [(chunk_start, chunk_end)]
-                        
-                    total_speech_duration = sum(e - s for s, e in merged_segs)
-                    if total_speech_duration <= 0:
-                        total_speech_duration = 0.1
-                        
-                    total_chars = sum(len(s) for s in sentences)
-                    if total_chars == 0:
-                        total_chars = 1
-                        
-                    current_speech_time = 0.0
-                    
-                    # 映射辅助函数：将相对的“语音时间轴”偏移转换为实际的“物理时间轴”时间戳
-                    def map_speech_to_real_time(speech_offset):
-                        temp_offset = speech_offset
-                        for s_start, s_end in merged_segs:
-                            seg_dur = s_end - s_start
-                            if temp_offset <= seg_dur:
-                                return s_start + temp_offset
-                            temp_offset -= seg_dur
-                        return merged_segs[-1][1]
-                        
-                    for s in sentences:
-                        char_len = len(s)
-                        duration_ratio = char_len / total_chars
-                        s_speech_duration = duration_ratio * total_speech_duration
-                        
-                        start = map_speech_to_real_time(current_speech_time)
-                        end = map_speech_to_real_time(current_speech_time + s_speech_duration)
-                        
-                        # 单调性与物理边界约束
-                        start = max(chunk_start, min(start, chunk_end))
-                        end = max(start + 0.1, min(end, chunk_end))
-                        
-                        whisper_segments.append(WhisperSegmentDummy(start, end, s))
-                        current_speech_time += s_speech_duration
-
-                except Exception as chunk_ex:
-                    if os.path.exists(chunk_mp3_path):
-                        try:
-                            os.remove(chunk_mp3_path)
-                        except Exception:
-                            pass
-                    raise chunk_ex
-
-            duration = audio_duration
-            print(f"🟢 [LOG] 在线 ASR 识别成功！所有分片合并完毕，共拆分出 {len(whisper_segments)} 段带有时间戳的句子。")
+            print(f"[LOG] Online ASR completed: {len(whisper_segments)} segments.")
 
         else:
             # 本地转录模式
