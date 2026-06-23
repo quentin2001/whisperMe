@@ -114,9 +114,13 @@ def get_ffmpeg_info(ffmpeg_path: str = None) -> dict:
             creationflags=0x08000000 if sys.platform == "win32" else 0
         )
         output = result.stdout.decode("utf-8", errors="ignore")
-        # 解析版本号: "ffmpeg version 8.1.1 ..."
+        # 只提取版本号数字: "ffmpeg version 8.1.1-full_build" -> "8.1.1"
         version_line = output.split("\n")[0] if output else ""
         version = version_line.strip()
+        import re
+        ver_match = re.search(r'(\d+\.\d+[\.\d]*)', version)
+        if ver_match:
+            version = ver_match.group(1)
         return {
             "available": result.returncode == 0,
             "path": path,

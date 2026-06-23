@@ -502,7 +502,7 @@ export default function SettingsView({
                   <div className="text-sm font-bold text-[#1d1c18]">
                     {ffmpegStatus === null ? "Detecting FFmpeg..." : ffmpegStatus?.available ? `FFmpeg ${ffmpegStatus.version || ""}` : "FFmpeg not found"}
                   </div>
-                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[#5d5a55]/70 font-mono truncate mt-0.5">{ffmpegStatus.path}</div>}
+                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[#5d5a55]/70 font-mono truncate mt-0.5">{ffmpegStatus.path.split(/[\\/]/).slice(-2).join("/")}</div>}
                   {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-red-600/80 mt-1">Install: winget install Gyan.FFmpeg</div>}
                 </div>
                 <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[#e7bcbb]/40 text-[#5d5a55] hover:bg-[#f2ede6] transition-colors font-semibold cursor-pointer bg-transparent">Re-detect</button>
