@@ -448,8 +448,8 @@ export default function SettingsView({
                     : "bg-[#e7e2db] hover:bg-[#ddd8d0] text-[#5d5a55]"
                 }`}
               >
-                <RefreshCw size={13} />
-                <span className="text-xs font-bold whitespace-nowrap">
+                <RefreshCw size={16} />
+                <span className="font-bold whitespace-nowrap">
                   {t("自动保存", "Auto-Save")}
                 </span>
                 <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSaveEnabled ? "bg-white/30" : "bg-[#c8c3bc]"}`}>
