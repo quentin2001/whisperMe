@@ -619,7 +619,7 @@ export default function SettingsView({
                 <div>
                   <h4 className="font-bold text-xs text-[#1d1c18]">{t("最大并行任务数", "Max Concurrent Tasks")}</h4>
                   <p className="text-[#5d5a55] text-[10px] mt-0.5">
-                    {t("选"自动"则根据 GPU 显存自动决定。调高此值可同时处理多个任务，但会占用更多显存。", "Auto mode detects GPU VRAM capacity. Increase to process multiple tasks simultaneously, but uses more VRAM.")}
+                    {t("选'自动'则根据 GPU 显存自动决定。调高此值可同时处理多个任务，但会占用更多显存。", "Auto mode detects GPU VRAM capacity. Increase to process multiple tasks simultaneously, but uses more VRAM.")}
                   </p>
                 </div>
                 <SettingsDropdown
