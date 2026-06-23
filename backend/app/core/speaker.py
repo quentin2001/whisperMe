@@ -51,6 +51,8 @@ def match_speakers_with_voiceprints(speaker_embeddings: dict) -> tuple:
 
             for known_name, info in fingerprints.items():
                 known_v = np.array(info["embedding"])
+                # 维度不匹配时跳过（可能是不同 pyannote 模型版本提取的）
+                if len(emb_v) != len(known_v): continue
                 norm_known = np.linalg.norm(known_v)
                 if norm_known == 0: continue
 

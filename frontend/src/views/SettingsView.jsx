@@ -609,6 +609,32 @@ export default function SettingsView({
               )}
             </div>
 
+            {/* Concurrent Tasks Config */}
+            <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">
+                <Cpu size={16} />
+                <h3 className="text-xs font-bold uppercase tracking-wider">{t("并行转录", "Parallel Transcription")}</h3>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs text-[#1d1c18]">{t("最大并行任务数", "Max Concurrent Tasks")}</h4>
+                  <p className="text-[#5d5a55] text-[10px] mt-0.5">
+                    {t("选"自动"则根据 GPU 显存自动决定。调高此值可同时处理多个任务，但会占用更多显存。", "Auto mode detects GPU VRAM capacity. Increase to process multiple tasks simultaneously, but uses more VRAM.")}
+                  </p>
+                </div>
+                <SettingsDropdown
+                  value={configData.max_concurrent_tasks || 0}
+                  onChange={(val) => handleConfigChange("max_concurrent_tasks", Number(val))}
+                  options={[
+                    { value: 0, label: t("自动检测", "Auto-detect") },
+                    { value: 1, label: t("1 个任务（串行）", "1 task (sequential)") },
+                    { value: 2, label: t("2 个任务", "2 tasks") },
+                    { value: 3, label: t("3 个任务", "3 tasks") }
+                  ]}
+                />
+              </div>
+            </div>
+
             {/* API Secret panel guide instructions */}
             <div className="bg-white border border-[#e7bcbb]/40 rounded-xl p-6 shadow-xs">
               <div className="flex items-center gap-2 pb-3 border-b border-[#e7bcbb]/10 mb-4 text-[#bf0029]">
