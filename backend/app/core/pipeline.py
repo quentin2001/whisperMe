@@ -262,9 +262,11 @@ def run_podcast_pipeline(task_id: str, url: str):
         db.update_task(task_id, status="completed", progress=100.0)
 
         # Step 6: 消息提醒
+        duration_str = metadata.get("duration", "")
+        duration_info = f" ({duration_str})" if duration_str and duration_str != "00:00" else ""
         notifier.send_desktop_notification(
-            title="播客 AI 转录完成！",
-            message=f"《{metadata['title']}》已转录成功，点击进入工作台查看。"
+            title="🎙️ 播客转录完成",
+            message=f"{metadata['podcast_name']}｜{metadata['title']}{duration_info}"
         )
         if config.get("enable_email_notification", False):
             notifier.send_email_notification(
@@ -297,9 +299,10 @@ def run_podcast_pipeline(task_id: str, url: str):
         traceback.print_exc()
         db.update_task(task_id, status="failed", error_message=str(e), progress=100.0)
         
+        err_short = str(e)[:80] + ("..." if len(str(e)) > 80 else "")
         notifier.send_desktop_notification(
-            title="播客处理失败",
-            message=f"URL: {url}\n错误: {str(e)}"
+            title="❌ 播客处理失败",
+            message=f"{task_info.get('title', '未知')}｜{err_short}"
         )
     finally:
         if standardized_wav and os.path.exists(standardized_wav):

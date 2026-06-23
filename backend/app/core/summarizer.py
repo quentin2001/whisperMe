@@ -95,6 +95,68 @@ class PodcastSummarizer:
         # 动态读取配置，实现热更新
         pass
 
+    def _split_transcript_into_chunks(self, lines: list[str], max_chars: int, overlap_lines: int = 20) -> list[list[str]]:
+        """
+        将转录文本行列表分段，每段不超过 max_chars 字符，段间有 overlap_lines 行重叠
+        """
+        if not lines:
+            return [[]]
+
+        chunks = []
+        current_chunk = []
+        current_len = 0
+
+        for line in lines:
+            line_len = len(line) + 1  # +1 for newline
+            if current_len + line_len > max_chars and current_chunk:
+                chunks.append(current_chunk)
+                # 保留最后 overlap_lines 行作为下一段的开头（重叠）
+                overlap = current_chunk[-overlap_lines:] if len(current_chunk) > overlap_lines else current_chunk[:]
+                current_chunk = overlap
+                current_len = sum(len(l) + 1 for l in current_chunk)
+            current_chunk.append(line)
+            current_len += line_len
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+    def _call_llm(self, prompt: str, api_url: str, headers: dict, target_model: str, temperature: float = 0.2) -> str:
+        """统一的 LLM 调用方法，支持代理和 DoH 双重回退"""
+
+        payload = {
+            "model": target_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "temperature": temperature
+        }
+
+        response = None
+        # 1. 优先使用系统代理
+        try:
+            with httpx.Client(timeout=600.0, trust_env=True) as client:
+                response = client.post(api_url, json=payload, headers=headers)
+                response.raise_for_status()
+        except Exception:
+            pass
+
+        # 2. 直连模式兜底 (结合 DoH 绕过)
+        if response is None or response.status_code != 200:
+            try:
+                with doh_dns_bypass(api_url):
+                    with httpx.Client(timeout=600.0, trust_env=False) as client:
+                        response = client.post(api_url, json=payload, headers=headers)
+            except Exception:
+                pass
+
+        if response is None or response.status_code != 200:
+            detail_msg = response.text if response is not None else "无响应"
+            status_code = response.status_code if response is not None else "未知"
+            raise Exception(f"大模型接口请求失败，状态码: {status_code}，详情: {detail_msg}")
+
+        return response.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
     def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None) -> str:
         """
         根据播客元数据、热门评论以及转录剧本，调用大模型生成报告（支持本地与在线 API 切换）
@@ -148,25 +210,17 @@ class PodcastSummarizer:
             comments_text_lines.append(f"{idx+1}. {c['author']} (点赞 {c['likes']}): {c['content']}")
         full_comments_text = "\n".join(comments_text_lines) if comments_text_lines else "暂无评论数据"
 
-        # 5. 限制长文本大小（如果是本地模型为了安全限制大小，在线大模型通常可以大一些）
+        # 5. 长文本分段策略
         max_char_len = 80000 if summary_mode == "online" else 45000
-        if len(full_transcript_text) > max_char_len:
-            print(f"⚠️ [LOG] 转录剧本字数较多 ({len(full_transcript_text)}字)，为了防止超出大模型上下文窗口进行安全裁剪...")
-            half_len = max_char_len // 2
-            full_transcript_text = (
-                full_transcript_text[:half_len]
-                + "\n\n...[此处省略部分中间对话]...\n\n"
-                + full_transcript_text[-half_len:]
-            )
+        chunk_threshold = max_char_len  # 超过此长度则分段总结
 
         # 6. 动态加载 Prompt，支持前端实时编辑
         prompt_dict = load_prompt()
         base_prompt = prompt_dict.get("base_prompt", "")
         action_prompt = prompt_dict.get("action_prompt", "")
 
-        # 将实际数据填充进 prompt（如果 prompt 包含占位符）
-        # 如果 base_prompt 含有 {metadata} 等占位符则替换，否则直接拼接数据块
-        data_block = f"""
+        # 公共数据块（不含转录文本）
+        meta_block = f"""
 # 事实源数据：
 
 ## 1. 播客单集元数据：
@@ -182,54 +236,73 @@ class PodcastSummarizer:
 ---
 {full_comments_text}
 ---
+"""
+
+        try:
+            if len(full_transcript_text) > chunk_threshold:
+                # ========== 长播客分段总结模式 ==========
+                chunk_chars = max_char_len - 5000  # 留余量给 prompt 本身
+                chunks = self._split_transcript_into_chunks(transcript_text_lines, chunk_chars, overlap_lines=15)
+                total_chunks = len(chunks)
+                print(f"📄 [LOG] 转录文本较长 ({len(full_transcript_text)}字)，自动分为 {total_chunks} 段进行分段总结...")
+
+                partial_summaries = []
+                for i, chunk_lines in enumerate(chunks):
+                    chunk_text = "\n".join(chunk_lines)
+                    chunk_data = f"""{meta_block}
+
+## 3. 播客对话转录文本 - 第 {i+1}/{total_chunks} 段（按时间戳与发言人排列）：
+---
+{chunk_text}
+---
+"""
+                    chunk_prompt = f"""{base_prompt}
+
+{chunk_data}
+
+请针对以上第 {i+1}/{total_chunks} 段转录内容，生成一份**该段落的局部总结报告**。要求：
+1. 严格遵守上方的核心防伪守则。
+2. 按照标准报告结构输出，但仅覆盖本段中讨论的内容。
+3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。
+4. 在报告最末尾增加一行：`本段覆盖时间范围：{chunk_lines[0][:12] if chunk_lines else '?'} — {chunk_lines[-1][:12] if chunk_lines else '?'}`"""
+                    print(f"📝 [LOG] 正在总结第 {i+1}/{total_chunks} 段...")
+                    partial = self._call_llm(chunk_prompt, api_url, headers, target_model)
+                    partial_summaries.append(partial)
+                    print(f"✅ [LOG] 第 {i+1}/{total_chunks} 段总结完成")
+
+                # 合并阶段：将所有分段总结合并为最终报告
+                all_partial = "\n\n---\n\n".join(
+                    [f"### 第 {i+1} 段总结\n\n{s}" for i, s in enumerate(partial_summaries)]
+                )
+                merge_prompt = f"""请根据以下一份播客的多段分段总结报告，合并生成一份**完整、连贯、无重复**的最终播客价值总结分析报告。
+
+**播客标题**：《{metadata.get('title', '未知标题')}》
+**所属节目**：{metadata.get('podcast_name', '未知播客')}
+
+以下是各段总结报告：
+---
+{all_partial}
+---
+
+{action_prompt}"""
+                print(f"🔗 [LOG] 正在合并 {total_chunks} 段总结为最终报告...")
+                summary_md = self._call_llm(merge_prompt, api_url, headers, target_model)
+                print("🟢 [LOG] 长播客分段总结报告生成完成！")
+
+            else:
+                # ========== 普通单次总结模式 ==========
+                data_block = f"""{meta_block}
 
 ## 3. 播客对话转录文本（按时间戳与发言人排列）：
 ---
 {full_transcript_text}
 ---
 """
-        prompt = f"{base_prompt}\n{data_block}\n{action_prompt}"
+                prompt = f"{base_prompt}\n{data_block}\n{action_prompt}"
+                print(f"📝 [LOG] 转录文本长度正常 ({len(full_transcript_text)}字)，使用单次总结模式")
+                summary_md = self._call_llm(prompt, api_url, headers, target_model)
+                print("🟢 [LOG] 大模型总结报告生成顺利完成！")
 
-        # 7. 调用 completions 接口
-        payload = {
-            "model": target_model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.2
-        }
-
-        try:
-            response = None
-            # 1. 优先使用系统代理
-            try:
-                with httpx.Client(timeout=600.0, trust_env=True) as client:
-                    response = client.post(api_url, json=payload, headers=headers)
-                    response.raise_for_status()
-                    print("🟢 [LOG] 通过代理模式成功生成总结报告！")
-            except Exception as e_proxy:
-                print(f"⚠️ [LOG] 大模型总结接口代理请求失败: {e_proxy}。正在尝试直连模式...")
-                
-            # 2. 直连模式兜底 (结合 DoH 绕过)
-            if response is None or response.status_code != 200:
-                try:
-                    with doh_dns_bypass(api_url):
-                        with httpx.Client(timeout=600.0, trust_env=False) as client:
-                            response = client.post(api_url, json=payload, headers=headers)
-                            if response.status_code == 200:
-                                print("🟢 [LOG] 通过直连(DoH DNS 绕过)模式成功生成总结报告！")
-                except Exception as e_doh:
-                    print(f"❌ [LOG] 大模型总结直连(DoH DNS 绕过)请求失败: {e_doh}")
-
-            if response is None or response.status_code != 200:
-                detail_msg = response.text if response is not None else "无响应"
-                status_code = response.status_code if response is not None else "未知"
-                raise Exception(f"大模型接口请求失败，状态码: {status_code}，详情: {detail_msg}")
-
-            result = response.json()
-            summary_md = result.get("choices", [{}])[0].get("message", {}).get("content", "未能获得 LLM 总结的有效内容").strip()
-            print("🟢 [LOG] 大模型总结报告生成顺利完成！")
             return summary_md
 
         except httpx.ConnectError:
