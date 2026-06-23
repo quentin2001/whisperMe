@@ -1053,14 +1053,14 @@ class PodcastDownloader:
                 local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
                 if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
                     print(f"[LOG] 网易云音乐音频缓存命中: {local_filename}")
-                    netease_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    netease_meta["duration"] = get_audio_duration_str(local_filename)
                     if progress_callback:
                         progress_callback(100.0)
                     return local_filename, netease_meta
 
                 print(f"[LOG] 正在下载网易云音乐音频: {audio_url}")
                 self._download_file_with_fallback(audio_url, local_filename, progress_callback)
-                netease_meta["duration"] = self.get_audio_duration_str(local_filename)
+                netease_meta["duration"] = get_audio_duration_str(local_filename)
                 return local_filename, netease_meta
 
             print(f"[LOG] 网易云音乐下载失败，尝试 yt-dlp 兜底...")
@@ -1074,14 +1074,14 @@ class PodcastDownloader:
                 local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
                 if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
                     print(f"[LOG] 喜马拉雅音频缓存命中: {local_filename}")
-                    ximalaya_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    ximalaya_meta["duration"] = get_audio_duration_str(local_filename)
                     if progress_callback:
                         progress_callback(100.0)
                     return local_filename, ximalaya_meta
 
                 print(f"[LOG] 正在下载喜马拉雅音频: {audio_url[:80]}")
                 self._download_file_with_fallback(audio_url, local_filename, progress_callback)
-                ximalaya_meta["duration"] = self.get_audio_duration_str(local_filename)
+                ximalaya_meta["duration"] = get_audio_duration_str(local_filename)
                 return local_filename, ximalaya_meta
 
             print(f"[LOG] 喜马拉雅下载失败，尝试 yt-dlp 兜底...")
@@ -1095,14 +1095,14 @@ class PodcastDownloader:
                 local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
                 if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
                     print(f"[LOG] 荔枝FM音频缓存命中: {local_filename}")
-                    lizhi_meta["duration"] = self.get_audio_duration_str(local_filename)
+                    lizhi_meta["duration"] = get_audio_duration_str(local_filename)
                     if progress_callback:
                         progress_callback(100.0)
                     return local_filename, lizhi_meta
 
                 print(f"[LOG] 正在下载荔枝FM音频: {audio_url[:80]}")
                 self._download_file_with_fallback(audio_url, local_filename, progress_callback)
-                lizhi_meta["duration"] = self.get_audio_duration_str(local_filename)
+                lizhi_meta["duration"] = get_audio_duration_str(local_filename)
                 return local_filename, lizhi_meta
 
             print(f"[LOG] 荔枝FM下载失败，尝试 yt-dlp 兜底...")
@@ -1116,14 +1116,14 @@ class PodcastDownloader:
                 local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
                 if os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
                     print(f"[LOG] RSS 音频缓存命中: {local_filename}")
-                    rss_metadata["duration"] = self.get_audio_duration_str(local_filename)
+                    rss_metadata["duration"] = get_audio_duration_str(local_filename)
                     if progress_callback:
                         progress_callback(100.0)
                     return local_filename, rss_metadata
 
                 print(f"[LOG] 正在从 RSS Feed 下载音频: {audio_url}")
                 self._download_file_with_fallback(audio_url, local_filename, progress_callback)
-                rss_metadata["duration"] = self.get_audio_duration_str(local_filename)
+                rss_metadata["duration"] = get_audio_duration_str(local_filename)
                 return local_filename, rss_metadata
 
             print(f"[LOG] RSS 下载失败，尝试 yt-dlp 兜底...")
@@ -1156,6 +1156,8 @@ class PodcastDownloader:
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
+                if info is None:
+                    raise Exception("yt-dlp 无法解析此链接")
                 title = info.get('title', '未知音频')
                 metadata = {
                     "title": title,
