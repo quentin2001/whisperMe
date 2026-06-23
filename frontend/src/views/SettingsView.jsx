@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe } from "lucide-react";
+import { Sliders, Save, Database, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw } from "lucide-react";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -437,18 +437,25 @@ export default function SettingsView({
                 <Save size={16} />
                 <span>{t("保存配置表", "Save Configuration")}</span>
               </button>
-              <div className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e7bcbb]/40 rounded-lg">
-                <span className="text-xs font-bold text-[#5d5a55] whitespace-nowrap">{t("自动保存", "Auto-Save")}</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={autoSaveEnabled}
-                  onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer border-0 outline-none ${autoSaveEnabled ? "bg-[#f62440]" : "bg-[#d4cfc7]"}`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${autoSaveEnabled ? "translate-x-4.5" : "translate-x-1"}`} />
-                </button>
-              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoSaveEnabled}
+                onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                className={`group flex items-center gap-2.5 px-4 py-3 rounded-lg border transition-all cursor-pointer bg-transparent outline-none select-none ${
+                  autoSaveEnabled
+                    ? "border-[#FF6A1C]/30 bg-[#FF6A1C]/5"
+                    : "border-[#e7bcbb]/40 hover:border-[#e7bcbb]/60"
+                }`}
+              >
+                <RefreshCw size={13} className={`transition-colors ${autoSaveEnabled ? "text-[#FF6A1C]" : "text-[#b8b2aa]"}`} />
+                <span className={`text-xs font-bold whitespace-nowrap transition-colors ${autoSaveEnabled ? "text-[#FF6A1C]" : "text-[#8a8580]"}`}>
+                  {t("自动保存", "Auto-Save")}
+                </span>
+                <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSaveEnabled ? "bg-[#FF6A1C]" : "bg-[#d4cfc7]"}`}>
+                  <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${autoSaveEnabled ? "left-[16px]" : "left-[2px]"}`} />
+                </div>
+              </button>
             </div>
           </div>
 
