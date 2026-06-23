@@ -36,6 +36,10 @@ class CreateTaskRequest(BaseModel):
     url: str
     asr_mode: str = "local"
 
+class BatchCreateRequest(BaseModel):
+    urls: list[str]
+    asr_mode: str = "local"
+
 class RenameSpeakerRequest(BaseModel):
     speaker_id: str
     new_name: str
@@ -154,6 +158,67 @@ def get_task_details(task_id: str):
         
     return sanitize_floats(task)
 
+@router.get("/{task_id}/transcript")
+def get_task_transcript(task_id: str, format: str = "text"):
+    """导出转录文本（支持 text/srt/vtt/json 格式，供外部工具/MCP 调用）"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到该任务")
+    if task.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="任务尚未完成，无法导出转录文本")
+
+    transcript = task.get("transcript", [])
+    speaker_mappings = task.get("speaker_mappings", {})
+    paragraphs = db.get_paragraphs_by_podcast(task_id)
+
+    if format == "json":
+        return {"task_id": task_id, "title": task.get("title"), "paragraphs": paragraphs, "speaker_mappings": speaker_mappings}
+
+    # 使用 paragraphs（有结构化时间）或 fallback 到 transcript
+    items = paragraphs if paragraphs else transcript
+    if not items:
+        raise HTTPException(status_code=404, detail="无转录数据")
+
+    def resolve_speaker(speaker_id):
+        return speaker_mappings.get(speaker_id, speaker_id)
+
+    if format == "srt":
+        lines = []
+        for i, p in enumerate(items):
+            start = p.get("start_time", 0)
+            end = p.get("end_time", 0)
+            speaker = resolve_speaker(p.get("speaker", ""))
+            text = p.get("content", "") or p.get("text", "")
+            sh, sm, ss = int(start//3600), int((start%3600)//60), start%60
+            eh, em, es = int(end//3600), int((end%3600)//60), end%60
+            lines.append(f"{i+1}\n{sh:02d}:{sm:02d}:{ss:06.3f}".replace(".",",") + f" --> {eh:02d}:{em:02d}:{es:06.3f}".replace(".",",") + f"\n{speaker}: {text}")
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("\n\n".join(lines), media_type="text/plain", headers={"Content-Disposition": f"attachment; filename=transcript.srt"})
+
+    if format == "vtt":
+        lines = ["WEBVTT", ""]
+        for i, p in enumerate(items):
+            start = p.get("start_time", 0)
+            end = p.get("end_time", 0)
+            speaker = resolve_speaker(p.get("speaker", ""))
+            text = p.get("content", "") or p.get("text", "")
+            sh, sm, ss = int(start//3600), int((start%3600)//60), start%60
+            eh, em, es = int(end//3600), int((end%3600)//60), end%60
+            lines.append(f"{i+1}\n{sh:02d}:{sm:02d}:{ss:06.3f} --> {eh:02d}:{em:02d}:{es:06.3f}\n{speaker}: {text}")
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("\n\n".join(lines), media_type="text/vtt", headers={"Content-Disposition": f"attachment; filename=transcript.vtt"})
+
+    # 默认 text 格式
+    lines = []
+    for p in items:
+        start = p.get("start_time", 0)
+        speaker = resolve_speaker(p.get("speaker", ""))
+        text = p.get("content", "") or p.get("text", "")
+        mm, ss = int(start//60), int(start%60)
+        lines.append(f"[{mm:02d}:{ss:02d}] {speaker}: {text}")
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("\n".join(lines), media_type="text/plain")
+
 @router.post("")
 def create_task(req: CreateTaskRequest):
     task_id = str(uuid.uuid4())
@@ -164,6 +229,31 @@ def create_task(req: CreateTaskRequest):
     queue_manager.add_task(task_id, req.url)
     
     res = {"task_id": task_id, "status": "pending"}
+    warning = check_low_disk_space()
+    if warning:
+        res["warning"] = warning
+    return res
+
+@router.post("/batch")
+def create_batch_tasks(req: BatchCreateRequest):
+    """批量创建转录任务（队列自动串行处理）"""
+    if not req.urls:
+        raise HTTPException(status_code=400, detail="URL 列表不能为空")
+    if len(req.urls) > 20:
+        raise HTTPException(status_code=400, detail="单次批量最多支持 20 个链接")
+
+    curr_summary_mode = config.get("summary_mode", "local")
+    created = []
+    for url in req.urls:
+        url = url.strip()
+        if not url:
+            continue
+        task_id = str(uuid.uuid4())
+        db.add_task(task_id, url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
+        queue_manager.add_task(task_id, url)
+        created.append({"task_id": task_id, "url": url, "status": "pending"})
+
+    res = {"created": len(created), "tasks": created}
     warning = check_low_disk_space()
     if warning:
         res["warning"] = warning
