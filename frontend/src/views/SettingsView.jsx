@@ -442,17 +442,17 @@ export default function SettingsView({
                 role="switch"
                 aria-checked={autoSaveEnabled}
                 onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
-                className={`group flex items-center gap-2.5 px-4 py-3 rounded-lg border transition-all cursor-pointer bg-transparent outline-none select-none ${
+                className={`group flex items-center gap-2.5 px-4 py-3 rounded-lg transition-all cursor-pointer border-0 outline-none select-none shadow-xs ${
                   autoSaveEnabled
-                    ? "border-[#FF6A1C]/30 bg-[#FF6A1C]/5"
-                    : "border-[#e7bcbb]/40 hover:border-[#e7bcbb]/60"
+                    ? "bg-[#f62440] hover:bg-[#bb0028] text-white"
+                    : "bg-[#e7e2db] hover:bg-[#ddd8d0] text-[#5d5a55]"
                 }`}
               >
-                <RefreshCw size={13} className={`transition-colors ${autoSaveEnabled ? "text-[#FF6A1C]" : "text-[#b8b2aa]"}`} />
-                <span className={`text-xs font-bold whitespace-nowrap transition-colors ${autoSaveEnabled ? "text-[#FF6A1C]" : "text-[#8a8580]"}`}>
+                <RefreshCw size={13} />
+                <span className="text-xs font-bold whitespace-nowrap">
                   {t("自动保存", "Auto-Save")}
                 </span>
-                <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSaveEnabled ? "bg-[#FF6A1C]" : "bg-[#d4cfc7]"}`}>
+                <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSaveEnabled ? "bg-white/30" : "bg-[#c8c3bc]"}`}>
                   <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${autoSaveEnabled ? "left-[16px]" : "left-[2px]"}`} />
                 </div>
               </button>
