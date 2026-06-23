@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
-  MessageSquare, History, Calendar, FileText, Users, ExternalLink
+  MessageSquare, History, Calendar, FileText, Users, ExternalLink, Download,
+  GitMerge, Trash2
 } from "lucide-react";
 
 // ==================== 📝 Inline Markdown Parser ====================
@@ -465,6 +466,8 @@ export default function PodcastDetailView({
   const [editingSpeakerName, setEditingSpeakerName] = useState("");
   const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
+  const [mergingSpeakerId, setMergingSpeakerId] = useState(null);
+  const [mergeTargetId, setMergeTargetId] = useState(null);
 
   const containerRef = useRef(null);
   const activeBubbleRef = useRef(null);
@@ -510,6 +513,57 @@ export default function PodcastDetailView({
     }
   };
 
+  const handleMergeSpeaker = async (sourceId, targetId) => {
+    const sourceName = activeTask.speaker_mappings?.[sourceId] || sourceId;
+    const targetName = activeTask.speaker_mappings?.[targetId] || targetId;
+    if (!confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tasks/speakers/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_name: sourceName, target_name: targetName }),
+      });
+      if (res.ok) {
+        // Also rename in this task's mappings
+        const mappings = { ...activeTask.speaker_mappings };
+        mappings[sourceId] = targetName;
+        const renameRes = await fetch(`http://127.0.0.1:8000/api/tasks/${activeTask.id}/speaker/rename`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ speaker_id: sourceId, new_name: targetName }),
+        });
+        if (renameRes.ok && onRefreshTask) onRefreshTask();
+        setMergingSpeakerId(null);
+        setMergeTargetId(null);
+      } else {
+        const err = await res.json();
+        alert(err.detail || t("合并失败", "Merge failed"));
+      }
+    } catch (err) {
+      alert(t("通信出错：", "Communication error: ") + err.message);
+    }
+  };
+
+  const handleForgetSpeaker = async (speakerId) => {
+    const speakerName = activeTask.speaker_mappings?.[speakerId] || speakerId;
+    if (!confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/tasks/speakers/forget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: speakerName }),
+      });
+      if (res.ok) {
+        if (onRefreshTask) onRefreshTask();
+      } else {
+        const err = await res.json();
+        alert(err.detail || t("操作失败", "Operation failed"));
+      }
+    } catch (err) {
+      alert(t("通信出错：", "Communication error: ") + err.message);
+    }
+  };
+
   const handleRedownloadAudio = async () => {
     setIsTriggeringRestore(true);
     try {
@@ -537,6 +591,61 @@ export default function PodcastDetailView({
     const mins = Math.floor(secondsCount / 60);
     const secs = Math.floor(secondsCount % 60);
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // SRT time format: HH:MM:SS,mmm
+  const formatSrtTime = (seconds) => {
+    if (isNaN(seconds) || seconds === null) return "00:00:00,000";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")},${ms.toString().padStart(3,"0")}`;
+  };
+
+  // VTT time format: HH:MM:SS.mmm
+  const formatVttTime = (seconds) => {
+    if (isNaN(seconds) || seconds === null) return "00:00:00.000";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}.${ms.toString().padStart(3,"0")}`;
+  };
+
+  const handleExport = (format) => {
+    if (!paragraphs || paragraphs.length === 0) return;
+    const title = activeTask.title || "transcript";
+    const safeName = title.replace(/[<>:"/\\|?*]/g, "_").slice(0, 60);
+    let content = "";
+    let ext = "";
+    let mimeType = "text/plain";
+
+    if (format === "srt") {
+      ext = "srt";
+      content = paragraphs.map((p, i) => {
+        const speaker = p.speaker ? `${p.speaker}: ` : "";
+        return `${i+1}\n${formatSrtTime(p.start_time)} --> ${formatSrtTime(p.end_time)}\n${speaker}${p.text}`;
+      }).join("\n\n");
+    } else {
+      ext = "vtt";
+      mimeType = "text/vtt";
+      const body = paragraphs.map((p, i) => {
+        const speaker = p.speaker ? `${p.speaker}: ` : "";
+        return `${i+1}\n${formatVttTime(p.start_time)} --> ${formatVttTime(p.end_time)}\n${speaker}${p.text}`;
+      }).join("\n\n");
+      content = "WEBVTT\n\n" + body;
+    }
+
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeName}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Seeking handlers
@@ -755,7 +864,25 @@ export default function PodcastDetailView({
           className="overflow-y-auto px-10 py-8 border-r border-[#e7bcbb]/30 h-full shrink-0"
           style={{ width: `${leftWidth}%` }}
         >
-          <h2 className="text-3xl font-extrabold tracking-tight text-[#1d1c18] font-display mb-6">{t("完整转录文本", "Full Transcript")}</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-extrabold tracking-tight text-[#1d1c18] font-display">{t("完整转录文本", "Full Transcript")}</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExport("srt")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#e7bcbb]/40 hover:bg-[#f2ede6] text-[#5d3f3e] text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                <Download size={13} className="text-[#bf0029]" />
+                <span>SRT</span>
+              </button>
+              <button
+                onClick={() => handleExport("vtt")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#e7bcbb]/40 hover:bg-[#f2ede6] text-[#5d3f3e] text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                <Download size={13} className="text-[#bf0029]" />
+                <span>VTT</span>
+              </button>
+            </div>
+          </div>
           
           <div className="flex flex-col gap-6">
             {paragraphs
@@ -940,7 +1067,7 @@ export default function PodcastDetailView({
             <div>
               {activeTask.restoring ? (
                 <span className="text-xs font-mono font-bold text-[#f62440] animate-pulse whitespace-nowrap">
-                  {typeof activeTask.restore_progress === 'number' ? activeTask.restore_progress.toFixed(1) : "0.0"}%
+                  {typeof activeTask.restore_progress === 'number' ? Math.round(activeTask.restore_progress) : 0}%
                 </span>
               ) : (
                 <button
@@ -1073,6 +1200,21 @@ export default function PodcastDetailView({
                   getUniqueSpeakers().map((spId) => {
                     const currentName = activeTask.speaker_mappings?.[spId] || spId;
                     const isEditing = editingSpeakerId === spId;
+                    const confidenceData = activeTask.speaker_confidence?.[spId];
+                    const confidenceScore = confidenceData?.score;
+                    const confidenceSource = confidenceData?.source;
+                    const isMerging = mergingSpeakerId === spId;
+
+                    const getConfidenceLabel = (score, source) => {
+                      if (source === "noise") return { text: t("语气词", "Interjection"), color: "bg-gray-100 text-gray-500" };
+                      if (source === "manual") return { text: t("手动", "Manual"), color: "bg-blue-50 text-blue-600" };
+                      if (source === "llm") return { text: t("AI推理", "AI Inferred"), color: "bg-purple-50 text-purple-600" };
+                      if (!score && score !== 0) return null;
+                      if (score >= 0.85) return { text: `${t("高置信", "High")} ${(score*100).toFixed(0)}%`, color: "bg-green-50 text-green-700" };
+                      if (score >= 0.78) return { text: `${t("中置信", "Medium")} ${(score*100).toFixed(0)}%`, color: "bg-yellow-50 text-yellow-700" };
+                      return { text: `${t("低置信", "Low")} ${(score*100).toFixed(0)}%`, color: "bg-orange-50 text-orange-600" };
+                    };
+                    const confLabel = getConfidenceLabel(confidenceScore, confidenceSource);
 
                     return (
                       <div key={spId} className="flex items-center justify-between p-3 border border-[#e7bcbb]/30 rounded-lg bg-[#fef9f2]/30">
@@ -1105,23 +1247,73 @@ export default function PodcastDetailView({
                               {t("取消", "Cancel")}
                             </button>
                           </div>
+                        ) : isMerging ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <span className="text-xs text-[#5d3f3e] font-semibold whitespace-nowrap">{t("合并到:", "Merge to:")}</span>
+                            <select
+                              value={mergeTargetId || ""}
+                              onChange={(e) => setMergeTargetId(e.target.value)}
+                              className="flex-1 bg-white border border-[#e7bcbb]/40 rounded px-2 py-1.5 text-sm text-[#1d1c18] outline-none"
+                            >
+                              <option value="">{t("选择目标...", "Select target...")}</option>
+                              {getUniqueSpeakers().filter(id => id !== spId).map(id => (
+                                <option key={id} value={id}>{activeTask.speaker_mappings?.[id] || id}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleMergeSpeaker(spId, mergeTargetId)}
+                              disabled={!mergeTargetId}
+                              className="px-3 py-1.5 bg-[#f62440] hover:bg-[#bb0028] disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer border-0 outline-none"
+                            >
+                              {t("合并", "Merge")}
+                            </button>
+                            <button
+                              onClick={() => { setMergingSpeakerId(null); setMergeTargetId(null); }}
+                              className="px-3 py-1.5 bg-[#f2ede6] text-[#5d3f3e] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded cursor-pointer border-0 outline-none"
+                            >
+                              {t("取消", "Cancel")}
+                            </button>
+                          </div>
                         ) : (
                           <>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-[#1d1c18]">{currentName}</span>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-[#1d1c18] truncate">{currentName}</span>
+                                {confLabel && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide shrink-0 ${confLabel.color}`}>
+                                    {confLabel.text}
+                                  </span>
+                                )}
+                              </div>
                               {activeTask.speaker_mappings?.[spId] && (
                                 <span className="text-[10px] text-[#5d5a55] font-semibold mt-0.5">{t("原始 ID: ", "Original ID: ")}{spId}</span>
                               )}
                             </div>
-                            <button
-                              onClick={() => {
-                                setEditingSpeakerId(spId);
-                                setEditingSpeakerName(currentName);
-                              }}
-                              className="text-xs text-[#bf0029] hover:underline font-bold bg-transparent border-0 outline-none cursor-pointer"
-                            >
-                              {t("编辑", "Edit")}
-                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setEditingSpeakerId(spId);
+                                  setEditingSpeakerName(currentName);
+                                }}
+                                className="text-xs text-[#bf0029] hover:underline font-bold bg-transparent border-0 outline-none cursor-pointer px-1"
+                              >
+                                {t("编辑", "Edit")}
+                              </button>
+                              <button
+                                onClick={() => { setMergingSpeakerId(spId); setMergeTargetId(null); }}
+                                className="p-1 text-[#5d5a55]/50 hover:text-[#bf0029] transition-colors bg-transparent border-0 outline-none cursor-pointer"
+                                title={t("合并到其他说话人", "Merge into another speaker")}
+                              >
+                                <GitMerge size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleForgetSpeaker(spId)}
+                                className="p-1 text-[#5d5a55]/50 hover:text-[#f62440] transition-colors bg-transparent border-0 outline-none cursor-pointer"
+                                title={t("从声纹库中移除", "Remove from voiceprint library")}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </>
                         )}
                       </div>

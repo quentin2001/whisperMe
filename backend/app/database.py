@@ -139,6 +139,17 @@ class LocalDatabase:
                 FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE,
                 FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             )''')
+
+            # speakers table (global voiceprint library)
+            c.execute('''CREATE TABLE IF NOT EXISTS speakers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                embedding TEXT NOT NULL,
+                sample_count INTEGER DEFAULT 1,
+                last_seen_at TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )''')
             self.conn.commit()
 
     def _migrate_if_needed(self):
@@ -271,22 +282,58 @@ class LocalDatabase:
             except Exception as e_backfill:
                 print(f"⚠️ [MIGRATION] 历史任务音频时长回填失败: {e_backfill}")
 
+            # 增量升级：为 tasks 表增加 speaker_confidence 列
+            c.execute("PRAGMA table_info(tasks)")
+            task_columns = [col["name"] for col in c.fetchall()]
+            if "speaker_confidence" not in task_columns:
+                try:
+                    c.execute("ALTER TABLE tasks ADD COLUMN speaker_confidence TEXT")
+                    self.conn.commit()
+                    print("✅ [MIGRATION] 成功为 tasks 表增加 speaker_confidence 列")
+                except Exception as e:
+                    print(f"❌ [MIGRATION] 增加 speaker_confidence 列失败: {e}")
+                    self.conn.rollback()
+
+            # 增量升级：将 speaker_fingerprints.json 迁移到 speakers 表
+            fingerprints_json = os.path.join(PROJECT_DIR, "speaker_fingerprints.json")
+            if os.path.exists(fingerprints_json):
+                c.execute("SELECT COUNT(*) as cnt FROM speakers")
+                sp_count = c.fetchone()["cnt"]
+                if sp_count == 0:
+                    try:
+                        with open(fingerprints_json, "r", encoding="utf-8") as f:
+                            fingerprints = json.load(f)
+                        now_iso = datetime.now().isoformat()
+                        for name, emb in fingerprints.items():
+                            c.execute(
+                                "INSERT OR IGNORE INTO speakers (name, embedding, sample_count, last_seen_at) VALUES (?, ?, 1, ?)",
+                                (name, json.dumps(emb, ensure_ascii=False), now_iso)
+                            )
+                        self.conn.commit()
+                        os.rename(fingerprints_json, fingerprints_json + ".bak")
+                        print(f"✅ [MIGRATION] 成功将 {len(fingerprints)} 条声纹从 JSON 迁移到 SQLite speakers 表")
+                    except Exception as e:
+                        print(f"❌ [MIGRATION] 声纹 JSON 迁移失败: {e}")
+                        self.conn.rollback()
+
 
     def _insert_task_internal(self, c, t: dict):
         metadata = json.dumps(t.get("metadata", {}), ensure_ascii=False)
         transcript = json.dumps(t.get("transcript", []), ensure_ascii=False)
         speaker_mappings = json.dumps(t.get("speaker_mappings", {}), ensure_ascii=False)
         speaker_embeddings = json.dumps(t.get("speaker_embeddings", {}), ensure_ascii=False)
-        c.execute('''INSERT OR REPLACE INTO tasks 
-            (id, url, asr_mode, summary_mode, title, podcast_name, status, progress, 
-            error_message, created_at, image_url, obsidian_synced, restoring, restore_progress, 
-            metadata, transcript, summary, speaker_mappings, speaker_embeddings, audio_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+        speaker_confidence = json.dumps(t.get("speaker_confidence", {}), ensure_ascii=False)
+        c.execute('''INSERT OR REPLACE INTO tasks
+            (id, url, asr_mode, summary_mode, title, podcast_name, status, progress,
+            error_message, created_at, image_url, obsidian_synced, restoring, restore_progress,
+            metadata, transcript, summary, speaker_mappings, speaker_embeddings, audio_url, speaker_confidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (t.get("id"), t.get("url"), t.get("asr_mode", "local"), t.get("summary_mode", "local"),
              t.get("title"), t.get("podcast_name"), t.get("status"), t.get("progress"),
-             t.get("error_message"), t.get("created_at"), t.get("image_url"), 
+             t.get("error_message"), t.get("created_at"), t.get("image_url"),
              bool(t.get("obsidian_synced")), bool(t.get("restoring")), t.get("restore_progress", 0),
-             metadata, transcript, t.get("summary", ""), speaker_mappings, speaker_embeddings, t.get("audio_url", "")))
+             metadata, transcript, t.get("summary", ""), speaker_mappings, speaker_embeddings, t.get("audio_url", ""),
+             speaker_confidence))
 
     def _insert_paragraph_internal(self, c, p: dict):
         sentences = json.dumps(p.get("sentences", []), ensure_ascii=False)
@@ -421,7 +468,8 @@ class LocalDatabase:
             "transcript": [],
             "summary": "",
             "speaker_mappings": {},
-            "speaker_embeddings": {}
+            "speaker_embeddings": {},
+            "speaker_confidence": {}
         }
         with self.write_lock:
             c = self.conn.cursor()
@@ -690,6 +738,90 @@ class LocalDatabase:
             c.execute("UPDATE board_cards SET pos_x=?, pos_y=? WHERE board_id=? AND card_id=?",
                       (pos_x, pos_y, board_id, card_id))
             self.conn.commit()
+
+    # ==================== SPEAKERS (Global Voiceprint Library) ====================
+    def get_all_speakers(self) -> list[dict]:
+        """获取全局声纹库列表（不返回 embedding 向量）"""
+        c = self.conn.cursor()
+        c.execute("SELECT id, name, sample_count, last_seen_at, created_at, updated_at FROM speakers ORDER BY sample_count DESC, name ASC")
+        return c.fetchall()
+
+    def get_speaker(self, name: str) -> dict:
+        """按名字查询单个声纹（含 embedding）"""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM speakers WHERE name=?", (name,))
+        return c.fetchone()
+
+    def get_all_speakers_with_embeddings(self) -> dict:
+        """获取全局声纹库 {name: embedding_list}，供匹配使用"""
+        c = self.conn.cursor()
+        c.execute("SELECT name, embedding, sample_count FROM speakers")
+        rows = c.fetchall()
+        result = {}
+        for r in rows:
+            emb = r["embedding"]
+            if isinstance(emb, str):
+                try: emb = json.loads(emb)
+                except: continue
+            result[r["name"]] = {"embedding": emb, "sample_count": r.get("sample_count", 1)}
+        return result
+
+    def upsert_speaker(self, name: str, embedding: list, sample_count: int = None):
+        """插入或更新声纹（name 为 UNIQUE 键）"""
+        with self.write_lock:
+            c = self.conn.cursor()
+            now_iso = datetime.now().isoformat()
+            emb_json = json.dumps(embedding, ensure_ascii=False)
+            c.execute("SELECT id, sample_count FROM speakers WHERE name=?", (name,))
+            existing = c.fetchone()
+            if existing:
+                new_count = sample_count if sample_count is not None else (existing["sample_count"] or 0) + 1
+                c.execute("UPDATE speakers SET embedding=?, sample_count=?, last_seen_at=?, updated_at=? WHERE name=?",
+                          (emb_json, new_count, now_iso, now_iso, name))
+            else:
+                c.execute("INSERT INTO speakers (name, embedding, sample_count, last_seen_at) VALUES (?, ?, ?, ?)",
+                          (name, emb_json, sample_count or 1, now_iso))
+            self.conn.commit()
+
+    def delete_speaker(self, name: str) -> bool:
+        """从全局声纹库中删除指定说话人"""
+        with self.write_lock:
+            c = self.conn.cursor()
+            c.execute("DELETE FROM speakers WHERE name=?", (name,))
+            if c.rowcount > 0:
+                self.conn.commit()
+                return True
+            return False
+
+    def merge_speakers(self, source_name: str, target_name: str) -> bool:
+        """合并声纹：将 source 的 embedding 加权合并到 target，然后删除 source"""
+        with self.write_lock:
+            c = self.conn.cursor()
+            c.execute("SELECT * FROM speakers WHERE name=?", (source_name,))
+            source = c.fetchone()
+            c.execute("SELECT * FROM speakers WHERE name=?", (target_name,))
+            target = c.fetchone()
+            if not source or not target:
+                return False
+
+            src_emb = source["embedding"]
+            tgt_emb = target["embedding"]
+            if isinstance(src_emb, str): src_emb = json.loads(src_emb)
+            if isinstance(tgt_emb, str): tgt_emb = json.loads(tgt_emb)
+
+            src_count = source.get("sample_count", 1)
+            tgt_count = target.get("sample_count", 1)
+            total = src_count + tgt_count
+
+            # 加权平均合并 embedding
+            merged_emb = [(s * src_count + t * tgt_count) / total for s, t in zip(src_emb, tgt_emb)]
+
+            now_iso = datetime.now().isoformat()
+            c.execute("UPDATE speakers SET embedding=?, sample_count=?, last_seen_at=?, updated_at=? WHERE name=?",
+                      (json.dumps(merged_emb, ensure_ascii=False), total, now_iso, now_iso, target_name))
+            c.execute("DELETE FROM speakers WHERE name=?", (source_name,))
+            self.conn.commit()
+            return True
 
 # 实例化全局单例数据库对象
 db = LocalDatabase()

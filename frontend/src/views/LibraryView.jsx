@@ -806,7 +806,7 @@ export default function LibraryView({
                       <span className="text-[#e7bcbb]/40">•</span>
                       {session.status === 'IN_PROGRESS' ? (
                         <span className="bg-[#ffdad6] text-[#b81a1a] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
-                          {session.rawTask.status === 'pending' ? t("排队中", "Queued") : `${t("处理中", "In Progress")} (${session.progress}%)`}
+                          {session.rawTask.status === 'pending' ? t("排队中", "Queued") : `${t("处理中", "In Progress")} (${Math.round(session.progress)}%)`}
                         </span>
                       ) : (
                         <span className="bg-[#f0e2b7] text-[#554428] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">

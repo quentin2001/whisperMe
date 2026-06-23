@@ -55,19 +55,12 @@ def check_low_disk_space():
     return None
 
 def save_speaker_fingerprint(name: str, embedding: list[float]):
+    """保存声纹到全局 SQLite 声纹库"""
     if not name or not embedding:
         return
     try:
-        import json
-        fingerprints_file = os.path.join(PROJECT_DIR, "speaker_fingerprints.json")
-        fingerprints = {}
-        if os.path.exists(fingerprints_file):
-            with open(fingerprints_file, "r", encoding="utf-8") as f:
-                fingerprints = json.load(f)
-        fingerprints[name] = embedding
-        with open(fingerprints_file, "w", encoding="utf-8") as f:
-            json.dump(fingerprints, f, ensure_ascii=False, indent=2)
-        print(f"💾 [LOG] 声纹特征成功写入特征库: {name}")
+        db.upsert_speaker(name, embedding)
+        print(f"💾 [LOG] 声纹特征成功写入全局声纹库: {name}")
     except Exception as e:
         print(f"⚠️ [LOG] 写入声纹特征库失败: {e}")
 
@@ -92,6 +85,39 @@ def list_tasks():
             pos = queue_manager.get_queue_position(t.get("id"))
             t["queue_position"] = pos
     return tasks
+
+# --- 全局声纹库 API（必须在 /{task_id} 之前定义，避免被路径参数拦截）---
+
+class MergeSpeakerRequest(BaseModel):
+    source_name: str
+    target_name: str
+
+class ForgetSpeakerRequest(BaseModel):
+    name: str
+
+@router.get("/speakers/list")
+def list_speakers():
+    """获取全局声纹库列表（不含 embedding 向量）"""
+    speakers = db.get_all_speakers()
+    return {"speakers": speakers}
+
+@router.post("/speakers/merge")
+def merge_speakers(req: MergeSpeakerRequest):
+    """合并两个说话人声纹"""
+    if req.source_name == req.target_name:
+        raise HTTPException(status_code=400, detail="不能合并同一个说话人")
+    success = db.merge_speakers(req.source_name, req.target_name)
+    if not success:
+        raise HTTPException(status_code=404, detail="未找到指定说话人")
+    return {"success": True, "message": f"已将 '{req.source_name}' 合并到 '{req.target_name}'"}
+
+@router.post("/speakers/forget")
+def forget_speaker(req: ForgetSpeakerRequest):
+    """从全局声纹库中忘记某说话人"""
+    success = db.delete_speaker(req.name)
+    if not success:
+        raise HTTPException(status_code=404, detail="未找到指定说话人")
+    return {"success": True, "message": f"已从声纹库中移除 '{req.name}'"}
 
 @router.get("/{task_id}")
 def get_task_details(task_id: str):

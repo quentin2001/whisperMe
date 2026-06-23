@@ -8,50 +8,70 @@ from app.core import logger
 
 print = logger.info
 
-def match_speakers_with_voiceprints(speaker_embeddings: dict) -> dict:
+
+def get_dynamic_threshold(sample_count: int) -> float:
+    """根据声纹出现次数动态调整匹配阈值：出现越多，信任度越高，阈值越宽松"""
+    if sample_count >= 10:
+        return 0.75   # 老熟人
+    elif sample_count >= 5:
+        return 0.78
+    elif sample_count >= 2:
+        return 0.80
+    else:
+        return 0.83   # 只见过一次，严格匹配
+
+
+def match_speakers_with_voiceprints(speaker_embeddings: dict) -> tuple:
     """
-    Compare speaker embeddings with fingerprints database using Cosine Similarity
+    Compare speaker embeddings with global voiceprint library (SQLite) using Cosine Similarity.
+    返回 (mappings, confidence_dict)
+    - mappings: { "SPEAKER_00": "张三" }
+    - confidence: { "SPEAKER_00": { "score": 0.87, "source": "voiceprint" } }
     """
     if not speaker_embeddings:
-        return {}
+        return {}, {}
     try:
         import numpy as np
-        fingerprints_file = os.path.join(PROJECT_DIR, "speaker_fingerprints.json")
-        if not os.path.exists(fingerprints_file):
-            return {}
-        with open(fingerprints_file, "r", encoding="utf-8") as f:
-            fingerprints = json.load(f)
+        # 从 SQLite 全局声纹库读取
+        fingerprints = db.get_all_speakers_with_embeddings()
         if not fingerprints:
-            return {}
-            
+            return {}, {}
+
         mappings = {}
+        confidence = {}
         for sp_id, emb in speaker_embeddings.items():
             if not emb: continue
             best_match = None
             max_sim = -1.0
-            
+            best_count = 1
+
             emb_v = np.array(emb)
             norm_emb = np.linalg.norm(emb_v)
             if norm_emb == 0: continue
-            
-            for known_name, known_emb in fingerprints.items():
-                known_v = np.array(known_emb)
+
+            for known_name, info in fingerprints.items():
+                known_v = np.array(info["embedding"])
                 norm_known = np.linalg.norm(known_v)
                 if norm_known == 0: continue
-                
+
                 sim = np.dot(emb_v, known_v) / (norm_emb * norm_known)
                 if sim > max_sim:
                     max_sim = sim
                     best_match = known_name
-            
-            # 余弦相似度阈值设为 0.81，确保匹配高精准
-            if max_sim >= 0.81 and best_match:
+                    best_count = info.get("sample_count", 1)
+
+            # 动态阈值：出现次数越多，阈值越宽松
+            threshold = get_dynamic_threshold(best_count)
+            if max_sim >= threshold and best_match:
                 mappings[sp_id] = best_match
-                print(f"🎯 [LOG] 声纹库匹配成功 - 自动将 {sp_id} 关联为老熟人: {best_match} (相似度: {max_sim:.3f})")
-        return mappings
+                confidence[sp_id] = {"score": round(max_sim, 4), "source": "voiceprint"}
+                # 匹配成功，更新出现次数和最近见过时间
+                db.upsert_speaker(best_match, fingerprints[best_match]["embedding"], sample_count=best_count + 1)
+                print(f"🎯 [LOG] 声纹库匹配成功 - {sp_id} → {best_match} (相似度: {max_sim:.3f}, 阈值: {threshold}, 出现次数: {best_count})")
+        return mappings, confidence
     except Exception as e:
         print(f"⚠️ [LOG] 比对声纹特征库失败: {e}")
-        return {}
+        return {}, {}
 
 def pre_filter_noise_speakers(transcript: list) -> dict:
     """
@@ -318,41 +338,52 @@ def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker
     """
     task = db.get_task(task_id)
     if not task: return
-    
+
     existing_mappings = task.get("speaker_mappings", {})
+    existing_confidence = task.get("speaker_confidence", {})
     all_speakers = set(seg.get("speaker") for seg in transcript if seg.get("speaker"))
-    
+
     noise_mappings = pre_filter_noise_speakers(transcript)
-    
+
     unmatched_embeddings = {}
     if speaker_embeddings:
         for sp_id, emb in speaker_embeddings.items():
             if sp_id not in noise_mappings and sp_id not in existing_mappings:
                 unmatched_embeddings[sp_id] = emb
-                
-    voiceprint_mappings = match_speakers_with_voiceprints(unmatched_embeddings)
+
+    voiceprint_mappings, voiceprint_confidence = match_speakers_with_voiceprints(unmatched_embeddings)
     known_mappings = {**noise_mappings, **voiceprint_mappings}
-    
+
+    # 构建置信度字典
+    all_confidence = {**existing_confidence}
+    for sp_id in noise_mappings:
+        all_confidence[sp_id] = {"score": 1.0, "source": "noise"}
+    for sp_id, info in voiceprint_confidence.items():
+        all_confidence[sp_id] = info
+
     unmatched_speakers = list(all_speakers - set(known_mappings.keys()) - set(existing_mappings.keys()))
-    
+
     llm_mappings = {}
     if unmatched_speakers:
         try:
             summary_mode = task.get("summary_mode", "local")
             llm_mappings = match_speakers_with_llm(
-                metadata, 
-                transcript, 
-                unmatched_speakers, 
-                {**existing_mappings, **known_mappings}, 
+                metadata,
+                transcript,
+                unmatched_speakers,
+                {**existing_mappings, **known_mappings},
                 summary_mode=summary_mode
             )
+            for sp_id in llm_mappings:
+                all_confidence[sp_id] = {"score": 0.0, "source": "llm"}
         except Exception as e:
             print(f"⚠️ [LOG] 大模型推理改名失败: {e}")
-            
+
     final_mappings = {**noise_mappings, **voiceprint_mappings, **llm_mappings}
     if final_mappings:
         merged = {**final_mappings, **existing_mappings}
-        db.update_task(task_id, speaker_mappings=merged)
+        merged_confidence = {**all_confidence, **existing_confidence}
+        db.update_task(task_id, speaker_mappings=merged, speaker_confidence=merged_confidence)
         print(f"🎉 [LOG] 四阶段智能识别完成！已自动应用以下角色命名: {merged}")
 
 def apply_interjection_labels(task_id: str, transcript: list):
@@ -365,6 +396,7 @@ def apply_interjection_labels(task_id: str, transcript: list):
         if not sp: continue
         speaker_texts[sp] = speaker_texts.get(sp, "") + seg.get("text", "").strip()
     mappings = task.get("speaker_mappings", {})
+    confidence = task.get("speaker_confidence", {})
     modified = False
     interjection_chars = set("嗯对啊哦吧呢呀啦哈哼嗨呗嘛呃喔呦哎好的噢唏嚯啥么是吗了嘿哟嗷呐哇")
     for sp, full_text in speaker_texts.items():
@@ -372,11 +404,13 @@ def apply_interjection_labels(task_id: str, transcript: list):
         cleaned = "".join([c for c in full_text if c.isalnum()])
         if not cleaned:
             mappings[sp] = "未识别语气词"
+            confidence[sp] = {"score": 1.0, "source": "noise"}
             modified = True
             continue
         if len(cleaned) <= 15 and all(c in interjection_chars for c in cleaned):
             mappings[sp] = "未识别语气词"
+            confidence[sp] = {"score": 1.0, "source": "noise"}
             modified = True
             print(f"🏷️ [LOG] 自动将仅说语气助词的发言人 {sp} 标记为 '未识别语气词'")
     if modified:
-        db.update_task(task_id, speaker_mappings=mappings)
+        db.update_task(task_id, speaker_mappings=mappings, speaker_confidence=confidence)
