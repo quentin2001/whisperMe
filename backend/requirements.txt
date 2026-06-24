@@ -11,3 +11,4 @@ plyer
 psutil
 websocket-client
 pyyaml
+mcp
