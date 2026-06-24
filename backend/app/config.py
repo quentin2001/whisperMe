@@ -6,15 +6,19 @@ import ctypes
 from pathlib import Path
 
 # ==================== 🛡️ 钢铁防御层 0：NumPy 2.0 兼容性补焊 ====================
-import numpy as np
-if not hasattr(np, "NaN"):
-    np.NaN = np.nan
-if not hasattr(np, "NAN"):
-    np.NAN = np.nan
-if not hasattr(np, "float"):
-    np.float = float
-if not hasattr(np, "int"):
-    np.int = int
+# 延迟导入：仅在 numpy 已安装时打补丁，在线模式不需要 numpy
+try:
+    import numpy as np
+    if not hasattr(np, "NaN"):
+        np.NaN = np.nan
+    if not hasattr(np, "NAN"):
+        np.NAN = np.nan
+    if not hasattr(np, "float"):
+        np.float = float
+    if not hasattr(np, "int"):
+        np.int = int
+except ImportError:
+    pass
 
 # ==================== 🛡️ 钢铁防御层 1：强行重写控制台物理输出流 ====================
 # 仅在编码不是 UTF-8 时替换，避免破坏 pytest 等工具的输出捕获机制
