@@ -12,7 +12,12 @@ import socket
 import subprocess
 import webbrowser
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller 打包后 __file__ 指向临时目录，需要用 exe 所在目录
+if getattr(sys, 'frozen', False):
+    ROOT_DIR = os.path.dirname(sys.executable)
+else:
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
 PORT = 9101
 URL = f"http://localhost:{PORT}"
