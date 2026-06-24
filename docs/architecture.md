@@ -164,7 +164,7 @@ whisperMe/
 ### 4.1 技术栈
 
 - **Vite** — 构建工具
-- **React 18** — UI 框架
+- **React 19** — UI 框架
 - **Vanilla CSS** — 全局样式，使用 CSS Custom Properties (设计令牌)
 - **无第三方 UI 库** — 所有组件均为自研
 
