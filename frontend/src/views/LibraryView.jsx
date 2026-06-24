@@ -708,11 +708,14 @@ export default function LibraryView({
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-[var(--border-primary)]/30 bg-[var(--bg-hover)]/50 relative">
+                    <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] font-bold text-xs absolute inset-0">
+                      {(session.podcastName || session.title || "?").charAt(0)}
+                    </div>
                     <img
                       src={session.thumbnail}
                       alt=""
                       referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover absolute inset-0"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                     {session.status === 'IN_PROGRESS' && (

@@ -465,9 +465,23 @@ export default function PodcastDetailView({
   const [qaLoading, setQaLoading] = useState(false);
 
   useEffect(() => {
-    setQaMessages([]);
     setQaInput("");
     setQaLoading(false);
+    // Load saved Q&A history from backend
+    if (activeTask?.id && activeTask?.status === "completed") {
+        fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`)
+            .then(res => res.ok ? res.json() : { history: [] })
+            .then(data => {
+                const history = (data.history || []).map(m => ({
+                    role: m.role,
+                    content: m.content,
+                }));
+                setQaMessages(history);
+            })
+            .catch(() => setQaMessages([]));
+    } else {
+        setQaMessages([]);
+    }
   }, [activeTask?.id]);
 
   // Speaker Management State
@@ -700,24 +714,31 @@ export default function PodcastDetailView({
     if (!qaInput.trim() || qaLoading) return;
     const question = qaInput.trim();
     setQaInput("");
+    // Show user message immediately
     setQaMessages(prev => [...prev, { role: "user", content: question }]);
     setQaLoading(true);
 
     try {
-      const history = qaMessages.map(m => ({ role: m.role, content: m.content }));
       const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question }),
       });
       const data = await res.json();
       if (res.ok) {
-        setQaMessages(prev => [...prev, { role: "assistant", content: data.answer }]);
+        // Reload full history from backend to stay in sync
+        setQaMessages(data.history || []);
       } else {
-        setQaMessages(prev => [...prev, { role: "assistant", content: `错误: ${data.detail || "请求失败"}` }]);
+        // Remove the optimistic user message on error
+        setQaMessages(prev => prev.slice(0, -1));
+        setQaMessages(prev => [...prev, { role: "user", content: question }, { role: "assistant", content: `错误: ${data.detail || "请求失败"}` }]);
       }
     } catch (err) {
-      setQaMessages(prev => [...prev, { role: "assistant", content: `网络错误: ${err.message}` }]);
+      // On network error, keep the user message but show error
+      setQaMessages(prev => {
+        const withoutLast = prev.slice(0, -1);
+        return [...withoutLast, { role: "user", content: question }, { role: "assistant", content: `网络错误: ${err.message}` }];
+      });
     } finally {
       setQaLoading(false);
     }
@@ -1200,18 +1221,27 @@ export default function PodcastDetailView({
         
         {/* Left: session audio details */}
         <div className="w-1/4 flex items-center gap-3">
-          <div className="w-11 h-11 bg-[var(--accent-red)] rounded-lg overflow-hidden shadow-sm shrink-0">
+          <div className="w-11 h-11 bg-[var(--accent-red)] rounded-lg overflow-hidden shadow-sm shrink-0 relative">
             {activeTask.image_url ? (
-              <img
-                src={activeTask.image_url}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
+              <>
+                <img
+                  src={activeTask.image_url}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover absolute inset-0"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+                <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight absolute inset-0">
+                  <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
+                    {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
+                  </span>
+                </div>
+              </>
             ) : (
               <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight">
-                <span className="text-[10px] uppercase font-mono tracking-wide leading-none">WM</span>
+                <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
+                  {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
+                </span>
               </div>
             )}
           </div>
