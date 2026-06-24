@@ -459,7 +459,7 @@ export default function PodcastDetailView({
   // Layout resize state (proportion of left panel in %)
   const [leftWidth, setLeftWidth] = useState(60);
   const [isDragging, setIsDragging] = useState(false);
-  const [detailSubTab, setDetailSubTab] = useState("summary"); // "summary" | "shownotes" | "comments" | "qa"
+  const [detailSubTab, setDetailSubTab] = useState("shownotes"); // "shownotes" | "comments" | "summary" | "qa"
   const [qaMessages, setQaMessages] = useState([]);
   const [qaInput, setQaInput] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
@@ -1020,16 +1020,6 @@ export default function PodcastDetailView({
           {/* Sub-tabs header selectors */}
           <div className="flex border-b border-[var(--border-primary)]/30 bg-[var(--bg-primary)]/90 shrink-0 h-12">
             <button
-              onClick={() => setDetailSubTab("summary")}
-              className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
-                detailSubTab === "summary"
-                  ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
-                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
-              }`}
-            >
-              {t("AI 总结", "AI Summary")}
-            </button>
-            <button
               onClick={() => setDetailSubTab("shownotes")}
               className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
                 detailSubTab === "shownotes"
@@ -1050,6 +1040,16 @@ export default function PodcastDetailView({
               {t("听众热评", "Listener Comments")}
             </button>
             <button
+              onClick={() => setDetailSubTab("summary")}
+              className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
+                detailSubTab === "summary"
+                  ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
+                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
+              }`}
+            >
+              {t("AI 总结", "AI Summary")}
+            </button>
+            <button
               onClick={() => setDetailSubTab("qa")}
               className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
                 detailSubTab === "qa"
@@ -1063,6 +1063,37 @@ export default function PodcastDetailView({
 
           {/* Sub-tab scrollable content */}
           <div className="flex-1 overflow-y-auto px-8 py-8 flex flex-col gap-6 custom-scrollbar">
+            {detailSubTab === "shownotes" && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
+                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <FileText size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
+                </div>
+                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} t={t} />
+              </div>
+            )}
+
+            {detailSubTab === "comments" && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
+                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <MessageSquare size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {commentsList.length > 0 ? (
+                    commentsList.map((comment, cIdx) => (
+                      <CommentItemRenderer key={cIdx} comment={comment} onTimeJump={jumpToTimeSeconds} t={t} />
+                    ))
+                  ) : (
+                    <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
+                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {detailSubTab === "summary" && (
               <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs select-text animate-fade-in">
                 <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
@@ -1095,37 +1126,6 @@ export default function PodcastDetailView({
                     <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无总结内容", "No summary available")}</span>
                   </div>
                 )}
-              </div>
-            )}
-
-            {detailSubTab === "shownotes" && (
-              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
-                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <FileText size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
-                </div>
-                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} t={t} />
-              </div>
-            )}
-
-            {detailSubTab === "comments" && (
-              <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
-                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <MessageSquare size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  {commentsList.length > 0 ? (
-                    commentsList.map((comment, cIdx) => (
-                      <CommentItemRenderer key={cIdx} comment={comment} onTimeJump={jumpToTimeSeconds} t={t} />
-                    ))
-                  ) : (
-                    <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
-                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
