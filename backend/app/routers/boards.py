@@ -335,7 +335,7 @@ def review_card(card_id: str, req: ReviewCardRequest):
             webhook_url = config.get("webhook_url", "").strip()
             if webhook_url:
                 import httpx
-                source_link = f"http://localhost:5173/?task_id={card['podcast_id']}&paragraph_id={card['paragraph_id']}"
+                source_link = f"http://localhost:9173/?task_id={card['podcast_id']}&paragraph_id={card['paragraph_id']}"
                 payload = {
                     "msg_type": "text",
                     "text": {
