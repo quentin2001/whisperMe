@@ -110,7 +110,7 @@ def run_podcast_pipeline(task_id: str, url: str):
             
         t_download_start = time.time()
         local_mp3, metadata = downloader.download_url_audio(url, progress_callback=download_progress_callback)
-        timing_stats['音频下载与解析'] = time.time() - t_download_start
+        timing_stats['音频下载'] = time.time() - t_download_start
         
         # 双重检查
         check_cancelled(task_id)
@@ -141,7 +141,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         check_cancelled(task_id)
         t_diarization_start = time.time()
         diar_data = transcriber.run_diarization(standardized_wav)
-        timing_stats['声纹分割 (PyAnnote)'] = time.time() - t_diarization_start
+        timing_stats['声纹分割'] = time.time() - t_diarization_start
         db.update_task(task_id, progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
@@ -172,15 +172,13 @@ def run_podcast_pipeline(task_id: str, url: str):
             asr_mode=asr_mode,
             on_segment_batch=on_segment_batch
         )
-        timing_stats['语音识别转录 (Whisper)'] = time.time() - t_transcribe_start
+        timing_stats['语音识别转录'] = time.time() - t_transcribe_start
         db.update_task(task_id, transcript=merged_transcript, progress=75.0)
 
         # Step 4.2: 最终段落聚合（兜底，确保完整性）
         try:
             print("⏳ [LOG] 正在运行最终语义分块聚合...")
-            t_chunk_start = time.time()
             paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
-            timing_stats['语义段落聚合'] = time.time() - t_chunk_start
             db.add_paragraphs(paragraphs)
             print(f"✅ [LOG] 成功为任务 {task_id} 聚合出 {len(paragraphs)} 个语义段落。")
         except Exception as chunk_ex:
@@ -260,7 +258,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         task_summary_mode = task.get("summary_mode", "local")
         t_summary_start = time.time()
         summary_report = summarizer.summarize(metadata, merged_transcript, summary_mode=task_summary_mode)
-        timing_stats['AI 深度总结 (LLM)'] = time.time() - t_summary_start
+        timing_stats['AI 深度总结'] = time.time() - t_summary_start
         
         total_time = time.time() - pipeline_start_time
         time_report = "\n\n---\n\n### ⏱️ 分析用时统计\n"
