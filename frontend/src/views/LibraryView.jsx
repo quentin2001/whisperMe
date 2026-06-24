@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Search, SlidersHorizontal, Mic, Square, Cloud, Play,
-  Trash2, BarChart3, Database, Plus, Calendar, FastForward, ExternalLink,
+  Trash2, BarChart3, Database, Plus, Calendar, FastForward, Compass,
   Sun, Moon, Monitor
 } from "lucide-react";
 import { API_BASE } from "../constants.js";
@@ -795,7 +795,7 @@ export default function LibraryView({
                       className="p-1.5 hover:bg-[var(--bg-hover)]/50 rounded-full transition-all text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <ExternalLink size={14} />
+                      <Compass size={14} />
                     </a>
                     <button
                       className="p-1.5 hover:bg-[var(--accent-red-light)]/50 hover:text-[var(--accent-red)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"

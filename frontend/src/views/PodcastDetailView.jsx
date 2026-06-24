@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
-  MessageSquare, History, Calendar, FileText, Users, ExternalLink, Download,
+  MessageSquare, History, Calendar, FileText, Users, Compass, Download,
   GitMerge, Trash2
 } from "lucide-react";
 import { API_BASE } from "../constants.js";
@@ -464,6 +464,12 @@ export default function PodcastDetailView({
   const [qaInput, setQaInput] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
 
+  useEffect(() => {
+    setQaMessages([]);
+    setQaInput("");
+    setQaLoading(false);
+  }, [activeTask?.id]);
+
   // Speaker Management State
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const [editingSpeakerId, setEditingSpeakerId] = useState(null);
@@ -882,7 +888,7 @@ export default function PodcastDetailView({
                   title={t("打开原始播客链接", "Open original podcast link")}
                   className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-all text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 >
-                  <ExternalLink size={15} />
+                  <Compass size={15} />
                 </a>
               )}
             </div>
@@ -949,13 +955,6 @@ export default function PodcastDetailView({
               >
                 <Download size={13} className="text-[var(--accent-red)]" />
                 <span>VTT</span>
-              </button>
-              <button
-                onClick={handleExportMarkdown}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
-              >
-                <Download size={13} className="text-[var(--accent-red)]" />
-                <span>MD</span>
               </button>
             </div>
           </div>
@@ -1066,9 +1065,20 @@ export default function PodcastDetailView({
           <div className="flex-1 overflow-y-auto px-8 py-8 flex flex-col gap-6 custom-scrollbar">
             {detailSubTab === "summary" && (
               <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs select-text animate-fade-in">
-                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <Sparkles size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
+                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={18} className="text-[var(--accent-red)]" />
+                    <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
+                  </div>
+                  {activeTask.summary && (
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                    >
+                      <Download size={13} className="text-[var(--accent-red)]" />
+                      <span>MD</span>
+                    </button>
+                  )}
                 </div>
 
                 {activeTask.status === "summarizing" ? (
