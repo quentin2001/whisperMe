@@ -141,22 +141,30 @@ def get_task_details(task_id: str):
     try:
         paragraphs = db.get_paragraphs_by_podcast(task_id) or []
 
-        if task.get("status") == "completed" and paragraphs:
+        if task.get("status") == "completed":
+            # 旧格式兼容 + 段落丢失兜底：从 transcript 重新生成段落
+            need_regen = False
+            if not paragraphs and task.get("transcript"):
+                need_regen = True
+            elif paragraphs and (
+                "sentences" not in paragraphs[0] or
+                not isinstance(paragraphs[0].get("sentences"), list)
+            ):
+                need_regen = True
+
+            if need_regen and task.get("transcript"):
+                try:
+                    paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, task.get("transcript"))
+                    db.delete_paragraphs_by_podcast(task_id)
+                    db.add_paragraphs(paragraphs)
+                except Exception as regen_ex:
+                    print(f"⚠️ [LOG ERROR] 段落重新生成失败: {regen_ex}")
+
             # 仅对已完成任务做 sedimented 检查
             podcast_cards = db.get_cards_by_podcast(task_id)
             sedimented_paragraph_ids = {c["paragraph_id"] for c in podcast_cards}
             for p in paragraphs:
                 p["sedimented"] = p["id"] in sedimented_paragraph_ids
-
-            # 旧格式兼容检查
-            is_old_format = paragraphs and len(paragraphs) > 0 and (
-                "sentences" not in paragraphs[0] or
-                not isinstance(paragraphs[0].get("sentences"), list)
-            )
-            if (not paragraphs or is_old_format) and task.get("transcript"):
-                paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, task.get("transcript"))
-                db.delete_paragraphs_by_podcast(task_id)
-                db.add_paragraphs(paragraphs)
 
         task["paragraphs"] = paragraphs
     except Exception as e:
