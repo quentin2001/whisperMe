@@ -33,6 +33,7 @@ docs/                # 详细文档
 | 说话人系统（SQLite 声纹库） | ✅ | 动态阈值 + 合并/忘记 + 置信度显示 |
 | 引用提取 | ✅ | Prompt 第 6 节：金句/书籍/影视/工具/人物 |
 | 并行转录 | ✅ | 线程池 + CAS + GPU 显存自动检测 |
+| 增量处理流水线 | ✅ | 音频即时播放 + 转录逐步显示 + AI 总结加载态 |
 | 长播客分段总结 | ✅ | 自动分段 + 15 行重叠 + 合并 |
 | 批量转录 | ✅ | `POST /api/tasks/batch`，最多 20 URL |
 | 通知优化 | ✅ | 播客名+标题+时长，错误截断 80 字 |
@@ -65,6 +66,7 @@ docs/                # 详细文档
 - 本地 ASR 模型支持显存常驻缓存 + TTL 自动释放
 - 支持零外部 AI 依赖的在线模式极速启动
 - **Prompt 系统**: 单一 Prompt 格式，使用 `{{PODCAST_DATA}}` 占位符。存储在 `backend/data/prompt.json`，默认值在 `prompt_manager.py`。预设模板：standard / concise / deep
+- **Agent 接口**: CORS 已放通本地任意端口，未来 AI Agent 可通过 REST API 操控 whisperMe（`/docs` 查看 OpenAPI 文档）
 
 ## API 端点速览
 ```
