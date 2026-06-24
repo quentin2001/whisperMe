@@ -28,12 +28,17 @@ from app.routers.config import router as config_router
 from app.routers.system import router as system_router, start_system_background_tasks
 from app.routers.boards import router as boards_router
 
-app = FastAPI(title="whisperMe Local Podcast Processor", version=CURRENT_VERSION)
+app = FastAPI(
+    title="whisperMe Local Podcast Processor",
+    version=CURRENT_VERSION,
+    description="本地优先的播客转录与知识提炼工具。支持小宇宙、Bilibili 等平台的播客音频下载、ASR 转录、说话人识别和 AI 总结。",
+)
 
-# 配置 CORS 跨域请求（前端 Vite 运行在 9173，后端运行在 9101）
+# 配置 CORS 跨域请求
+# 允许本地任意端口（前端 9173 + 未来 AI Agent 调用）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:9173", "http://127.0.0.1:9173"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
