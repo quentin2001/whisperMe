@@ -32,17 +32,34 @@ else:
     ])
 
 
+def _get_bundled_ffmpeg() -> str | None:
+    """检查应用自带的 ffmpeg（打包发布时内置在 ffmpeg/ 目录下）"""
+    # 向上找到项目根目录（backend/app/core/ffmpeg.py → 项目根）
+    root = Path(__file__).resolve().parents[3]
+    exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    candidate = root / "ffmpeg" / exe
+    if candidate.is_file():
+        return str(candidate)
+    return None
+
+
 def find_ffmpeg() -> str | None:
     """
     自动发现可用的 ffmpeg 可执行文件路径。
     优先级：
-      1. 用户在 config.json 中手动指定的路径（存在且可执行）
-      2. shutil.which("ffmpeg") — 系统 PATH
-      3. 常见安装位置扫描
+      1. 应用自带的 ffmpeg（打包发布时内置）
+      2. 用户在 config.json 中手动指定的路径（存在且可执行）
+      3. shutil.which("ffmpeg") — 系统 PATH
+      4. 常见安装位置扫描
     Returns:
         ffmpeg 可执行文件的绝对路径，或 None（未找到）
     """
-    # 1. 检查 config 中是否有用户手动指定的路径
+    # 1. 打包自带的 ffmpeg（最高优先级）
+    bundled = _get_bundled_ffmpeg()
+    if bundled:
+        return bundled
+
+    # 2. 检查 config 中是否有用户手动指定的路径
     try:
         from app.config import config as app_config
         user_path = app_config.get("ffmpeg_path", "").strip()
@@ -61,12 +78,12 @@ def find_ffmpeg() -> str | None:
     except Exception:
         pass
 
-    # 2. shutil.which — 系统 PATH
+    # 3. shutil.which — 系统 PATH
     which_path = shutil.which("ffmpeg")
     if which_path:
         return os.path.abspath(which_path)
 
-    # 3. 常见安装位置扫描
+    # 4. 常见安装位置扫描
     for base_dir in _COMMON_PATHS:
         if not os.path.isdir(base_dir):
             continue

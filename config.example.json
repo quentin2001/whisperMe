@@ -1,6 +1,4 @@
 {
-  "ffmpeg_path": "",
-  "ffmpeg_bin_dir": "",
   "local_whisper_model_path": "",
   "hf_token": "YOUR_HUGGING_FACE_READ_TOKEN_HERE",
   "ollama_url": "http://localhost:11434",

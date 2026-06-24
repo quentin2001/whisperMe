@@ -69,7 +69,6 @@ export default function SettingsView({
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isFlashing, setIsFlashing] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
-  const [showFfmpegAdvanced, setShowFfmpegAdvanced] = useState(false);
 
   // Prompt template system
   const [templates, setTemplates] = useState([]);
@@ -548,24 +547,7 @@ export default function SettingsView({
                 </div>
                 <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-check</button>
               </div>
-              <div>
-                <button onClick={() => setShowFfmpegAdvanced(!showFfmpegAdvanced)} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors cursor-pointer bg-transparent border-0 p-0">
-                  <span className={`transition-transform ${showFfmpegAdvanced ? "rotate-90" : ""}`}>&#9654;</span>
-                  Manual path override (advanced)
-                </button>
-                {showFfmpegAdvanced && (
-                  <div className="mt-3 flex flex-col gap-4 animate-fade-in">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Path</label>
-                      <input type="text" value={configData.ffmpeg_path || ""} onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto" />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Bin Directory</label>
-                      <input type="text" value={configData.ffmpeg_bin_dir || ""} onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto" />
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* FFmpeg 路径已内置，无需手动配置 */}
             </div>
 
             {/* GitHub Repo & Version Info */}

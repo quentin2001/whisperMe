@@ -5,6 +5,11 @@ import hashlib
 import subprocess
 import sys
 
+# 跨平台 curl 命令名
+CURL_CMD = "curl.exe" if sys.platform == "win32" else "curl"
+# --ssl-no-revoke 仅 Windows Schannel 支持
+CURL_SSL_ARGS = ["--ssl-no-revoke"] if sys.platform == "win32" else []
+
 _original_run = subprocess.run
 def _patched_run(*args, **kwargs):
     if sys.platform == 'win32' and 'creationflags' not in kwargs:
@@ -358,7 +363,7 @@ class PodcastDownloader:
         if not downloaded:
             try:
                 print(f"[LOG] 尝试 curl 代理下载...")
-                cmd = ["curl.exe", "-L", "-o", get_short_path_name(local_path), "-s", "--max-time", "300", url]
+                cmd = [CURL_CMD, "-L", "-o", get_short_path_name(local_path), "-s", "--max-time", "300", url]
                 res = subprocess.run(cmd, capture_output=True, timeout=310)
                 if res.returncode == 0 and os.path.exists(local_path):
                     downloaded = True
@@ -371,7 +376,7 @@ class PodcastDownloader:
                 print(f"[LOG] 尝试 curl DoH 直连下载...")
                 real_ip = resolve_host_via_doh(urlparse(url).hostname)
                 if real_ip:
-                    cmd = ["curl.exe", "-L", "-o", get_short_path_name(local_path), "-s",
+                    cmd = [CURL_CMD, "-L", "-o", get_short_path_name(local_path), "-s",
                            "--max-time", "300", "--resolve",
                            f"{urlparse(url).hostname}:443:{real_ip}", url]
                     res = subprocess.run(cmd, capture_output=True, timeout=310)
@@ -523,7 +528,7 @@ class PodcastDownloader:
                     pass
             if not html_home:
                 try:
-                    cmd = ["curl.exe", "-k", "-L", "-s", url]
+                    cmd = [CURL_CMD, "-k", "-L", "-s", url]
                     res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=15)
                     if res.returncode == 0 and res.stdout.strip():
                         html_home = res.stdout
@@ -535,7 +540,7 @@ class PodcastDownloader:
                     clean_env = os.environ.copy()
                     for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
                         clean_env.pop(key, None)
-                    cmd = ["curl.exe", "-k", "-L", "-s", "--noproxy", "*"]
+                    cmd = [CURL_CMD, "-k", "-L", "-s", "--noproxy", "*"]
                     if resolve_ip:
                         cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
                     cmd.append(url)
@@ -582,7 +587,7 @@ class PodcastDownloader:
         # 策略 3: 尝试用 curl.exe (使用系统默认环境变量，包含代理)
         if not html:
             try:
-                cmd = ["curl.exe", "-k", "-L", "-s", url]
+                cmd = [CURL_CMD, "-k", "-L", "-s", url]
                 res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=15)
                 if res.returncode == 0 and res.stdout.strip():
                     html = res.stdout
@@ -597,7 +602,7 @@ class PodcastDownloader:
                 clean_env = os.environ.copy()
                 for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
                     clean_env.pop(key, None)
-                cmd = ["curl.exe", "-k", "-L", "-s", "--noproxy", "*"]
+                cmd = [CURL_CMD, "-k", "-L", "-s", "--noproxy", "*"]
                 if resolve_ip:
                     cmd.extend(["--resolve", f"www.xiaoyuzhoufm.com:443:{resolve_ip}"])
                 cmd.append(url)
@@ -820,7 +825,7 @@ class PodcastDownloader:
             if not download_success:
                 print(f"📡 [LOG] 尝试通过 curl.exe (使用代理) 下载音频: {final_audio_url} -> {local_filename}")
                 try:
-                    cmd = ["curl.exe", "--ssl-no-revoke", "-k", "-L", "-s", "-o", local_filename, final_audio_url]
+                    cmd = [CURL_CMD, *CURL_SSL_ARGS, "-k", "-L", "-s", "-o", local_filename, final_audio_url]
                     res = subprocess.run(cmd, capture_output=True)
                     if res.returncode == 0 and os.path.exists(local_filename) and os.path.getsize(local_filename) > 1024*1024:
                         print(f"🟢 [LOG] 音频下载完成 (curl.exe 代理模式) -> {local_filename}")
@@ -854,7 +859,7 @@ class PodcastDownloader:
                     final_cdn_ip = None
                     if final_audio_host:
                         final_cdn_ip = self.resolve_host_via_doh(final_audio_host)
-                    cmd = ["curl.exe", "--ssl-no-revoke", "--noproxy", "*", "-k", "-L", "-s"]
+                    cmd = [CURL_CMD, *CURL_SSL_ARGS, "--noproxy", "*", "-k", "-L", "-s"]
                     if final_cdn_ip and final_audio_host:
                         cmd.extend(["--resolve", f"{final_audio_host}:{final_audio_port}:{final_cdn_ip}"])
                     cmd.extend(["-o", local_filename, final_audio_url])

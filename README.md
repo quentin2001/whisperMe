@@ -91,8 +91,6 @@ cp config.example.json config.json
 
 | 配置项 | 必填 | 说明 |
 |--------|------|------|
-| `ffmpeg_path` | ✅ | FFmpeg 可执行文件的绝对路径 |
-| `ffmpeg_bin_dir` | ✅ | FFmpeg `bin` 目录的绝对路径 |
 | `asr_mode` | — | `local`（离线 Whisper）或 `online`（在线 API，默认） |
 | `summary_mode` | — | `local`（本地 Ollama）或 `online`（在线 LLM，默认） |
 | `online_api_key` | 仅在线 ASR | 在线语音识别 API Key |

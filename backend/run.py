@@ -15,12 +15,17 @@ warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
 def main():
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(backend_dir)
-    
-    # 确定 venv 路径下的 python.exe
-    venv_python = os.path.join(project_dir, "venv", "Scripts", "python.exe")
+
+    # 确定 venv 路径下的 python（跨平台）
+    if sys.platform == "win32":
+        _venv_rel = os.path.join("Scripts", "python.exe")
+    else:
+        _venv_rel = os.path.join("bin", "python")
+
+    venv_python = os.path.join(project_dir, "venv", _venv_rel)
     if not os.path.exists(venv_python):
         # 兜底查找 backend 下的 venv
-        venv_python = os.path.join(backend_dir, "venv", "Scripts", "python.exe")
+        venv_python = os.path.join(backend_dir, "venv", _venv_rel)
         
     if not os.path.exists(venv_python):
         print("[ERROR] 找不到 Python 虚拟环境，请确保已成功创建 venv 并安装依赖。")

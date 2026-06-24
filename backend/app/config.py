@@ -149,8 +149,16 @@ if not venv_base.exists():
     # 兼容根目录下的 venv
     venv_base = PROJECT_DIR / "venv"
 
-cublas_bin_path = venv_base / "Lib" / "site-packages" / "nvidia" / "cublas" / "bin"
-cudnn_bin_path = venv_base / "Lib" / "site-packages" / "nvidia" / "cudnn" / "bin"
+if sys.platform == "win32":
+    _site_packages = venv_base / "Lib" / "site-packages"
+else:
+    # macOS/Linux: lib/python3.x/site-packages
+    import glob as _glob
+    _matches = list(_glob.glob(str(venv_base / "lib" / "python*" / "site-packages")))
+    _site_packages = Path(_matches[0]) if _matches else venv_base / "lib" / "site-packages"
+
+cublas_bin_path = _site_packages / "nvidia" / "cublas" / "bin"
+cudnn_bin_path = _site_packages / "nvidia" / "cudnn" / "bin"
 
 if cublas_bin_path.exists():
     os.environ["PATH"] = str(cublas_bin_path) + os.pathsep + os.environ["PATH"]
@@ -176,13 +184,20 @@ TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
 HF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# 物理转换为 8.3 短路径
+# 物理转换为 8.3 短路径（仅 Windows 需要，规避中文路径问题）
 SHORT_TEMP_DIR = get_short_path_name(TEMP_SANDBOX_DIR)
 SHORT_HF_CACHE_DIR = get_short_path_name(HF_CACHE_DIR)
 
-# 重置环境变量，锁死本地英文临时区与模型区
-for env_key in ["TEMP", "TMP", "USERPROFILE", "HOMEPATH", "HOME", "APPDATA", "LOCALAPPDATA"]:
-    os.environ[env_key] = SHORT_TEMP_DIR
+if sys.platform == "win32":
+    # Windows: 重置环境变量，锁死本地英文临时区（规避中文用户名路径问题）
+    for env_key in ["TEMP", "TMP", "USERPROFILE", "HOMEPATH", "APPDATA", "LOCALAPPDATA"]:
+        os.environ[env_key] = SHORT_TEMP_DIR
+    # HOME 在 Windows 上影响较小，但仍需设置以兼容部分工具
+    os.environ["HOME"] = SHORT_TEMP_DIR
+else:
+    # macOS/Linux: 只设置 TEMP/TMP，不动 HOME（会破坏子进程的配置解析）
+    os.environ["TEMP"] = str(TEMP_SANDBOX_DIR)
+    os.environ["TMP"] = str(TEMP_SANDBOX_DIR)
 
 os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
 os.environ["HF_HUB_CACHE"] = SHORT_HF_CACHE_DIR

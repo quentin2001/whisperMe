@@ -22,9 +22,14 @@ backend_log_file = os.path.join(LOGS_DIR, f"backend_{timestamp}.log")
 frontend_log_file = os.path.join(LOGS_DIR, f"frontend_{timestamp}.log")
 
 # 自动寻找虚拟环境的 python，如果没有则使用全局 python
-venv_python = os.path.join(ROOT_DIR, "venv", "Scripts", "python.exe")
+if sys.platform == "win32":
+    _venv_rel = os.path.join("Scripts", "python.exe")
+else:
+    _venv_rel = os.path.join("bin", "python")
+
+venv_python = os.path.join(ROOT_DIR, "venv", _venv_rel)
 if not os.path.exists(venv_python):
-    venv_python = os.path.join(BACKEND_DIR, "venv", "Scripts", "python.exe")
+    venv_python = os.path.join(BACKEND_DIR, "venv", _venv_rel)
 if not os.path.exists(venv_python):
     venv_python = "python"
 

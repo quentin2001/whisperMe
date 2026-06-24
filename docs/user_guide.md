@@ -12,13 +12,6 @@
 cp config.example.json config.json
 ```
 
-### 必填项
-
-| 配置项 | 说明 |
-|---|---|
-| `ffmpeg_path` | FFmpeg 可执行文件的绝对路径（`.exe`） |
-| `ffmpeg_bin_dir` | FFmpeg `bin` 目录的绝对路径 |
-
 ### ASR 语音转录
 
 | 配置项 | 说明 |
