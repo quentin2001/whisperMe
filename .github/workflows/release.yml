@@ -1,0 +1,200 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: Windows
+            python_version: "3.12"
+            ffmpeg_url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            ffmpeg_bin: "ffmpeg-master-latest-win64-gpl/bin"
+          - os: macos-latest
+            platform: macOS
+            python_version: "3.12"
+            ffmpeg_url: "https://evermeet.cx/ffmpeg/getrelease/zip"
+            ffmpeg_bin: "."
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ── Frontend ──
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+      # ── Backend dependencies ──
+      - name: Create release directory
+        run: |
+          mkdir -p release/whisperMe/python
+          mkdir -p release/whisperMe/ffmpeg
+
+      - name: Copy backend code
+        run: |
+          cp -r backend release/whisperMe/
+          rm -rf release/whisperMe/backend/__pycache__
+          rm -rf release/whisperMe/backend/**/__pycache__
+          rm -rf release/whisperMe/backend/venv
+        shell: bash
+
+      - name: Copy frontend build
+        run: cp -r frontend/dist release/whisperMe/frontend/
+
+      - name: Copy launcher files
+        run: |
+          cp launcher.py release/whisperMe/
+          cp start.bat release/whisperMe/ 2>/dev/null || true
+          cp start.sh release/whisperMe/
+          cp config.example.json release/whisperMe/
+          cp README.md release/whisperMe/
+          cp -r docs release/whisperMe/
+        shell: bash
+
+      # ── Python embedded ──
+      - name: Download Python (Windows)
+        if: matrix.platform == 'Windows'
+        shell: pwsh
+        run: |
+          $pyver = "${{ matrix.python_version }}.4"
+          $url = "https://www.python.org/ftp/python/$pyver/python-$pyver-embed-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile python-embed.zip
+          Expand-Archive -Path python-embed.zip -DestinationPath release/whisperMe/python
+          Remove-Item python-embed.zip
+          # Enable site-packages
+          $pth = Get-ChildItem release/whisperMe/python/*.pth | Select-Object -First 1
+          (Get-Content $pth.FullName) -replace '#import site', 'import site' | Set-Content $pth.FullName
+
+      - name: Download Python (macOS)
+        if: matrix.platform == 'macOS'
+        shell: bash
+        run: |
+          # Use the system Python framework for packaging
+          PYTHON_PATH=$(which python3)
+          PYTHON_PREFIX=$(python3 -c "import sys; print(sys.prefix)")
+          # Create a portable Python using the installed one
+          mkdir -p release/whisperMe/python/bin
+          mkdir -p release/whisperMe/python/lib
+          cp $PYTHON_PATH release/whisperMe/python/bin/python3
+          # Copy essential libs
+          cp -r $PYTHON_PREFIX/lib/python${{ matrix.python_version }} release/whisperMe/python/lib/ 2>/dev/null || true
+
+      - name: Install pip
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install get-pip.py 2>/dev/null || true
+          # Download get-pip for embedded python
+          curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+        working-directory: release/whisperMe
+
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'Windows'
+        shell: pwsh
+        run: |
+          # Use system pip to install into the embedded python's site-packages
+          $target = "release/whisperMe/python/Lib/site-packages"
+          New-Item -ItemType Directory -Force -Path $target
+          pip install -r backend/requirements.txt --target $target --no-deps 2>$null
+          pip install -r backend/requirements.txt --target $target
+        working-directory: release/whisperMe
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macOS'
+        shell: bash
+        run: |
+          target="release/whisperMe/python/lib/python${{ matrix.python_version }}/site-packages"
+          mkdir -p "$target"
+          pip install -r backend/requirements.txt --target "$target"
+        working-directory: release/whisperMe
+
+      # ── FFmpeg ──
+      - name: Download FFmpeg (Windows)
+        if: matrix.platform == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "${{ matrix.ffmpeg_url }}" -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extract
+          $bin = Get-ChildItem -Path ffmpeg-extract -Recurse -Directory -Filter "bin" | Select-Object -First 1
+          Copy-Item "$($bin.FullName)/ffmpeg.exe" release/whisperMe/ffmpeg/
+          Copy-Item "$($bin.FullName)/ffprobe.exe" release/whisperMe/ffmpeg/ -ErrorAction SilentlyContinue
+          Remove-Item -Recurse ffmpeg-extract, ffmpeg.zip
+
+      - name: Download FFmpeg (macOS)
+        if: matrix.platform == 'macOS'
+        shell: bash
+        run: |
+          curl -sL "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
+          unzip -o ffmpeg.zip -d release/whisperMe/ffmpeg/
+          rm ffmpeg.zip
+          # Also get ffprobe
+          curl -sL "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
+          unzip -o ffprobe.zip -d release/whisperMe/ffmpeg/ 2>/dev/null || true
+          rm -f ffprobe.zip
+          chmod +x release/whisperMe/ffmpeg/*
+
+      # ── Clean up ──
+      - name: Clean up runtime files
+        shell: bash
+        run: |
+          cd release/whisperMe
+          rm -rf downloads temp_sandbox transcripts hf_cache_models
+          rm -f whisperMe.db whisperMe.db-shm whisperMe.db-wal config.json
+          rm -rf python/include python/share python/Scripts 2>/dev/null || true
+          # Remove pip from embedded python (not needed at runtime)
+          rm -rf python/Lib/site-packages/pip python/Lib/site-packages/setuptools 2>/dev/null || true
+          rm -rf python/lib/python*/site-packages/pip python/lib/python*/site-packages/setuptools 2>/dev/null || true
+
+      - name: Make launcher executable (macOS)
+        if: matrix.platform == 'macOS'
+        run: chmod +x release/whisperMe/start.sh
+
+      # ── Package ──
+      - name: Create zip
+        shell: bash
+        run: |
+          cd release
+          zip -r "whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip" whisperMe/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisperMe-${{ matrix.platform }}
+          path: release/whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**/*.zip
