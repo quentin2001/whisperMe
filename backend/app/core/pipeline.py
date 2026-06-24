@@ -56,8 +56,10 @@ def run_podcast_pipeline(task_id: str, url: str):
                 )
             
         # Step 0.8: ASR 断点续传/跳过检查
+        # 增量写入后，转录中也会有段落。只有段落+完整transcript同时存在才跳过
         existing_paragraphs = db.get_paragraphs_by_podcast(task_id)
-        if existing_paragraphs and len(existing_paragraphs) > 0:
+        has_full_transcript = bool(task.get("transcript"))
+        if existing_paragraphs and len(existing_paragraphs) > 0 and has_full_transcript:
             print(f"🎯 [LOG] 检测到数据库中任务 {task_id} 已有历史转录段落 ({len(existing_paragraphs)} 段)，直接跳过下载与 ASR 转录，进入 AI 总结重算阶段。")
             db.update_task(task_id, status="summarizing", progress=80.0)
             
@@ -91,6 +93,11 @@ def run_podcast_pipeline(task_id: str, url: str):
             )
             return
 
+        # 清理不完整的增量段落（上次转录中途崩溃留下的）
+        if existing_paragraphs and len(existing_paragraphs) > 0 and not has_full_transcript:
+            print(f"🧹 [LOG] 检测到 {len(existing_paragraphs)} 条残留段落（无完整转录），清理后重新开始。")
+            db.delete_paragraphs_by_podcast(task_id)
+
         # Step 1: 下载音频与获取元数据
         db.update_task(task_id, status="downloading", progress=10.0)
         
@@ -117,18 +124,18 @@ def run_podcast_pipeline(task_id: str, url: str):
             metadata=metadata,
             progress=30.0
         )
-        
+
+        # 立即注册音频播放路径，让用户可以边听边等
+        check_cancelled(task_id)
+        audio_filename = os.path.basename(local_mp3)
+        db.update_task(task_id, audio_url=f"/audio/{audio_filename}", progress=32.0)
+
         # Step 2: 音频格式预处理（16kHz Mono WAV）
         check_cancelled(task_id)
         db.update_task(task_id, status="transcribing", progress=40.0)
         t_preprocess_start = time.time()
         standardized_wav = downloader.preprocess_audio(local_mp3)
         timing_stats['音频预处理'] = time.time() - t_preprocess_start
-        
-        # 在数据库中记录音频相对于服务端的播放路径 (e.g. /audio/hash.mp3)
-        check_cancelled(task_id)
-        audio_filename = os.path.basename(local_mp3)
-        db.update_task(task_id, audio_url=f"/audio/{audio_filename}", progress=45.0)
 
         # Step 3: PyAnnote 声纹分割
         check_cancelled(task_id)
@@ -139,25 +146,38 @@ def run_podcast_pipeline(task_id: str, url: str):
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
         check_cancelled(task_id)
-            
+
         def progress_callback(current_progress):
             check_cancelled(task_id)
             db.update_task(task_id, progress=current_progress)
 
+        # 增量段落写入回调
+        accumulated_segments = []
+
+        def on_segment_batch(new_segments):
+            """每 10 个段落触发一次，增量写入数据库"""
+            accumulated_segments.extend(new_segments)
+            try:
+                paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, accumulated_segments)
+                db.add_paragraphs(paragraphs)
+            except Exception as batch_ex:
+                print(f"⚠️ [LOG] 增量段落写入失败: {batch_ex}")
+
         asr_mode = task.get("asr_mode", "local")
         t_transcribe_start = time.time()
         merged_transcript = transcriber.transcribe_and_merge(
-            standardized_wav, 
-            diar_data, 
+            standardized_wav,
+            diar_data,
             progress_callback=progress_callback,
-            asr_mode=asr_mode
+            asr_mode=asr_mode,
+            on_segment_batch=on_segment_batch
         )
         timing_stats['语音识别转录 (Whisper)'] = time.time() - t_transcribe_start
         db.update_task(task_id, transcript=merged_transcript, progress=75.0)
 
-        # Step 4.2: 运行语义段落聚合 (Semantic Chunking)
+        # Step 4.2: 最终段落聚合（兜底，确保完整性）
         try:
-            print("⏳ [LOG] 正在运行语义分块聚合管道...")
+            print("⏳ [LOG] 正在运行最终语义分块聚合...")
             t_chunk_start = time.time()
             paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
             timing_stats['语义段落聚合'] = time.time() - t_chunk_start
