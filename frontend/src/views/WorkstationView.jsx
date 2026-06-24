@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  List, LayoutGrid, Calendar, Play, MoreVertical, ChevronDown, Trash2 
+import {
+  List, LayoutGrid, Calendar, Play, MoreVertical, ChevronDown, Trash2
 } from "lucide-react";
+import { confirm } from "../components/Dialog.jsx";
 
 const parseDurationToMinutes = (durationStr) => {
   if (!durationStr || typeof durationStr !== "string") return 0;
@@ -288,10 +289,10 @@ export default function WorkstationView({
                 {/* Delete button indicator tag */}
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
                     if (typeof onDeleteTask === "function") {
-                      if (confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
+                      if (await confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
                         onDeleteTask(session.id);
                       }
                     }
@@ -411,10 +412,10 @@ export default function WorkstationView({
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
                     if (typeof onDeleteTask === "function") {
-                      if (confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
+                      if (await confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
                         onDeleteTask(session.id);
                       }
                     }

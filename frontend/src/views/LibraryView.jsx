@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useTheme } from "../contexts/ThemeContext.jsx";
+import { alert, confirm } from "../components/Dialog.jsx";
 
 const formatDateToYYYYMMDD = (dateInput) => {
   if (!dateInput) return "";
@@ -490,9 +491,9 @@ export default function LibraryView({
           if (response.ok) {
             const result = await response.json();
             if (result.warning) {
-              alert(result.warning);
+              await alert(result.warning);
             } else {
-              alert(t("麦克风录音上传成功！", "Microphone recording uploaded successfully!"));
+              await alert(t("麦克风录音上传成功！", "Microphone recording uploaded successfully!"), { variant: 'success' });
             }
             if (typeof onAddNewSession === "function") {
               onAddNewSession({
@@ -503,11 +504,11 @@ export default function LibraryView({
               });
             }
           } else {
-            alert(t("上传失败。请确保后端服务正在运行。", "Upload failed. Please ensure the backend is running."));
+            await alert(t("上传失败。请确保后端服务正在运行。", "Upload failed. Please ensure the backend is running."));
           }
         } catch (err) {
           console.error("Failed to upload captured audio:", err);
-          alert(t("向本地服务器上传捕获的音频时发生连接错误。", "Connection error uploading captured audio to local server."));
+          await alert(t("向本地服务器上传捕获的音频时发生连接错误。", "Connection error uploading captured audio to local server."));
         } finally {
           setSyncing(false);
           stream.getTracks().forEach(track => track.stop());
@@ -526,7 +527,7 @@ export default function LibraryView({
 
     } catch (err) {
       console.error("Microphone permissions denied or error:", err);
-      alert(t("麦克风连接失败。请确保您已在浏览器中允许麦克风权限。", "Microphone connection failed. Please ensure you have allowed microphone permissions in your browser."));
+      await alert(t("麦克风连接失败。请确保您已在浏览器中允许麦克风权限。", "Microphone connection failed. Please ensure you have allowed microphone permissions in your browser."));
     }
   };
 
@@ -546,11 +547,11 @@ export default function LibraryView({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleSyncClick = () => {
+  const handleSyncClick = async () => {
     setSyncing(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setSyncing(false);
-      alert(t("云同步成功！所有音频档案已安全加密存储。", "Cloud Sync completed successfully! All acoustic archives are secured and encrypted."));
+      await alert(t("云同步成功！所有音频档案已安全加密存储。", "Cloud Sync completed successfully! All acoustic archives are secured and encrypted."), { variant: 'success' });
     }, 2000);
   };
 
@@ -802,14 +803,14 @@ export default function LibraryView({
                     </a>
                     <button
                       className="p-1.5 hover:bg-[var(--accent-red-light)]/50 hover:text-[var(--accent-red)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
                         if (typeof onDeleteTask === "function") {
-                          if (confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
+                          if (await confirm(t(`确定要删除任务 "${session.title}" 并擦除音频缓存吗？`, `Determine to delete this task "${session.title}" and wipe audio cache?`))) {
                             onDeleteTask(session.id);
                           }
                         } else {
-                          alert("Session Options: Delete, Rename, Export XML, Sync to Drive.");
+                          await alert("Session Options: Delete, Rename, Export XML, Sync to Drive.");
                         }
                       }}
                     >

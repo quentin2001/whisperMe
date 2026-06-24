@@ -6,6 +6,7 @@ import {
   GitMerge, Trash2
 } from "lucide-react";
 import { API_BASE } from "../constants.js";
+import { alert, confirm } from "../components/Dialog.jsx";
 
 // ==================== 📝 Inline Markdown Parser ====================
 function parseInlineMarkdown(text) {
@@ -527,11 +528,11 @@ export default function PodcastDetailView({
           onRefreshTask();
         }
       } else {
-        alert(t("重命名发言人失败，请重试。", "Failed to rename speaker. Please try again."));
+        await alert(t("重命名发言人失败，请重试。", "Failed to rename speaker. Please try again."));
       }
     } catch (err) {
       console.error(err);
-      alert(t("通信出错：", "Communication error: ") + err.message);
+      await alert(t("通信出错：", "Communication error: ") + err.message);
     } finally {
       setIsSavingSpeaker(false);
     }
@@ -540,7 +541,7 @@ export default function PodcastDetailView({
   const handleMergeSpeaker = async (sourceId, targetId) => {
     const sourceName = activeTask.speaker_mappings?.[sourceId] || sourceId;
     const targetName = activeTask.speaker_mappings?.[targetId] || targetId;
-    if (!confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
+    if (!await confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
     try {
       const res = await fetch(`${API_BASE}/api/tasks/speakers/merge`, {
         method: "POST",
@@ -561,16 +562,16 @@ export default function PodcastDetailView({
         setMergeTargetId(null);
       } else {
         const err = await res.json();
-        alert(err.detail || t("合并失败", "Merge failed"));
+        await alert(err.detail || t("合并失败", "Merge failed"));
       }
     } catch (err) {
-      alert(t("通信出错：", "Communication error: ") + err.message);
+      await alert(t("通信出错：", "Communication error: ") + err.message);
     }
   };
 
   const handleForgetSpeaker = async (speakerId) => {
     const speakerName = activeTask.speaker_mappings?.[speakerId] || speakerId;
-    if (!confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
+    if (!await confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
     try {
       const res = await fetch(`${API_BASE}/api/tasks/speakers/forget`, {
         method: "POST",
@@ -581,10 +582,10 @@ export default function PodcastDetailView({
         if (onRefreshTask) onRefreshTask();
       } else {
         const err = await res.json();
-        alert(err.detail || t("操作失败", "Operation failed"));
+        await alert(err.detail || t("操作失败", "Operation failed"));
       }
     } catch (err) {
-      alert(t("通信出错：", "Communication error: ") + err.message);
+      await alert(t("通信出错：", "Communication error: ") + err.message);
     }
   };
 
@@ -599,11 +600,11 @@ export default function PodcastDetailView({
           onRefreshTask();
         }
       } else {
-        alert(t("启动音频重新下载失败，请重试。", "Failed to trigger audio re-download. Please try again."));
+        await alert(t("启动音频重新下载失败，请重试。", "Failed to trigger audio re-download. Please try again."));
       }
     } catch (err) {
       console.error("Error triggering redownload:", err);
-      alert(t("启动音频重新下载时发生网络错误。", "Network error triggering audio re-download."));
+      await alert(t("启动音频重新下载时发生网络错误。", "Network error triggering audio re-download."));
     } finally {
       setIsTriggeringRestore(false);
     }
@@ -712,7 +713,7 @@ export default function PodcastDetailView({
 
   const handleQAClear = async () => {
     if (qaMessages.length === 0) return;
-    if (!confirm(t("确定要清空所有问答记录吗？", "Clear all Q&A history?"))) return;
+    if (!await confirm(t("确定要清空所有问答记录吗？", "Clear all Q&A history?"))) return;
     try {
       await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, { method: "DELETE" });
       setQaMessages([]);
@@ -812,13 +813,13 @@ export default function PodcastDetailView({
         method: "POST"
       });
       if (res.ok) {
-        alert(t("AI总结与深度分析已重新排队生成，请稍候！", "AI summary and deep analysis have been queued for regeneration, please wait!"));
+        await alert(t("AI总结与深度分析已重新排队生成，请稍候！", "AI summary and deep analysis have been queued for regeneration, please wait!"), { variant: 'info', confirmText: t('好的', 'OK') });
       } else {
-        alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
+        await alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
       }
     } catch (err) {
       console.error(err);
-      alert(t("通信出错：", "Communication error: ") + err.message);
+      await alert(t("通信出错：", "Communication error: ") + err.message);
     } finally {
       setAnalyzing(false);
     }

@@ -4,6 +4,7 @@ import LibraryView from "./views/LibraryView";
 import WorkstationView from "./views/WorkstationView";
 import PodcastDetailView from "./views/PodcastDetailView";
 import SettingsView from "./views/SettingsView";
+import DialogRenderer, { alert, confirm } from "./components/Dialog.jsx";
 import { initialLogs } from "./data.js";
 import { API_BASE } from "./constants.js";
 
@@ -115,12 +116,12 @@ export default function App() {
           setVersionInfo(data);
           if (force) {
             if (data.has_update) {
-              alert(t(
+              await alert(t(
                 `发现新版本 v${data.latest_version}！已为您在设置页面顶部载入更新日志。`,
                 `New version v${data.latest_version} found! Changelog has been loaded at the top of Settings.`
-              ));
+              ), { variant: 'info', confirmText: t('好的', 'OK') });
             } else {
-              alert(t("当前已是最新版本！", "You are already on the latest version!"));
+              await alert(t("当前已是最新版本！", "You are already on the latest version!"), { variant: 'success' });
             }
           }
         }
@@ -128,7 +129,7 @@ export default function App() {
     } catch (e) {
       console.error("无法获取软件版本信息:", e);
       if (force) {
-        alert(t(
+        await alert(t(
           "检测更新失败，请稍后重试（可能触发了 GitHub API 速率限制）。",
           "Failed to check updates, please try again later (GitHub API rate limit might be exceeded)."
         ));
@@ -195,8 +196,8 @@ export default function App() {
     }
   };
 
-  const handleResetPrompt = () => {
-    if (window.confirm(t("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。", "Are you sure you want to restore the default Prompt templates? This will overwrite your current configuration."))) {
+  const handleResetPrompt = async () => {
+    if (await confirm(t("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。", "Are you sure you want to restore the default Prompt templates? This will overwrite your current configuration."))) {
       // Reset to empty, then fetch default from backend
       fetch(`${BACKEND_URL}/api/prompt/template/standard`)
         .then(res => res.json())
@@ -289,11 +290,11 @@ export default function App() {
         setIsIngestModalOpen(false);
         fetchTasks();
         if (result.warning) {
-          alert(result.warning);
+          await alert(result.warning);
         }
       }
     } catch (e) {
-      alert(t("发起任务失败，请检查后端服务是否启动！", "Failed to start task. Please check if the backend service is running!"));
+      await alert(t("发起任务失败，请检查后端服务是否启动！", "Failed to start task. Please check if the backend service is running!"));
     } finally {
       setLoading(false);
     }
@@ -317,16 +318,16 @@ export default function App() {
         setIsIngestModalOpen(false);
         fetchTasks();
         if (result.warning) {
-          alert(result.warning);
+          await alert(result.warning);
         } else {
-          alert(t("音频文件导入成功！", "Audio file imported successfully!"));
+          await alert(t("音频文件导入成功！", "Audio file imported successfully!"), { variant: 'success' });
         }
       } else {
-        alert(t("文件上传失败。", "File upload failed."));
+        await alert(t("文件上传失败。", "File upload failed."));
       }
     } catch (err) {
       console.error(err);
-      alert(t("上传出错：", "Upload error: ") + err.message);
+      await alert(t("上传出错：", "Upload error: ") + err.message);
     } finally {
       setUploading(false);
     }
@@ -341,7 +342,7 @@ export default function App() {
         setActiveTab("dashboard");
       }
     } catch (e) {
-      alert(t("删除失败", "Delete failed"));
+      await alert(t("删除失败", "Delete failed"));
     }
   };
 
@@ -354,11 +355,11 @@ export default function App() {
         body: JSON.stringify(configData)
       });
       if (res.status === 200) {
-        alert(t("配置已成功更新！", "Configuration updated successfully!"));
+        await alert(t("配置已成功更新！", "Configuration updated successfully!"), { variant: 'success' });
         fetchConfig();
       }
     } catch (e) {
-      alert(t("保存配置失败", "Failed to save configuration"));
+      await alert(t("保存配置失败", "Failed to save configuration"));
     }
   };
 
@@ -382,8 +383,8 @@ export default function App() {
     setCurrentTime(time);
   };
 
-  const handleAnalyzeAllLogs = () => {
-    alert(t("正在对所有单集记录进行日志分析以寻找行动项... 综合计算已加载。", "Analyzing logs across all session records to find action items... Synthesis calculations loaded."));
+  const handleAnalyzeAllLogs = async () => {
+    await alert(t("正在对所有单集记录进行日志分析以寻找行动项... 综合计算已加载。", "Analyzing logs across all session records to find action items... Synthesis calculations loaded."), { variant: 'info', confirmText: t('好的', 'OK') });
     const newLog = {
       id: "9912-S",
       text: "Global action trace compiled. Synthesis confirms latency trends is stable and workspace frame rate of 60fps achieved.",
@@ -422,12 +423,12 @@ export default function App() {
     return false;
   };
 
-  const handleResetData = () => {
+  const handleResetData = async () => {
     localStorage.removeItem("whisperme_logs");
     setLogs(initialLogs);
     setActiveTaskId(null);
     setActiveTab("dashboard");
-    alert(t("本地工作区内存已完全清除！已恢复默认录音。", "Local workspace memory wiped cleanly! Restored default recordings."));
+    await alert(t("本地工作区内存已完全清除！已恢复默认录音。", "Local workspace memory wiped cleanly! Restored default recordings."), { variant: 'success' });
   };
 
   return (
@@ -658,6 +659,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <DialogRenderer />
     </div>
   );
 }
