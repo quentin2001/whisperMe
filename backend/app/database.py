@@ -335,17 +335,18 @@ class LocalDatabase:
         speaker_mappings = json.dumps(t.get("speaker_mappings", {}), ensure_ascii=False)
         speaker_embeddings = json.dumps(t.get("speaker_embeddings", {}), ensure_ascii=False)
         speaker_confidence = json.dumps(t.get("speaker_confidence", {}), ensure_ascii=False)
+        qa_history = json.dumps(t.get("qa_history") or [], ensure_ascii=False)
         c.execute('''INSERT OR REPLACE INTO tasks
             (id, url, asr_mode, summary_mode, title, podcast_name, status, progress,
             error_message, created_at, image_url, obsidian_synced, restoring, restore_progress,
-            metadata, transcript, summary, speaker_mappings, speaker_embeddings, audio_url, speaker_confidence)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            metadata, transcript, summary, speaker_mappings, speaker_embeddings, audio_url, speaker_confidence, qa_history)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (t.get("id"), t.get("url"), t.get("asr_mode", "local"), t.get("summary_mode", "local"),
              t.get("title"), t.get("podcast_name"), t.get("status"), t.get("progress"),
              t.get("error_message"), t.get("created_at"), t.get("image_url"),
              bool(t.get("obsidian_synced")), bool(t.get("restoring")), t.get("restore_progress", 0),
              metadata, transcript, t.get("summary", ""), speaker_mappings, speaker_embeddings, t.get("audio_url", ""),
-             speaker_confidence))
+             speaker_confidence, qa_history))
 
     def _insert_paragraph_internal(self, c, p: dict):
         sentences = json.dumps(p.get("sentences", []), ensure_ascii=False)
