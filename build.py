@@ -20,7 +20,18 @@ def clean():
     release_parent = ROOT_DIR / "release"
     if release_parent.exists():
         print(f"🧹 清理旧构建: {release_parent}")
-        shutil.rmtree(release_parent)
+        try:
+            shutil.rmtree(release_parent)
+        except PermissionError:
+            # 文件被占用时，尝试删除子目录
+            for item in release_parent.iterdir():
+                try:
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+                except PermissionError:
+                    print(f"  ⚠️ 跳过被占用的文件: {item.name}")
 
 
 def build_frontend():

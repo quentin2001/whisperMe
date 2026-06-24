@@ -1,9 +1,10 @@
 # whisperMe - Git Ignore Configurations
 
-# 0. Build artifacts
+# 0. Build artifacts & runtime
 release/
 frontend/dist/
 ffmpeg/
+.whisperMe.pid
 
 # 1. Credentials & Configuration (🛡️ CRITICAL - DO NOT SECURELY UN-IGNORE)
 config.json

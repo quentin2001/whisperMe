@@ -73,6 +73,15 @@ if _frontend_dist.is_dir():
     app.mount("/", _StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
     print(f"✅ [STARTUP] 前端静态文件已托管: {_frontend_dist}")
 
+# --- 生产模式：优雅关闭接口 ---
+import threading as _threading
+@app.post("/api/shutdown")
+async def shutdown():
+    """优雅关闭服务（仅生产模式使用）"""
+    import signal
+    _threading.Thread(target=lambda: (time.sleep(0.5), os.kill(os.getpid(), signal.SIGTERM)), daemon=True).start()
+    return {"message": "whisperMe is shutting down..."}
+
 # --- 智能声纹特征与大模型命名推理引擎 ---
 from app.core.speaker import auto_rename_speakers, apply_interjection_labels
 
