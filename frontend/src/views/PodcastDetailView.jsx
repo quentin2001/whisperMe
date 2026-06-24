@@ -459,7 +459,10 @@ export default function PodcastDetailView({
   // Layout resize state (proportion of left panel in %)
   const [leftWidth, setLeftWidth] = useState(60);
   const [isDragging, setIsDragging] = useState(false);
-  const [detailSubTab, setDetailSubTab] = useState("summary"); // "summary" | "shownotes" | "comments"
+  const [detailSubTab, setDetailSubTab] = useState("summary"); // "summary" | "shownotes" | "comments" | "qa"
+  const [qaMessages, setQaMessages] = useState([]);
+  const [qaInput, setQaInput] = useState("");
+  const [qaLoading, setQaLoading] = useState(false);
 
   // Speaker Management State
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
@@ -647,6 +650,71 @@ export default function PodcastDetailView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportMarkdown = () => {
+    if (!activeTask) return;
+    const title = activeTask.title || "transcript";
+    const safeName = title.replace(/[<>:"/\\|?*]/g, "_").slice(0, 60);
+    const metadata = activeTask.metadata || {};
+
+    let frontmatter = "---\n";
+    frontmatter += `title: "${title}"\n`;
+    frontmatter += `podcast: "${activeTask.podcast_name || ""}"\n`;
+    if (metadata.pub_date) frontmatter += `date: ${metadata.pub_date}\n`;
+    if (metadata.duration) frontmatter += `duration: "${metadata.duration}"\n`;
+    if (activeTask.url) frontmatter += `url: "${activeTask.url}"\n`;
+    frontmatter += "---\n\n";
+
+    let doc = frontmatter;
+    doc += `# ${title}\n\n`;
+    doc += `> ${activeTask.podcast_name || ""}`;
+    if (metadata.pub_date) doc += ` · ${metadata.pub_date}`;
+    if (metadata.duration) doc += ` · ${metadata.duration}`;
+    doc += "\n\n";
+
+    if (activeTask.summary) {
+      doc += `## AI Summary\n\n${activeTask.summary}\n`;
+    } else {
+      doc += "*暂无 AI 总结*\n";
+    }
+
+    const blob = new Blob([doc], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeName}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleQASubmit = async () => {
+    if (!qaInput.trim() || qaLoading) return;
+    const question = qaInput.trim();
+    setQaInput("");
+    setQaMessages(prev => [...prev, { role: "user", content: question }]);
+    setQaLoading(true);
+
+    try {
+      const history = qaMessages.map(m => ({ role: m.role, content: m.content }));
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, history }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setQaMessages(prev => [...prev, { role: "assistant", content: data.answer }]);
+      } else {
+        setQaMessages(prev => [...prev, { role: "assistant", content: `错误: ${data.detail || "请求失败"}` }]);
+      }
+    } catch (err) {
+      setQaMessages(prev => [...prev, { role: "assistant", content: `网络错误: ${err.message}` }]);
+    } finally {
+      setQaLoading(false);
+    }
   };
 
   // Seeking handlers
@@ -882,6 +950,13 @@ export default function PodcastDetailView({
                 <Download size={13} className="text-[var(--accent-red)]" />
                 <span>VTT</span>
               </button>
+              <button
+                onClick={handleExportMarkdown}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                <Download size={13} className="text-[var(--accent-red)]" />
+                <span>MD</span>
+              </button>
             </div>
           </div>
           
@@ -975,6 +1050,16 @@ export default function PodcastDetailView({
             >
               {t("听众热评", "Listener Comments")}
             </button>
+            <button
+              onClick={() => setDetailSubTab("qa")}
+              className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
+                detailSubTab === "qa"
+                  ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
+                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
+              }`}
+            >
+              {t("问答", "Q&A")}
+            </button>
           </div>
 
           {/* Sub-tab scrollable content */}
@@ -1019,7 +1104,7 @@ export default function PodcastDetailView({
                   <MessageSquare size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
                 </div>
-                
+
                 <div className="flex flex-col gap-4">
                   {commentsList.length > 0 ? (
                     commentsList.map((comment, cIdx) => (
@@ -1030,6 +1115,68 @@ export default function PodcastDetailView({
                       <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {detailSubTab === "qa" && (
+              <div className="flex flex-col h-full animate-fade-in">
+                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <MessageSquare size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("与播客对话", "Ask the Podcast")}</h3>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto flex flex-col gap-4 mb-4">
+                  {qaMessages.length === 0 && !qaLoading && (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                      <MessageSquare size={32} className="text-[var(--text-muted)] opacity-40" />
+                      <p className="text-sm text-[var(--text-muted)]">{t("输入问题，基于转录文本为你解答", "Ask a question about this podcast")}</p>
+                    </div>
+                  )}
+                  {qaMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-[var(--accent-red)] text-white"
+                          : "bg-[var(--bg-card)] border border-[var(--border-primary)]/40 text-[var(--text-primary)]"
+                      }`}>
+                        {msg.role === "assistant" ? (
+                          <MarkdownRenderer text={msg.content} t={t} />
+                        ) : (
+                          msg.content
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {qaLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl px-4 py-3 flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-[var(--accent-red)] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-[var(--text-muted)]">{t("正在思考...", "Thinking...")}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Input */}
+                <div className="flex gap-2 shrink-0 pt-2 border-t border-[var(--border-primary)]/30">
+                  <input
+                    type="text"
+                    value={qaInput}
+                    onChange={(e) => setQaInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleQASubmit()}
+                    placeholder={t("输入问题...", "Ask a question...")}
+                    className="flex-1 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-red)]/50 transition-colors"
+                    disabled={qaLoading}
+                  />
+                  <button
+                    onClick={handleQASubmit}
+                    disabled={!qaInput.trim() || qaLoading}
+                    className="px-4 py-2.5 bg-[var(--accent-red)] text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all cursor-pointer"
+                  >
+                    {t("发送", "Send")}
+                  </button>
                 </div>
               </div>
             )}
