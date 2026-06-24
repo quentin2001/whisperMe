@@ -710,6 +710,17 @@ export default function PodcastDetailView({
     URL.revokeObjectURL(url);
   };
 
+  const handleQAClear = async () => {
+    if (qaMessages.length === 0) return;
+    if (!confirm(t("确定要清空所有问答记录吗？", "Clear all Q&A history?"))) return;
+    try {
+      await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, { method: "DELETE" });
+      setQaMessages([]);
+    } catch (err) {
+      console.error("清空问答历史失败:", err);
+    }
+  };
+
   const handleQASubmit = async () => {
     if (!qaInput.trim() || qaLoading) return;
     const question = qaInput.trim();
@@ -1152,9 +1163,20 @@ export default function PodcastDetailView({
 
             {detailSubTab === "qa" && (
               <div className="flex flex-col h-full animate-fade-in">
-                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <MessageSquare size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("与播客对话", "Ask the Podcast")}</h3>
+                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={18} className="text-[var(--accent-red)]" />
+                    <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("与播客对话", "Ask the Podcast")}</h3>
+                  </div>
+                  {qaMessages.length > 0 && (
+                    <button
+                      onClick={handleQAClear}
+                      className="flex items-center gap-1.5 px-2 py-1.5 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-red)] rounded-lg transition-all cursor-pointer border-0 outline-none bg-transparent"
+                      title={t("清空对话", "Clear conversation")}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Messages */}
