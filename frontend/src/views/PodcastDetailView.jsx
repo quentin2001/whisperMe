@@ -910,9 +910,14 @@ export default function PodcastDetailView({
               <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">
                 {displayTitle}
               </h1>
-              <span className="bg-[var(--accent-gold)] text-[var(--text-secondary)] text-[10px] font-extrabold tracking-widest px-2.5 py-0.5 rounded-sm uppercase">
+              <span className={`${activeTask.status === "failed" ? "bg-red-500/20 text-red-400" : "bg-[var(--accent-gold)] text-[var(--text-secondary)]"} text-[10px] font-extrabold tracking-widest px-2.5 py-0.5 rounded-sm uppercase`}>
                 {displayStatus}
               </span>
+              {activeTask.status === "failed" && activeTask.error_message && (
+                <span className="text-xs text-red-400 truncate max-w-md" title={activeTask.error_message}>
+                  {activeTask.error_message}
+                </span>
+              )}
               {activeTask.url && (
                 <a
                   href={activeTask.url}

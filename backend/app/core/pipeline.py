@@ -275,8 +275,16 @@ def run_podcast_pipeline(task_id: str, url: str):
         summary_report += time_report
         db.update_task(task_id, summary=summary_report, progress=95.0)
 
-        # 标志任务已彻底成功
+        # 标志任务已彻底成功（校验关键产出）
         check_cancelled(task_id)
+        if not merged_transcript or len(merged_transcript) == 0:
+            db.update_task(task_id, status="failed", error_message="转录结果为空，无法生成总结。", progress=100.0)
+            notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》转录结果为空")
+            return
+        if not summary_report or len(summary_report.strip()) < 20:
+            db.update_task(task_id, status="failed", error_message="AI 总结生成失败或内容过短。", progress=100.0)
+            notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》AI 总结失败")
+            return
         db.update_task(task_id, status="completed", progress=100.0)
 
         # Step 6: 消息提醒
