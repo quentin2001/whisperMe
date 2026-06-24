@@ -54,6 +54,16 @@ app.include_router(config_router)
 app.include_router(system_router)
 app.include_router(boards_router)
 
+# --- MCP Server 挂载 ---
+try:
+    from app.mcp_server import mcp as mcp_server
+    app.mount("/mcp", mcp_server.streamable_http_app())
+    print("✅ [STARTUP] MCP Server 已挂载到 /mcp")
+except ImportError:
+    print("⚠️ [STARTUP] MCP SDK 未安装，跳过 MCP Server 挂载。安装命令: pip install mcp")
+except Exception as e:
+    print(f"⚠️ [STARTUP] MCP Server 挂载失败: {e}")
+
 # --- 智能声纹特征与大模型命名推理引擎 ---
 from app.core.speaker import auto_rename_speakers, apply_interjection_labels
 
