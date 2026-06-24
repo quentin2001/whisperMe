@@ -5,6 +5,7 @@ import {
   MessageSquare, History, Calendar, FileText, Users, ExternalLink, Download,
   GitMerge, Trash2
 } from "lucide-react";
+import { API_BASE } from "../constants.js";
 
 // ==================== 📝 Inline Markdown Parser ====================
 function parseInlineMarkdown(text) {
@@ -33,7 +34,7 @@ function parseInlineMarkdown(text) {
 
 // ==================== 📝 High-Performance Markdown Parser with Alerts ====================
 function MarkdownRenderer({ text, t }) {
-  if (!text) return <p className="text-[var(--text-secondary)]/60 text-xs">{t("暂无总结内容", "No summary content available")}</p>;
+  if (!text) return <p className="text-[var(--text-muted)] text-xs">{t("暂无总结内容", "No summary content available")}</p>;
   
   const lines = text.replace(/\\n/g, "\n").split("\n");
   let inList = false;
@@ -122,7 +123,7 @@ function MarkdownRenderer({ text, t }) {
       inList = true;
       const content = line.substring(2);
       listItems.push(
-        <li key={`li-${i}`} className="text-[var(--text-primary)]/90 text-[13px] leading-relaxed">
+        <li key={`li-${i}`} className="text-[var(--text-primary)] text-[13px] leading-relaxed">
           {parseInlineMarkdown(content)}
         </li>
       );
@@ -328,7 +329,7 @@ function parseShownotesToBlocks(text) {
 }
 
 function ShownotesRenderer({ text, onTimeJump, t }) {
-  if (!text) return <p className="text-xs text-[var(--text-secondary)]/60">{t ? t("本单集暂无节目简介所示时间轴。", "No shownotes available for this episode.") : "No shownotes available."}</p>;
+  if (!text) return <p className="text-xs text-[var(--text-muted)]">{t ? t("本单集暂无节目简介所示时间轴。", "No shownotes available for this episode.") : "No shownotes available."}</p>;
 
   const blocks = parseShownotesToBlocks(text);
   const headerRegex = /^(?:#+\s+|[一二三四五六七八九十]+[、.]|[0-9]+\.|part\s*\d|【|🎙️|⏳|📅|💡|📌|「|『)/i;
@@ -487,7 +488,7 @@ export default function PodcastDetailView({
     if (!newName.trim()) return;
     setIsSavingSpeaker(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/speaker/rename`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/speaker/rename`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -518,7 +519,7 @@ export default function PodcastDetailView({
     const targetName = activeTask.speaker_mappings?.[targetId] || targetId;
     if (!confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8001/api/tasks/speakers/merge`, {
+      const res = await fetch(`${API_BASE}/api/tasks/speakers/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_name: sourceName, target_name: targetName }),
@@ -527,7 +528,7 @@ export default function PodcastDetailView({
         // Also rename in this task's mappings
         const mappings = { ...activeTask.speaker_mappings };
         mappings[sourceId] = targetName;
-        const renameRes = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/speaker/rename`, {
+        const renameRes = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/speaker/rename`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ speaker_id: sourceId, new_name: targetName }),
@@ -548,7 +549,7 @@ export default function PodcastDetailView({
     const speakerName = activeTask.speaker_mappings?.[speakerId] || speakerId;
     if (!confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8001/api/tasks/speakers/forget`, {
+      const res = await fetch(`${API_BASE}/api/tasks/speakers/forget`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: speakerName }),
@@ -567,7 +568,7 @@ export default function PodcastDetailView({
   const handleRedownloadAudio = async () => {
     setIsTriggeringRestore(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/redownload`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/redownload`, {
         method: "POST"
       });
       if (res.ok) {
@@ -701,7 +702,7 @@ export default function PodcastDetailView({
   const triggerAIAnalysis = async () => {
     setAnalyzing(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8001/api/tasks/${activeTask.id}/summarize`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/summarize`, {
         method: "POST"
       });
       if (res.ok) {
@@ -823,7 +824,7 @@ export default function PodcastDetailView({
         {/* Search transcript & AI Analysis options */}
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]/40 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4" />
             <input
               type="text"
               placeholder={t("搜索转录文本...", "Search transcript...")}
@@ -936,7 +937,7 @@ export default function PodcastDetailView({
               className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
                 detailSubTab === "summary"
                   ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
-                  : "border-transparent text-[var(--text-secondary)]/70 hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
+                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
               }`}
             >
               {t("AI 总结", "AI Summary")}
@@ -946,7 +947,7 @@ export default function PodcastDetailView({
               className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
                 detailSubTab === "shownotes"
                   ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
-                  : "border-transparent text-[var(--text-secondary)]/70 hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
+                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
               }`}
             >
               {t("节目简介", "Shownotes")}
@@ -956,7 +957,7 @@ export default function PodcastDetailView({
               className={`flex-1 font-sans text-xs uppercase tracking-wider font-bold transition-all border-b-2 outline-none cursor-pointer ${
                 detailSubTab === "comments"
                   ? "border-[#f62440] text-[var(--accent-red)] bg-[var(--bg-secondary)]/35"
-                  : "border-transparent text-[var(--text-secondary)]/70 hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
+                  : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/5 bg-transparent"
               }`}
             >
               {t("听众热评", "Listener Comments")}
@@ -1001,7 +1002,7 @@ export default function PodcastDetailView({
                     ))
                   ) : (
                     <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
-                      <span className="text-xs text-[var(--text-secondary)]/50 font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
+                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无被索引的评论", "No comments indexed")}</span>
                     </div>
                   )}
                 </div>
@@ -1180,20 +1181,20 @@ export default function PodcastDetailView({
                   setShowSpeakerModal(false);
                   setEditingSpeakerId(null);
                 }} 
-                className="text-[var(--text-secondary)]/60 hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg"
+                className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg"
               >
                 ✕
               </button>
             </div>
             
             <div className="p-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <p className="text-sm text-[var(--text-muted)]/85">
+              <p className="text-sm text-[var(--text-muted)]">
                 {t("在此处修改发言人名称。修改后将自动更新整个文本的发言人标签。", "Update speaker names here. The speaker tags across the entire transcript will be updated automatically.")}
               </p>
 
               <div className="flex flex-col gap-3">
                 {getUniqueSpeakers().length === 0 ? (
-                  <div className="border border-[var(--border-primary)]/40 border-dashed p-8 text-center rounded-lg text-sm text-[var(--text-muted)]/60 font-semibold">
+                  <div className="border border-[var(--border-primary)]/40 border-dashed p-8 text-center rounded-lg text-sm text-[var(--text-muted)] font-semibold">
                     {t("未检测到发言人", "No speakers detected")}
                   </div>
                 ) : (
@@ -1301,14 +1302,14 @@ export default function PodcastDetailView({
                               </button>
                               <button
                                 onClick={() => { setMergingSpeakerId(spId); setMergeTargetId(null); }}
-                                className="p-1 text-[var(--text-muted)]/50 hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
+                                className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
                                 title={t("合并到其他说话人", "Merge into another speaker")}
                               >
                                 <GitMerge size={14} />
                               </button>
                               <button
                                 onClick={() => handleForgetSpeaker(spId)}
-                                className="p-1 text-[var(--text-muted)]/50 hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
+                                className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
                                 title={t("从声纹库中移除", "Remove from voiceprint library")}
                               >
                                 <Trash2 size={14} />

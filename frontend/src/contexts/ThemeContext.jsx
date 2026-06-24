@@ -1,44 +1,57 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const ThemeContext = createContext();
 
+/**
+ * themeMode: "light" | "dark" | "system"
+ * resolvedTheme: "light" | "dark" (实际生效主题)
+ */
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem("whisperme_theme");
-    if (saved === "dark" || saved === "light") return saved;
-    // 跟随系统
+  const [themeMode, setThemeMode] = useState(() => {
+    const saved = localStorage.getItem("whisperme_theme_mode");
+    if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    return "system";
+  });
+
+  const [resolvedTheme, setResolvedTheme] = useState(() => {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
+  // 跟随系统
+  useEffect(() => {
+    if (themeMode === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      setResolvedTheme(mq.matches ? "dark" : "light");
+      const handler = (e) => setResolvedTheme(e.matches ? "dark" : "light");
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    } else {
+      setResolvedTheme(themeMode);
+    }
+  }, [themeMode]);
+
+  // 应用 DOM: 切换 .dark class → index.css .dark 变量自动生效
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
+    if (resolvedTheme === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("whisperme_theme", theme);
-  }, [theme]);
+  }, [resolvedTheme]);
 
-  // 监听系统主题变化（仅在用户选择"跟随系统"时生效）
+  // 持久化
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e) => {
-      const saved = localStorage.getItem("whisperme_theme");
-      if (!saved) {
-        setTheme(e.matches ? "dark" : "light");
-      }
-    };
-    mediaQuery.addEventListener("change", handler);
-    return () => mediaQuery.removeEventListener("change", handler);
+    localStorage.setItem("whisperme_theme_mode", themeMode);
+  }, [themeMode]);
+
+  // 循环切换 light → dark → system → light
+  const cycleTheme = useCallback(() => {
+    setThemeMode(prev => prev === "light" ? "dark" : prev === "dark" ? "system" : "light");
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === "dark" ? "light" : "dark");
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ themeMode, resolvedTheme, setThemeMode, cycleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

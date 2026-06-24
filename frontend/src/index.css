@@ -13,46 +13,78 @@
     --bg-hover: #f2ede6;
     --bg-active: #f2ede6;
     --bg-input: #fef9f2;
+    --bg-panel: #f9f3ea;
+    --bg-elevated: #ffffff;
+    --bg-warn: rgba(255,183,77,0.1);
 
     --text-primary: #1d1c18;
     --text-secondary: #5d3f3e;
-    --text-muted: #5d5a55;
+    --text-tertiary: #8a7e7d;
+    --text-muted: #9a9494;
     --text-accent: #bf0029;
+    --text-on-accent: #ffffff;
 
     --border-primary: #e7bcbb;
+    --border-secondary: #d4cdc6;
     --border-hover: #f62440;
+    --border-focus: #f62440;
+    --border-subtle: #f0ebe4;
+    --border-divider: #e7bcbb;
 
     --accent-red: #f62440;
     --accent-red-dark: #bb0028;
     --accent-red-light: #ffdad6;
+    --accent-red-bg: rgba(246,36,64,0.08);
     --accent-orange: #f27121;
     --accent-gold: #f0e2b7;
+
+    --surface-0: #fef9f2;
+    --surface-1: #f9f3ea;
+    --surface-2: #ffffff;
+    --surface-3: #f2ede6;
+    --surface-4: #ece7e1;
 
     --scrollbar-thumb: #e5dfd3;
     --scrollbar-hover: #bf0029;
   }
 
   .dark {
-    --bg-primary: #141218;
-    --bg-secondary: #1c1a22;
-    --bg-card: #22202a;
+    --bg-primary: #121218;
+    --bg-secondary: #1a1a24;
+    --bg-card: #1e1e2a;
     --bg-hover: #2a2834;
     --bg-active: #32303c;
-    --bg-input: #1c1a22;
+    --bg-input: #1e1e2a;
+    --bg-panel: #1a1a24;
+    --bg-elevated: #24243a;
+    --bg-warn: rgba(255,183,77,0.08);
 
-    --text-primary: #e8e4ef;
-    --text-secondary: #a8a0b4;
-    --text-muted: #8a8494;
+    --text-primary: #ecedef;
+    --text-secondary: #a0a0b8;
+    --text-tertiary: #70708a;
+    --text-muted: #5a5a70;
     --text-accent: #ff6a7a;
+    --text-on-accent: #ffffff;
 
-    --border-primary: #3a3644;
+    --border-primary: #2e2e42;
+    --border-secondary: #3a3a50;
     --border-hover: #ff6a7a;
+    --border-focus: #ff5c6c;
+    --border-subtle: #2a2a3c;
+    --border-divider: #2e2e42;
 
-    --accent-red: #ff6a7a;
+    --accent-red: #ff5c6c;
     --accent-red-dark: #e05566;
-    --accent-red-light: #3a2028;
+    --accent-red-light: rgba(255,92,108,0.15);
+    --accent-red-bg: rgba(255,92,108,0.1);
     --accent-orange: #f2a05c;
     --accent-gold: #4a4030;
+
+    --surface-0: #121218;
+    --surface-1: #1a1a24;
+    --surface-2: #1e1e2a;
+    --surface-3: #24243a;
+    --surface-4: #2a2834;
 
     --scrollbar-thumb: #3a3644;
     --scrollbar-hover: #ff6a7a;
@@ -69,6 +101,17 @@
   input:focus, textarea:focus {
     border-color: var(--accent-red) !important;
   }
+
+  /* Heatmap gradient levels — used instead of bg-[var(--x)]/opacity which CDN can't render */
+  .heatmap-0 { background-color: color-mix(in srgb, var(--text-muted) 30%, transparent); }
+  .heatmap-1 { background-color: color-mix(in srgb, var(--accent-red) 35%, transparent); }
+  .heatmap-2 { background-color: color-mix(in srgb, var(--accent-red) 65%, transparent); }
+  .heatmap-3 { background-color: var(--accent-red); }
+
+  .heatmap-legend-0 { background-color: color-mix(in srgb, var(--text-muted) 30%, transparent); }
+  .heatmap-legend-1 { background-color: color-mix(in srgb, var(--accent-red) 35%, transparent); }
+  .heatmap-legend-2 { background-color: color-mix(in srgb, var(--accent-red) 65%, transparent); }
+  .heatmap-legend-3 { background-color: var(--accent-red); }
 }
 
 /* Custom gorgeous background waves animation */

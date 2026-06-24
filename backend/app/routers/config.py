@@ -62,7 +62,7 @@ def list_asr_providers():
 
 @router.post("/config")
 def update_global_config(req: UpdateConfigRequest):
-    new_cfg = req.dict()
+    new_cfg = req.model_dump()
     save_config(new_cfg)
     
     # 强制将新变量重写回内存 config 字典中，完成实时热更新

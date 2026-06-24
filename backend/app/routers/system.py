@@ -199,16 +199,7 @@ def fetch_latest_release_worker():
                     return
     except Exception as e:
         print(f"[Version Check] Error fetching from GitHub: {str(e)}")
-        if CURRENT_VERSION == "0.9.0":
-            VERSION_CHECK_CACHE.update({
-                "latest_version": "v1.0.0",
-                "has_update": True,
-                "release_url": "https://github.com/quentin2001/whisperMe/releases/tag/v1.0.0",
-                "release_notes": "whisperMe v1.0.0 初始发布版本。支持本地/在线 ASR 转写与 AI 摘要分析。",
-                "last_checked": time.time()
-            })
-            return
-        
+
     VERSION_CHECK_CACHE.update({
         "latest_version": CURRENT_VERSION,
         "has_update": False,

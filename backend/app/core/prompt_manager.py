@@ -204,18 +204,15 @@ def save_prompt(data: dict) -> None:
 
 
 def get_templates() -> dict:
-    """返回内置模板列表（供前端选择）。"""
+    """返回内置模板字典（供前端选择）。"""
     return {
-        "templates": [
-            {
-                "id": tid,
-                "name": t["name"],
-                "name_en": t["name_en"],
-                "description": t["description"],
-                "description_en": t["description_en"],
-            }
-            for tid, t in BUILTIN_TEMPLATES.items()
-        ]
+        tid: {
+            "name": t["name"],
+            "name_en": t["name_en"],
+            "description": t["description"],
+            "description_en": t["description_en"],
+        }
+        for tid, t in BUILTIN_TEMPLATES.items()
     }
 
 

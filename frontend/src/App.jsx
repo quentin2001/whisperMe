@@ -5,12 +5,11 @@ import WorkstationView from "./views/WorkstationView";
 import PodcastDetailView from "./views/PodcastDetailView";
 import SettingsView from "./views/SettingsView";
 import { initialLogs } from "./data.js";
-import { useTheme } from "./contexts/ThemeContext.jsx";
+import { API_BASE } from "./constants.js";
 
-const BACKEND_URL = "http://127.0.0.1:8001";
+const BACKEND_URL = API_BASE;
 
 export default function App() {
-  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard', 'workstation', 'detail', 'config'
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [detailSourceTab, setDetailSourceTab] = useState("dashboard"); // 'dashboard' or 'workstation'
@@ -55,7 +54,7 @@ export default function App() {
     notification_email: "",
     enable_win_notification: true,
     enable_email_notification: false,
-    asr_mode: "local",
+    asr_mode: "online",
     online_asr_provider: "mimo",
     online_api_key: "",
     online_base_url: "",
@@ -68,7 +67,7 @@ export default function App() {
     custom_asr_timestamp_jsonpath: "",
     custom_asr_audio_format: "mp3",
     custom_asr_chunk_duration: 60,
-    summary_mode: "local",
+    summary_mode: "online",
     online_summary_api_key: "",
     online_summary_base_url: "",
     online_summary_model: "",
@@ -78,7 +77,7 @@ export default function App() {
     language: "en"
   });
   const t = (zh, en) => (configData.language === "en" ? en : zh);
-  const [asrMode, setAsrMode] = useState("online");
+  const [audioSource, setAudioSource] = useState("link");
 
   // Prompt 编辑状态
   const [promptData, setPromptData] = useState({
@@ -278,7 +277,7 @@ export default function App() {
       const res = await fetch(`${BACKEND_URL}/api/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: newUrl.trim(), asr_mode: asrMode })
+        body: JSON.stringify({ url: newUrl.trim(), asr_mode: configData.asr_mode || "online" })
       });
       if (res.status === 200) {
         const result = await res.json();
@@ -303,7 +302,7 @@ export default function App() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("asr_mode", asrMode);
+      formData.append("asr_mode", configData.asr_mode || "online");
 
       const res = await fetch(`${BACKEND_URL}/api/upload`, {
         method: "POST",
@@ -552,9 +551,6 @@ export default function App() {
                 handleResetPrompt={handleResetPrompt}
                 onCheckVersion={fetchVersion}
                 checkingVersion={checkingVersion}
-                theme={theme}
-                toggleTheme={toggleTheme}
-                t={t}
               />
             )}
           </>
@@ -584,27 +580,27 @@ export default function App() {
               <h3 className="text-xl font-bold font-display text-[var(--text-primary)] flex items-center gap-2">
                 {t("新建转录任务", "New Transcription")}
               </h3>
-              <button onClick={() => setIsIngestModalOpen(false)} className="text-[var(--text-secondary)]/60 hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg">
+              <button onClick={() => setIsIngestModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg">
                 ✕
               </button>
             </div>
 
             <div className="p-6 flex flex-col gap-4">
-              <p className="text-sm text-[var(--text-muted)]/85">
-                {t("选择 ASR 模式并提供单集播客链接或上传本地音频文件。", "Select ASR mode and provide either an episode link or upload a local audio file.")}
+              <p className="text-sm text-[var(--text-muted)]">
+                {t("选择音频来源：粘贴在线链接或上传本地文件。", "Choose audio source: paste a link or upload a local file.")}
               </p>
 
               <div className="flex gap-4 items-center">
-                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]/70">{t("ASR 模式：", "ASR MODE:")}</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{t("音频来源：", "AUDIO SOURCE:")}</span>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={asrMode === "online"} onChange={() => setAsrMode("online")} className="accent-[var(--accent-red)]" /> {t("在线 API", "ONLINE API")}
+                  <input type="radio" checked={audioSource === "link"} onChange={() => setAudioSource("link")} className="w-3.5 h-3.5 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("在线链接", "LINK")}
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={asrMode === "local"} onChange={() => setAsrMode("local")} className="accent-[var(--accent-red)]" /> {t("本地离线", "LOCAL OFFLINE")}
+                  <input type="radio" checked={audioSource === "file"} onChange={() => setAudioSource("file")} className="w-3.5 h-3.5 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("本地文件", "LOCAL FILE")}
                 </label>
               </div>
 
-              {asrMode === "online" ? (
+              {audioSource === "link" ? (
                 <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
                   <input
                     type="text"
@@ -612,7 +608,7 @@ export default function App() {
                     value={newUrl}
                     onChange={(e) => setNewUrl(e.target.value)}
                     disabled={loading}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 focus:border-[var(--accent-red)] focus:ring-1 focus:ring-[var(--accent-red)] rounded-lg px-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/40 outline-none transition-colors"
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 focus:border-[var(--accent-red)] focus:ring-1 focus:ring-[var(--accent-red)] rounded-lg px-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-colors"
                   />
 
                   <button
@@ -628,7 +624,7 @@ export default function App() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading || loading}
-                    className="w-full border-2 border-dashed border-[var(--border-primary)] hover:border-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/10 text-[var(--text-secondary)]/70 hover:text-[var(--accent-red)] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
+                    className="w-full border-2 border-dashed border-[var(--border-primary)] hover:border-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/10 text-[var(--text-tertiary)] hover:text-[var(--accent-red)] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
                   >
                     <span className="text-3xl mb-1">☁️</span>
                     <span className="text-xs font-bold">{uploading ? t("正在上传...", "UPLOADING...") : t("浏览本地文件", "BROWSE FILES")}</span>

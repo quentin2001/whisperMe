@@ -16,11 +16,13 @@ import httpx
 from bs4 import BeautifulSoup
 import yt_dlp
 from app.config import (
-    FFMPEG_PATH, 
-    FFMPEG_BIN_DIR, 
-    SHORT_DOWNLOADS_DIR, 
-    TEMP_SANDBOX_DIR
+    FFMPEG_PATH,
+    FFMPEG_BIN_DIR,
+    SHORT_DOWNLOADS_DIR,
+    TEMP_SANDBOX_DIR,
+    get_short_path_name
 )
+from app.core.transcriber import doh_dns_bypass
 
 # 递归在嵌套字典/列表中搜索特定键
 def find_nested_key(data, target_key):
@@ -415,29 +417,29 @@ class PodcastDownloader:
             r = self.safe_httpx_request("GET", mobile_url, headers=mobile_headers, timeout=15.0)
             if r.status_code != 200:
                 raise Exception(f"请求 Bilibili 移动端网页失败: HTTP {r.status_code}")
-                
-                html = r.text
-                state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
-                if not state_match:
-                    raise Exception("未能从 Bilibili 移动端网页中解析 window.__INITIAL_STATE__")
-                
-                state = json.loads(state_match.group(1))
-                view_info = state.get("video", {}).get("viewInfo", {})
-                title = view_info.get("title", "未知 Bilibili 视频")
-                desc = view_info.get("desc", "")
-                uploader = view_info.get("owner", {}).get("name", "B站UP主")
-                
-                return {
-                    "title": title,
-                    "podcast_name": uploader,
-                    "audio_url": url,
-                    "shownotes": desc,
-                    "like_count": view_info.get("stat", {}).get("like", 0),
-                    "comment_count": view_info.get("stat", {}).get("reply", 0),
-                    "comments": [],
-                    "image_url": view_info.get("pic", ""),
-                    "source": "bilibili_private"
-                }
+
+            html = r.text
+            state_match = re.search(r"window\.__INITIAL_STATE__\s*=\s*({.*?});", html)
+            if not state_match:
+                raise Exception("未能从 Bilibili 移动端网页中解析 window.__INITIAL_STATE__")
+
+            state = json.loads(state_match.group(1))
+            view_info = state.get("video", {}).get("viewInfo", {})
+            title = view_info.get("title", "未知 Bilibili 视频")
+            desc = view_info.get("desc", "")
+            uploader = view_info.get("owner", {}).get("name", "B站UP主")
+
+            return {
+                "title": title,
+                "podcast_name": uploader,
+                "audio_url": url,
+                "shownotes": desc,
+                "like_count": view_info.get("stat", {}).get("like", 0),
+                "comment_count": view_info.get("stat", {}).get("reply", 0),
+                "comments": [],
+                "image_url": view_info.get("pic", ""),
+                "source": "bilibili_private"
+            }
 
         # 判断是否为网易云音乐播客
         elif self._is_netease_podcast_url(url):
@@ -935,33 +937,57 @@ class PodcastDownloader:
             r_api = self.safe_httpx_request("GET", playurl_api, headers=api_headers, timeout=10.0)
             if r_api.status_code != 200:
                 raise Exception(f"Playurl API 请求失败: HTTP {r_api.status_code}")
-                
-                api_data = r_api.json()
-                if api_data.get("code") != 0:
-                    raise Exception(f"Playurl API 错误 ({api_data.get('code')}): {api_data.get('message')}")
-                
-                durl = api_data.get("data", {}).get("durl", [])
-                if not durl:
-                    raise Exception("未找到 Bilibili 流媒体下载地址")
-                
-                play_url = durl[0].get("url")
-                
-                temp_mp4 = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp4")
-                print(f"🟢 [LOG] 开始下载媒体流 -> {temp_mp4}")
-                stream_headers = {
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15",
-                    "Referer": f"https://www.bilibili.com/video/{bvid}/"
-                }
-                
+
+            api_data = r_api.json()
+            if api_data.get("code") != 0:
+                raise Exception(f"Playurl API 错误 ({api_data.get('code')}): {api_data.get('message')}")
+
+            durl = api_data.get("data", {}).get("durl", [])
+            if not durl:
+                raise Exception("未找到 Bilibili 流媒体下载地址")
+
+            play_url = durl[0].get("url")
+
+            temp_mp4 = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp4")
+            print(f"🟢 [LOG] 开始下载媒体流 -> {temp_mp4}")
+            stream_headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15",
+                "Referer": f"https://www.bilibili.com/video/{bvid}/"
+            }
+
+            downloaded = 0
+            total_bytes = durl[0].get("size", 0)
+
+            download_stream_success = False
+
+            # 尝试用系统代理下载媒体流 (trust_env=True)
+            try:
+                with open(temp_mp4, "wb") as f:
+                    with httpx.Client(trust_env=True) as stream_client:
+                        with stream_client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
+                            if response.status_code != 200:
+                                raise Exception(f"HTTP status code {response.status_code}")
+                            for chunk in response.iter_bytes(chunk_size=16384):
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                if progress_callback and total_bytes > 0:
+                                    percent = (downloaded / total_bytes) * 90.0
+                                    progress_callback(percent)
+                download_stream_success = True
+            except Exception as e_stream_proxy:
+                print(f"⚠️ [LOG] Bilibili 媒体流代理下载失败: {e_stream_proxy}。尝试直连下载...")
                 downloaded = 0
-                total_bytes = durl[0].get("size", 0)
-                
-                download_stream_success = False
-                
-                # 尝试用系统代理下载媒体流 (trust_env=True)
+                if os.path.exists(temp_mp4):
+                    try:
+                        os.remove(temp_mp4)
+                    except Exception:
+                        pass
+
+            # 尝试直连下载媒体流 (trust_env=False)
+            if not download_stream_success:
                 try:
                     with open(temp_mp4, "wb") as f:
-                        with httpx.Client(trust_env=True) as stream_client:
+                        with httpx.Client(trust_env=False) as stream_client:
                             with stream_client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
                                 if response.status_code != 200:
                                     raise Exception(f"HTTP status code {response.status_code}")
@@ -972,38 +998,14 @@ class PodcastDownloader:
                                         percent = (downloaded / total_bytes) * 90.0
                                         progress_callback(percent)
                     download_stream_success = True
-                except Exception as e_stream_proxy:
-                    print(f"⚠️ [LOG] Bilibili 媒体流代理下载失败: {e_stream_proxy}。尝试直连下载...")
-                    downloaded = 0
+                except Exception as e_stream_direct:
+                    print(f"❌ [LOG] Bilibili 媒体流直连下载失败: {e_stream_direct}")
                     if os.path.exists(temp_mp4):
                         try:
                             os.remove(temp_mp4)
                         except Exception:
                             pass
-
-                # 尝试直连下载媒体流 (trust_env=False)
-                if not download_stream_success:
-                    try:
-                        with open(temp_mp4, "wb") as f:
-                            with httpx.Client(trust_env=False) as stream_client:
-                                with stream_client.stream("GET", play_url, headers=stream_headers, timeout=30.0) as response:
-                                    if response.status_code != 200:
-                                        raise Exception(f"HTTP status code {response.status_code}")
-                                    for chunk in response.iter_bytes(chunk_size=16384):
-                                        f.write(chunk)
-                                        downloaded += len(chunk)
-                                        if progress_callback and total_bytes > 0:
-                                            percent = (downloaded / total_bytes) * 90.0
-                                            progress_callback(percent)
-                        download_stream_success = True
-                    except Exception as e_stream_direct:
-                        print(f"❌ [LOG] Bilibili 媒体流直连下载失败: {e_stream_direct}")
-                        if os.path.exists(temp_mp4):
-                            try:
-                                os.remove(temp_mp4)
-                            except Exception:
-                                pass
-                        raise e_stream_direct
+                    raise e_stream_direct
                                 
             local_filename = os.path.join(SHORT_DOWNLOADS_DIR, f"{url_hash}.mp3")
             print(f"🟢 [LOG] 提取音频 -> {local_filename}")
@@ -1182,9 +1184,8 @@ class PodcastDownloader:
         filename = os.path.basename(input_path)
         name_without_ext = os.path.splitext(filename)[0]
         output_wav = os.path.join(TEMP_SANDBOX_DIR, f"{name_without_ext}_standardized.wav")
-        
+
         # 统一转成 8.3 格式
-        from app.config import get_short_path_name
         short_input = get_short_path_name(input_path)
         short_output = get_short_path_name(output_wav)
         

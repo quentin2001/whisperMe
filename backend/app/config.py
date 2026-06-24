@@ -17,8 +17,11 @@ if not hasattr(np, "int"):
     np.int = int
 
 # ==================== 🛡️ 钢铁防御层 1：强行重写控制台物理输出流 ====================
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='ignore')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='ignore')
+# 仅在编码不是 UTF-8 时替换，避免破坏 pytest 等工具的输出捕获机制
+if hasattr(sys.stdout, "buffer") and getattr(sys.stdout, "encoding", "").lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='ignore')
+if hasattr(sys.stderr, "buffer") and getattr(sys.stderr, "encoding", "").lower() != "utf-8":
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='ignore')
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # 基础目录定义

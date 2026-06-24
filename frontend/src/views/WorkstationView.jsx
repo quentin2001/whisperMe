@@ -33,19 +33,19 @@ function CustomDropdown({ label, value, options, onChange }) {
 
   return (
     <div className="flex items-center gap-2" ref={dropdownRef}>
-      <span className="text-[11px] font-extrabold text-[var(--text-secondary)]/60 uppercase tracking-widest">{label}</span>
+      <span className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest">{label}</span>
       <div className="relative">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={`w-36 flex items-center justify-between bg-[var(--bg-hover)] border px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-secondary)] transition-all text-left outline-none cursor-pointer ${
             isOpen 
-              ? "border-[#f62440] ring-1 ring-[#f62440]" 
-              : "border-[var(--border-primary)]/20 hover:border-[#f62440]/50"
+              ? "border-[var(--accent-red)] ring-1 ring-[var(--accent-red)]" 
+              : "border-[var(--border-primary)]/20 hover:border-[var(--accent-red)]/50"
           }`}
         >
           <span className="truncate">{selectedOption.label}</span>
-          <ChevronDown size={14} className={`text-[var(--text-secondary)]/60 transition-transform duration-200 ${isOpen ? "rotate-180 text-[var(--accent-red)]" : ""}`} />
+          <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? "rotate-180 text-[var(--accent-red)]" : ""}`} />
         </button>
 
         {isOpen && (
@@ -93,7 +93,7 @@ const isWithinDays = (dateInput, days) => {
   if (!dateInput) return false;
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return false;
-  const now = new Date("2026-06-22T01:36:20+08:00");
+  const now = new Date();
   const diffTime = now.getTime() - d.getTime();
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
   return diffDays <= days;
@@ -190,7 +190,7 @@ export default function WorkstationView({
         {/* Top Header controls */}
       <div className="mb-8">
         <h2 className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">{t("工作台", "Workstation")}</h2>
-        <p className="text-sm text-[var(--text-muted)]/80 mt-1 font-medium">{t("在多轨可视化工作台中选择并解析您的音频档案。", "Select and parse any acoustic trace inside the advanced multi-track visualizer.")}</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1 font-medium">{t("在多轨可视化工作台中选择并解析您的音频档案。", "Select and parse any acoustic trace inside the advanced multi-track visualizer.")}</p>
       </div>
 
       {/* Filter toolbar */}
@@ -209,7 +209,7 @@ export default function WorkstationView({
             ]}
           />
 
-          <div className="h-4 w-[1px] bg-[#e7bcbb]/30 hidden sm:block" />
+          <div className="h-4 w-[1px] bg-[var(--border-primary)]/30 hidden sm:block" />
 
           {/* Published Date Filter */}
           <CustomDropdown 
@@ -223,7 +223,7 @@ export default function WorkstationView({
             ]}
           />
 
-          <div className="h-4 w-[1px] bg-[#e7bcbb]/30 hidden sm:block" />
+          <div className="h-4 w-[1px] bg-[var(--border-primary)]/30 hidden sm:block" />
 
           {/* Duration Filter */}
           <CustomDropdown 
@@ -245,7 +245,7 @@ export default function WorkstationView({
             <button
               onClick={() => setViewMode("grid")}
               className={`p-1.5 rounded-md transition-all cursor-pointer border-0 outline-none ${
-                viewMode === "grid" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-secondary)]/60 bg-transparent"
+                viewMode === "grid" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-muted)] bg-transparent"
               }`}
             >
               <LayoutGrid size={14} />
@@ -253,7 +253,7 @@ export default function WorkstationView({
             <button
               onClick={() => setViewMode("list")}
               className={`p-1.5 rounded-md transition-all cursor-pointer border-0 outline-none ${
-                viewMode === "list" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-secondary)]/60 bg-transparent"
+                viewMode === "list" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-muted)] bg-transparent"
               }`}
             >
               <List size={14} />
@@ -269,7 +269,7 @@ export default function WorkstationView({
             <div
               key={session.id}
               onClick={() => onOpenSession(session.rawTask)}
-              className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl overflow-hidden hover:border-[#f62440]/50 hover:shadow-sm transition-all flex flex-col group cursor-pointer"
+              className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl overflow-hidden hover:border-[var(--accent-red)]/50 hover:shadow-sm transition-all flex flex-col group cursor-pointer"
             >
               {/* Media Thumbnail Container */}
               <div className="aspect-[4/3] bg-neutral-900 relative overflow-hidden shrink-0">
@@ -319,7 +319,7 @@ export default function WorkstationView({
                       {session.rawTask.podcast_name && (
                         <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
                           {session.rawTask.podcast_name}
-                          <span className="text-[#e7bcbb] font-normal ml-1.5">|</span>
+                          <span className="text-[var(--border-primary)] font-normal ml-1.5">|</span>
                         </span>
                       )}
                       <span>{session.title}</span>
@@ -360,7 +360,7 @@ export default function WorkstationView({
             <div
               key={session.id}
               onClick={() => onOpenSession(session.rawTask)}
-              className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[#f62440]/55 rounded-xl cursor-pointer hover:shadow-xs transition-all"
+              className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[var(--accent-red)]/55 rounded-xl cursor-pointer hover:shadow-xs transition-all"
             >
               <div className="flex items-center gap-4">
                 <img
@@ -374,21 +374,21 @@ export default function WorkstationView({
                     {session.rawTask.podcast_name && (
                       <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
                         {session.rawTask.podcast_name}
-                        <span className="text-[#e7bcbb] font-normal ml-1.5">|</span>
+                        <span className="text-[var(--border-primary)] font-normal ml-1.5">|</span>
                       </span>
                     )}
                     <span>{session.title}</span>
                   </h3>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-semibold text-[var(--text-muted)] select-none">
                     <span>{t("时长：", "Duration: ")}{session.duration}</span>
-                    <span className="text-[#e7bcbb]/40">•</span>
+                    <span className="text-[var(--border-primary)]/40">•</span>
                     <div className="flex items-center gap-1">
                       <Calendar size={11} className="text-[var(--accent-red)]" />
                       <span>{t("导入于: ", "Imported: ")}{session.date}</span>
                     </div>
                     {session.rawTask.metadata && session.rawTask.metadata.pub_date && (
                       <>
-                        <span className="text-[#e7bcbb]/40">•</span>
+                        <span className="text-[var(--border-primary)]/40">•</span>
                         <div className="flex items-center gap-1 text-[var(--accent-red)]">
                           <Calendar size={11} className="text-[var(--accent-red)]" />
                           <span>{t("发布于: ", "Published: ")}{formatDateToYYYYMMDD(session.rawTask.metadata.pub_date)}</span>
@@ -419,7 +419,7 @@ export default function WorkstationView({
                       }
                     }
                   }}
-                  className="p-1.5 hover:bg-[var(--accent-red-light)]/50 text-[var(--text-secondary)]/60 hover:text-[var(--accent-red)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
+                  className="p-1.5 hover:bg-[var(--accent-red-light)]/50 text-[var(--text-muted)] hover:text-[var(--accent-red)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
                   title={t("删除任务", "Delete Task")}
                 >
                   <Trash2 size={15} />

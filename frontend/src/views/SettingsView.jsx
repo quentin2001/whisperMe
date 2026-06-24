@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, Moon, Sun, FileText } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText } from "lucide-react";
+import { API_BASE } from "../constants.js";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,7 +26,7 @@ function SettingsDropdown({ value, options, onChange }) {
         className="w-full bg-[var(--bg-input)]/40 hover:bg-[var(--bg-input)]/80 border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] flex justify-between items-center transition-colors text-left"
       >
         <span>{selectedOption?.label}</span>
-        <ChevronDown size={16} className={`text-[var(--text-secondary)]/60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
@@ -62,9 +63,7 @@ export default function SettingsView({
   handleSavePrompt,
   handleResetPrompt,
   onCheckVersion,
-  checkingVersion,
-  theme,
-  toggleTheme
+  checkingVersion
 }) {
   const t = (zh, en) => (configData.language === "en" ? en : zh);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -76,7 +75,7 @@ export default function SettingsView({
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const API = "http://127.0.0.1:8001";
+  const API = API_BASE;
 
   useEffect(() => {
     fetch(`${API}/api/prompt/templates`)
@@ -134,7 +133,7 @@ export default function SettingsView({
       <div className="max-w-[1280px] mx-auto p-10 font-sans w-full">
         <div className="mb-8">
           <h2 className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">{t("设置", "Settings")}</h2>
-          <p className="text-sm text-[var(--text-muted)]/80 mt-1 font-medium">{t("精细化配置音频处理阈值及神经网络转录引擎大模型参数。", "Fine-tune acoustic processing thresholds and neural transcription engine models.")}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1 font-medium">{t("精细化配置音频处理阈值及神经网络转录引擎大模型参数。", "Fine-tune acoustic processing thresholds and neural transcription engine models.")}</p>
         </div>
 
         {versionInfo?.has_update && (
@@ -168,34 +167,6 @@ export default function SettingsView({
           {/* Left Column: Config Panels */}
           <div className="lg:col-span-2 flex flex-col gap-6">
 
-            {/* Card 0: Theme Toggle */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                {theme === "dark" ? <Moon size={18} className="text-[var(--accent-red)]" /> : <Sun size={18} className="text-[var(--accent-red)]" />}
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("外观设置", "Appearance")}</h3>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("深色模式", "Dark Mode")}</h4>
-                  <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("切换浅色/深色主题，偏好自动保存。", "Switch between light and dark theme. Preference is saved automatically.")}</p>
-                </div>
-                <button
-                  onClick={toggleTheme}
-                  className={`relative w-14 h-7 rounded-full transition-all duration-300 cursor-pointer border-0 outline-none ${
-                    theme === "dark"
-                      ? "bg-[var(--accent-red)]"
-                      : "bg-[var(--border-primary)]"
-                  }`}
-                >
-                  <span className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-md transition-transform duration-300 flex items-center justify-center ${
-                    theme === "dark" ? "left-[28px]" : "left-[3px]"
-                  }`}>
-                    {theme === "dark" ? <Moon size={12} className="text-[var(--accent-red)]" /> : <Sun size={12} className="text-[var(--text-secondary)]" />}
-                  </span>
-                </button>
-              </div>
-            </div>
-
             {/* Card 1: ASR Settings */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
               <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
@@ -206,10 +177,10 @@ export default function SettingsView({
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("引擎工作模式", "Engine Mode")}</label>
                 <SettingsDropdown
-                  value={configData.asr_mode || "local"}
+                  value={configData.asr_mode || "online"}
                   onChange={(val) => handleConfigChange("asr_mode", val)}
                   options={[
-                    { value: "local", label: t("本地离线", "LOCAL OFFLINE") },
+                    { value: "local", label: t("本地模型", "LOCAL MODEL") },
                     { value: "online", label: t("在线 API", "ONLINE API") }
                   ]}
                 />
@@ -243,70 +214,30 @@ export default function SettingsView({
               {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("ASR Provider", "ASR Provider")}</label>
-                    <SettingsDropdown
-                      value={configData.online_asr_provider || "mimo"}
-                      onChange={(val) => handleConfigChange("online_asr_provider", val)}
-                      options={[
-                        { value: "mimo", label: "MiMo ASR" },
-                        { value: "openai", label: "OpenAI Whisper" },
-                        { value: "funasr", label: "FunASR" },
-                        { value: "custom", label: "Custom HTTP" }
-                      ]}
-                    />
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "API Base URL")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <input type="text" value={configData.online_base_url || ""} onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
+                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_base_url)}`}
+                      placeholder="https://api.openai.com/v1" />
+                    <span className="text-xs text-[var(--text-muted)] font-medium">
+                      {t("样例：https://api.openai.com/v1 或第三方中转地址", "Example: https://api.openai.com/v1 or a third-party API base URL")}
+                    </span>
                   </div>
-                  {configData.online_asr_provider !== "custom" && (
-                    <>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "API Base URL")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                        <input type="text" value={configData.online_base_url || ""} onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
-                          className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_base_url)}`}
-                          placeholder={configData.online_asr_provider === "openai" ? "https://api.openai.com/v1" : configData.online_asr_provider === "funasr" ? "http://localhost:10095" : "https://token-plan-sgp.xiaomimimo.com/v1"} />
-                      </div>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("Model ID", "Model ID")}</label>
-                        <input type="text" value={configData.online_model || ""} onChange={(e) => handleConfigChange("online_model", e.target.value)}
-                          className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_model)}`}
-                          placeholder={configData.online_asr_provider === "openai" ? "whisper-1" : "mimo-v2.5-asr"} />
-                      </div>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                        <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
-                          className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_api_key)}`}
-                          placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                      </div>
-                    </>
-                  )}
-                  {configData.online_asr_provider === "custom" && (
-                    <>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">API Endpoint<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                        <input type="text" value={configData.custom_asr_endpoint || ""} onChange={(e) => handleConfigChange("custom_asr_endpoint", e.target.value)}
-                          className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.custom_asr_endpoint)}`}
-                          placeholder="https://your-asr-service.com/api/transcribe" />
-                      </div>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Request Body Template</label>
-                        <textarea value={configData.custom_asr_body_template || ""} onChange={(e) => handleConfigChange("custom_asr_body_template", e.target.value)}
-                          className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] min-h-[80px] resize-y ${getHighlightClass(configData.custom_asr_body_template)}`}
-                          placeholder={'{"audio": "{{audio_base64}}"}'} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-2 animate-fade-in">
-                          <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Response Text Path</label>
-                          <input type="text" value={configData.custom_asr_response_jsonpath || "$.data.text"} onChange={(e) => handleConfigChange("custom_asr_response_jsonpath", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" />
-                        </div>
-                        <div className="flex flex-col gap-2 animate-fade-in">
-                          <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Chunk Duration (s)</label>
-                          <input type="number" value={configData.custom_asr_chunk_duration || 60} onChange={(e) => handleConfigChange("custom_asr_chunk_duration", parseInt(e.target.value) || 60)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" />
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 animate-fade-in">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">API Key (optional)</label>
-                        <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="sk-xxx" />
-                      </div>
-                    </>
-                  )}
+                  <div className="flex flex-col gap-2 animate-fade-in">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("Model ID", "Model ID")}</label>
+                    <input type="text" value={configData.online_model || ""} onChange={(e) => handleConfigChange("online_model", e.target.value)}
+                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_model)}`}
+                      placeholder="whisper-1" />
+                    <span className="text-xs text-[var(--text-muted)] font-medium">
+                      {t("样例：whisper-1 / mimo-v2.5-asr", "Example: whisper-1 / mimo-v2.5-asr")}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2 animate-fade-in">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
+                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_api_key)}`}
+                      placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key from your ASR service provider")}</span>
+                  </div>
                 </>
               )}
             </div>
@@ -324,7 +255,7 @@ export default function SettingsView({
                   value={configData.summary_mode || "online"}
                   onChange={(val) => handleConfigChange("summary_mode", val)}
                   options={[
-                    { value: "local", label: t("本地 OLLAMA", "LOCAL OLLAMA") },
+                    { value: "local", label: t("本地模型", "LOCAL MODEL") },
                     { value: "online", label: t("在线 API", "ONLINE API") }
                   ]}
                 />
@@ -354,21 +285,21 @@ export default function SettingsView({
                     <input type="text" value={configData.online_summary_base_url || ""} onChange={(e) => handleConfigChange("online_summary_base_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_base_url)}`}
                       placeholder="https://api.openai.com/v1" />
-                    <span className="text-xs text-[var(--text-secondary)]/60 font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线大模型 ID", "Online Model ID")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
                     <input type="text" value={configData.online_summary_model || ""} onChange={(e) => handleConfigChange("online_summary_model", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_model)}`}
                       placeholder="gpt-4o-mini" />
-                    <span className="text-xs text-[var(--text-secondary)]/60 font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                     <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
                     <input type="password" value={configData.online_summary_api_key || ""} onChange={(e) => handleConfigChange("online_summary_api_key", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                    <span className="text-xs text-[var(--text-secondary)]/60 font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
                   </div>
                 </>
               )}
@@ -390,8 +321,8 @@ export default function SettingsView({
                   </button>
                   <button type="button" onClick={handleSavePrompt} disabled={promptSaveStatus === "saving"}
                     className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none flex items-center gap-1.5 ${
-                      promptSaveStatus === "saved" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                      : promptSaveStatus === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                      promptSaveStatus === "saved" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      : promptSaveStatus === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
                       : "bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white"
                     }`}>
                     {promptSaveStatus === "saving" && <Loader2 size={13} className="animate-spin" />}
@@ -429,13 +360,15 @@ export default function SettingsView({
                         }`}
                       >
                         {loadingTemplate && selectedTemplate === tpl.id && <Loader2 size={12} className="animate-spin" />}
-                        <span>{tpl.name}</span>
+                        <span>{configData.language === "en" ? (tpl.name_en || tpl.name) : tpl.name}</span>
                       </button>
                     ))}
                   </div>
                   {selectedTemplate && templates.find(t => t.id === selectedTemplate)?.description && (
-                    <p className="text-xs text-[var(--text-muted)]/70 font-medium mt-0.5">
-                      {templates.find(t => t.id === selectedTemplate).description}
+                    <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                      {configData.language === "en"
+                        ? (templates.find(t => t.id === selectedTemplate).description_en || templates.find(t => t.id === selectedTemplate).description)
+                        : templates.find(t => t.id === selectedTemplate).description}
                     </p>
                   )}
                 </div>
@@ -446,12 +379,6 @@ export default function SettingsView({
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   {t("📝 总结 Prompt（完整指令）", "📝 Summary Prompt (Full Instructions)")}
                 </label>
-                <p className="text-xs text-[var(--text-muted)]/80 font-medium">
-                  {t(
-                    "完整的总结指令。播客数据（元数据、评论、转录文本）会自动替换占位符 {{PODCAST_DATA}}。请勿删除该占位符。",
-                    "Full summary instruction. Podcast data (metadata, comments, transcript) will auto-replace the {{PODCAST_DATA}} placeholder. Do not remove it."
-                  )}
-                </p>
                 <textarea
                   value={promptData?.prompt || ""}
                   onChange={(e) => setPromptData(prev => ({ ...prev, prompt: e.target.value }))}
@@ -464,15 +391,6 @@ export default function SettingsView({
                 />
               </div>
 
-              <div className="p-3.5 bg-[var(--bg-secondary)]/50 border border-[var(--border-primary)]/30 rounded-lg text-xs text-[var(--text-secondary)] leading-relaxed">
-                {t("💡 数据注入方式：", "💡 Data injection:")}
-                <code className="block mt-1 font-mono text-[11px] text-[var(--accent-red)] select-all">
-                  {t(
-                    "Prompt 中的 {{PODCAST_DATA}} 会被自动替换为：[播客元数据 + 评论 + 转录文本]",
-                    "{{PODCAST_DATA}} in your prompt will be replaced with: [Metadata + Comments + Transcript]"
-                  )}
-                </code>
-              </div>
             </div>
 
             <div className="flex items-center gap-3 mt-2">
@@ -496,15 +414,34 @@ export default function SettingsView({
 
           {/* Right Column */}
           <div className="flex flex-col gap-6">
-            {/* Card 3: System Notifications */}
+            {/* Language Preference Card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 transition-colors duration-300">
+              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 text-[var(--accent-red)]">
+                <Globe size={16} />
+                <h3 className="font-bold text-sm text-[var(--text-primary)]">{t("系统语言设置", "System Language Preference")}</h3>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("语言选择", "Select Language")}</label>
+                <SettingsDropdown
+                  value={configData.language || "en"}
+                  onChange={(val) => handleConfigChange("language", val)}
+                  options={[
+                    { value: "zh-CN", label: t("简体中文 (ZH-CN)", "CHINESE (ZH-CN)") },
+                    { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
+                  ]}
+                />
+              </div>
+            </div>
+
+            {/* Notifications Card */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
               <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
                 <Bell size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("系统提醒设置", "System Notifications")}</h3>
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("通知设置", "Notifications")}</h3>
               </div>
               <div className="flex items-center justify-between p-4 bg-[var(--bg-secondary)]/30 rounded-lg border border-[var(--border-primary)]/30">
                 <div>
-                  <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("Windows 气泡通知", "Windows Toast Notifications")}</h4>
+                  <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("桌面通知", "Desktop Notifications")}</h4>
                   <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
                 </div>
                 <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
@@ -545,45 +482,6 @@ export default function SettingsView({
                 </div>
               )}
             </div>
-
-            {/* Card 4: Core Dependencies */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <Terminal size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">Core Dependencies</h3>
-              </div>
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border-primary)]/30 bg-[var(--bg-secondary)]/20">
-                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${ffmpegStatus?.available ? "bg-green-500" : ffmpegStatus === null ? "bg-yellow-400 animate-pulse" : "bg-red-500"}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-[var(--text-primary)]">
-                    {ffmpegStatus === null ? "Detecting FFmpeg..." : ffmpegStatus?.available ? `FFmpeg ${ffmpegStatus.version || ""}` : "FFmpeg not found"}
-                  </div>
-                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[var(--text-muted)]/70 font-mono truncate mt-0.5">{ffmpegStatus.path.split(/[\\/]/).slice(-2).join("/")}</div>}
-                  {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-red-500 mt-1">Install: winget install Gyan.FFmpeg</div>}
-                </div>
-                <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-detect</button>
-              </div>
-              <div>
-                <button onClick={() => setShowFfmpegAdvanced(!showFfmpegAdvanced)} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]/70 hover:text-[var(--text-muted)] transition-colors cursor-pointer bg-transparent border-0 p-0">
-                  <span className={`transition-transform ${showFfmpegAdvanced ? "rotate-90" : ""}`}>&#9654;</span>
-                  Manual path override (advanced)
-                </button>
-                {showFfmpegAdvanced && (
-                  <div className="mt-3 flex flex-col gap-4 animate-fade-in">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Path</label>
-                      <input type="text" value={configData.ffmpeg_path || ""} onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto-detection" />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Bin Directory</label>
-                      <input type="text" value={configData.ffmpeg_bin_dir || ""} onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto-detection" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Language Preference Card */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 transition-colors duration-300">
               <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 text-[var(--accent-red)]">
                 <Globe size={16} />
@@ -633,44 +531,41 @@ export default function SettingsView({
               )}
             </div>
 
-            {/* Concurrent Tasks Config */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 mb-4 text-[var(--accent-red)]">
-                <Cpu size={16} />
-                <h3 className="text-xs font-bold uppercase tracking-wider">{t("并行转录", "Parallel Transcription")}</h3>
+            {/* Core Dependencies */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
+              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
+                <Terminal size={18} className="text-[var(--accent-red)]" />
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">Core Dependencies</h3>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-xs text-[var(--text-primary)]">{t("最大并行任务数", "Max Concurrent Tasks")}</h4>
-                  <p className="text-[var(--text-muted)] text-[10px] mt-0.5">
-                    {t("选'自动'则根据 GPU 显存自动决定。调高此值可同时处理多个任务，但会占用更多显存。", "Auto mode detects GPU VRAM capacity. Increase to process multiple tasks simultaneously, but uses more VRAM.")}
-                  </p>
+              <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border-primary)]/30 bg-[var(--bg-secondary)]/20">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${ffmpegStatus?.available ? "bg-green-500" : ffmpegStatus === null ? "bg-yellow-400 animate-pulse" : "bg-red-500"}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-[var(--text-primary)]">
+                    {ffmpegStatus === null ? "Detecting FFmpeg..." : ffmpegStatus?.available ? `FFmpeg ${ffmpegStatus.version || ""}` : "FFmpeg not found"}
+                  </div>
+                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">{ffmpegStatus.path.split(/[\\/]/).slice(-2).join("/")}</div>}
+                  {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-[var(--accent-red)] mt-1">Install: winget install Gyan.FFmpeg</div>}
                 </div>
-                <SettingsDropdown
-                  value={configData.max_concurrent_tasks || 0}
-                  onChange={(val) => handleConfigChange("max_concurrent_tasks", Number(val))}
-                  options={[
-                    { value: 0, label: t("自动检测", "Auto-detect") },
-                    { value: 1, label: t("1 个任务（串行）", "1 task (sequential)") },
-                    { value: 2, label: t("2 个任务", "2 tasks") },
-                    { value: 3, label: t("3 个任务", "3 tasks") }
-                  ]}
-                />
+                <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-check</button>
               </div>
-            </div>
-
-            {/* API Secret panel */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 mb-4 text-[var(--accent-red)]">
-                <Cpu size={16} />
-                <h3 className="font-bold text-sm text-[var(--text-primary)]">{t("AI 引擎机密凭据说明", "AI Secrets & Credentials")}</h3>
+              <div>
+                <button onClick={() => setShowFfmpegAdvanced(!showFfmpegAdvanced)} className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors cursor-pointer bg-transparent border-0 p-0">
+                  <span className={`transition-transform ${showFfmpegAdvanced ? "rotate-90" : ""}`}>&#9654;</span>
+                  Manual path override (advanced)
+                </button>
+                {showFfmpegAdvanced && (
+                  <div className="mt-3 flex flex-col gap-4 animate-fade-in">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Path</label>
+                      <input type="text" value={configData.ffmpeg_path || ""} onChange={(e) => handleConfigChange("ffmpeg_path", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">FFmpeg Bin Directory</label>
+                      <input type="text" value={configData.ffmpeg_bin_dir || ""} onChange={(e) => handleConfigChange("ffmpeg_bin_dir", e.target.value)} className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]" placeholder="Leave empty for auto" />
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-[var(--text-muted)] leading-relaxed font-semibold">
-                {t("本应用调用服务器端的大模型进行语音处理与大模型自动总结。", "This application utilizes server-side AI Models for complete voice processing and transcript summarization.")}
-              </p>
-              <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-2 font-medium">
-                {t("您的 API 密钥在安全容器中受到严格保护。您可以通过配置大模型 API Key 来解锁实时的总结分析功能。", "Your API key is kept strictly confidential on the secure container. Configure your credentials under the settings to unlock live real-time analysis.")}
-              </p>
             </div>
 
             {/* GitHub Repo & Version Info */}

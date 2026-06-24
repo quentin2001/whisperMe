@@ -78,7 +78,7 @@ export default function Sidebar({
             className={`w-full py-2.5 px-3.5 rounded-lg flex items-center gap-3 font-semibold transition-all cursor-pointer border-0 outline-none text-left ${
               currentTab === "library"
                 ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)]/70 hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)] bg-transparent"
+                : "text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] bg-transparent"
             }`}
           >
             <Library size={18} className="text-[var(--accent-red)]" />
@@ -91,7 +91,7 @@ export default function Sidebar({
             className={`w-full py-2.5 px-3.5 rounded-lg flex items-center gap-3 font-semibold transition-all cursor-pointer border-0 outline-none text-left ${
               currentTab === "workstation"
                 ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)]/70 hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)] bg-transparent"
+                : "text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] bg-transparent"
             }`}
           >
             <Sliders size={18} className="text-[var(--accent-red)]" />
@@ -104,7 +104,7 @@ export default function Sidebar({
             className={`w-full py-2.5 px-3.5 rounded-lg flex items-center justify-between font-semibold transition-all cursor-pointer border-0 outline-none text-left ${
               currentTab === "settings"
                 ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)]/70 hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)] bg-transparent"
+                : "text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] bg-transparent"
             }`}
           >
             <div className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export default function Sidebar({
       <div className="border-t border-[var(--border-primary)]/40 pt-4">
         {/* Dynamic System Status */}
         <div id="telemetry-info" className="flex flex-col gap-1 bg-[var(--bg-hover)]/40 p-3 rounded-lg border border-[var(--border-primary)]/20">
-          <p className="text-[10px] text-[var(--text-secondary)]/60 font-bold uppercase tracking-wider flex items-center gap-1.5">
+          <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider flex items-center gap-1.5">
             <Cpu size={12} className="text-[var(--accent-red)]" />
             {t("系统状态", "System Status")}
           </p>

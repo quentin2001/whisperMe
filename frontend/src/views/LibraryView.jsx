@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Search, SlidersHorizontal, Mic, Square, Cloud, Play,
-  Trash2, BarChart3, Database, Plus, Calendar, FastForward, ExternalLink
+  Trash2, BarChart3, Database, Plus, Calendar, FastForward, ExternalLink,
+  Sun, Moon, Monitor
 } from "lucide-react";
+import { API_BASE } from "../constants.js";
+import { useTheme } from "../contexts/ThemeContext.jsx";
 
 const formatDateToYYYYMMDD = (dateInput) => {
   if (!dateInput) return "";
@@ -263,6 +266,7 @@ export default function LibraryView({
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState("00:00");
   const [syncing, setSyncing] = useState(false);
+  const { themeMode, cycleTheme } = useTheme();
 
   const checkIsConfigured = () => {
     if (!configData) return false;
@@ -478,7 +482,7 @@ export default function LibraryView({
           formData.append("file", audioBlob, `mic_record_${Date.now()}.wav`);
           formData.append("asr_mode", "local");
 
-          const response = await fetch("http://127.0.0.1:8001/api/upload", {
+          const response = await fetch(`${API_BASE}/api/upload`, {
             method: "POST",
             body: formData
           });
@@ -557,9 +561,18 @@ export default function LibraryView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">{t("媒体库", "Library")}</h2>
-          <p className="text-sm text-[var(--text-muted)]/80 mt-1 font-medium">{t("管理您的音频档案与 AI 转录内容。", "Manage your acoustic archives and AI-powered transcriptions.")}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1 font-medium">{t("管理您的音频档案与 AI 转录内容。", "Manage your acoustic archives and AI-powered transcriptions.")}</p>
         </div>
-        <div className="shrink-0 self-start sm:self-center">
+        <div className="shrink-0 self-start sm:self-center flex items-center gap-2">
+          <button
+            onClick={cycleTheme}
+            title={themeMode === "light" ? t("浅色模式", "Light mode") : themeMode === "dark" ? t("深色模式", "Dark mode") : t("跟随系统", "Follow system")}
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--bg-hover)] hover:bg-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none"
+          >
+            {themeMode === "light" && <Sun size={15} />}
+            {themeMode === "dark" && <Moon size={15} />}
+            {themeMode === "system" && <Monitor size={15} />}
+          </button>
           {isConfigured ? (
             <div className="inline-flex items-center gap-2 bg-[var(--accent-red-light)]/40 text-[var(--accent-red)] text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider border border-[var(--accent-red-light)]/30">
               <span className="relative flex h-1.5 w-1.5">
@@ -641,23 +654,17 @@ export default function LibraryView({
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] animate-pulse" />
               {t("声音活力值", "Acoustic Energy")}
             </h4>
-            <p className="text-[10px] text-[var(--text-muted)]/60 font-semibold mb-3">
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold mb-3">
               {t("周度声音处理热力分布", "Weekly voice processing density")}
             </p>
 
             <div className="flex items-center justify-center py-1">
               <div className="grid grid-rows-7 grid-flow-col gap-[3px]">
                 {heatmapCells.map((cell) => {
-                  const colorClass =
-                    cell.level === 0 ? "bg-[var(--bg-hover)]" :
-                    cell.level === 1 ? "bg-[var(--accent-red-light)]" :
-                    cell.level === 2 ? "bg-[var(--accent-red)]/50" :
-                    "bg-[var(--accent-red)]";
-
                   return (
                     <div
                       key={cell.id}
-                      className={`w-[10px] h-[10px] rounded-[1.5px] ${colorClass} transition-all duration-200 hover:scale-125 cursor-pointer`}
+                      className={`w-[10px] h-[10px] rounded-[1.5px] heatmap-${cell.level} transition-all duration-200 hover:scale-125 cursor-pointer`}
                       title={t(`${cell.date.toLocaleDateString()}: ${cell.count} 次录音`, `${cell.date.toLocaleDateString()}: ${cell.count} recordings`)}
                     />
                   );
@@ -666,13 +673,13 @@ export default function LibraryView({
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-[9px] text-[var(--text-muted)]/60 font-bold tracking-wider mt-4">
+          <div className="flex items-center justify-between text-[9px] text-[var(--text-muted)] font-bold tracking-wider mt-4">
             <span>{t("较少", "LESS")}</span>
             <div className="flex gap-1">
-              <div className="w-[8px] h-[8px] bg-[var(--bg-hover)] rounded-[1px]" />
-              <div className="w-[8px] h-[8px] bg-[var(--accent-red-light)] rounded-[1px]" />
-              <div className="w-[8px] h-[8px] bg-[var(--accent-red)]/50 rounded-[1px]" />
-              <div className="w-[8px] h-[8px] bg-[var(--accent-red)] rounded-[1px]" />
+              <div className="w-[8px] h-[8px] heatmap-legend-0 rounded-[1px]" />
+              <div className="w-[8px] h-[8px] heatmap-legend-1 rounded-[1px]" />
+              <div className="w-[8px] h-[8px] heatmap-legend-2 rounded-[1px]" />
+              <div className="w-[8px] h-[8px] heatmap-legend-3 rounded-[1px]" />
             </div>
             <span>{t("较多", "MORE")}</span>
           </div>
@@ -725,7 +732,7 @@ export default function LibraryView({
                       )}
                       <span>{session.title}</span>
                     </h4>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] font-semibold select-none text-[var(--text-secondary)]/70">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] font-semibold select-none text-[var(--text-tertiary)]">
                       <span>{t("时长：", "Duration: ")}{session.duration}</span>
                       <span className="text-[var(--border-primary)]/40">•</span>
                       <div className="flex items-center gap-1">
@@ -757,7 +764,7 @@ export default function LibraryView({
 
                 <div className="flex items-center gap-4 mt-3 md:mt-0 self-end md:self-auto">
                   {session.status === 'IN_PROGRESS' ? (
-                    <span className="text-[12px] font-mono text-[var(--text-secondary)]/60 italic font-medium">
+                    <span className="text-[12px] font-mono text-[var(--text-muted)] italic font-medium">
                       {session.rawTask.status === 'pending' ? t("排队等待中...", "Waiting in queue...") : t("AI 生成标签中...", "AI generating tags...")}
                     </span>
                   ) : (
@@ -770,7 +777,7 @@ export default function LibraryView({
                     </div>
                   )}
 
-                  <div className="flex items-center gap-1 text-[var(--text-secondary)]/60">
+                  <div className="flex items-center gap-1 text-[var(--text-muted)]">
                     <button
                       className="p-1.5 hover:bg-[var(--bg-hover)]/50 rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
                       onClick={(e) => {
