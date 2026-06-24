@@ -388,6 +388,15 @@ def get_qa_history(task_id: str):
         raise HTTPException(status_code=404, detail="未找到该任务")
     return {"history": task.get("qa_history") or []}
 
+@router.delete("/{task_id}/qa")
+def clear_qa_history(task_id: str):
+    """清空播客问答历史"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到该任务")
+    db.update_task(task_id, qa_history=[])
+    return {"success": True, "message": "问答历史已清空"}
+
 @router.post("")
 def create_task(req: CreateTaskRequest):
     task_id = str(uuid.uuid4())
