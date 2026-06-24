@@ -47,8 +47,8 @@ docs/                # 详细文档
 - 配置: config.json（git 忽略），config.example.json（脱敏模板）
 
 ## 端口配置
-- 后端: 8001（因 8000 被 Windows TCP 残留占用，重启后可改回）
-- 前端: 5173（Vite dev server）
+- 后端: 9101
+- 前端: 9173（Vite dev server）
 - 启动脚本: `一键启动.bat` → `start_project.py`
 
 ## 网络代理配置

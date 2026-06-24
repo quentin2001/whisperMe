@@ -28,8 +28,8 @@ def main():
         
     print("[LOG] 启动 whisperMe 本地后台服务...")
     print(f"  * 虚拟环境 Python: {venv_python}")
-    print("  * 监听地址: http://127.0.0.1:8001")
-    print("  * 音频下载挂载路径: http://127.0.0.1:8001/audio")
+    print("  * 监听地址: http://127.0.0.1:9101")
+    print("  * 音频下载挂载路径: http://127.0.0.1:9101/audio")
     print("=" * 60)
     
     # 使用 venv 中的 python.exe 执行 uvicorn
@@ -39,7 +39,7 @@ def main():
         "-m", "uvicorn", 
         "app.main:app", 
         "--host", "127.0.0.1", 
-        "--port", "8001",
+        "--port", "9101",
         "--reload"
     ]
     

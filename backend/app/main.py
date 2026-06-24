@@ -30,10 +30,10 @@ from app.routers.boards import router as boards_router
 
 app = FastAPI(title="whisperMe Local Podcast Processor", version=CURRENT_VERSION)
 
-# 配置 CORS 跨域请求（前端 Vite 运行在 5173，后端运行在 8001）
+# 配置 CORS 跨域请求（前端 Vite 运行在 9173，后端运行在 9101）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:9173", "http://127.0.0.1:9173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

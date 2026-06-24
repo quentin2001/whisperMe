@@ -272,6 +272,6 @@ sequenceDiagram
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| Frontend (Vite) | 5173 | 开发服务器 |
-| Backend (FastAPI) | 8000 | API 服务 + 静态音频挂载 |
+| Frontend (Vite) | 9173 | 开发服务器 |
+| Backend (FastAPI) | 9101 | API 服务 + 静态音频挂载 |
 | Ollama / LM Studio | 11434 | 本地 LLM 推理（可选） |
