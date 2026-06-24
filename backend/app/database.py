@@ -294,6 +294,18 @@ class LocalDatabase:
                     print(f"❌ [MIGRATION] 增加 speaker_confidence 列失败: {e}")
                     self.conn.rollback()
 
+            # 增量升级：为 tasks 表增加 qa_history 列
+            c.execute("PRAGMA table_info(tasks)")
+            task_columns = [col["name"] for col in c.fetchall()]
+            if "qa_history" not in task_columns:
+                try:
+                    c.execute("ALTER TABLE tasks ADD COLUMN qa_history TEXT")
+                    self.conn.commit()
+                    print("✅ [MIGRATION] 成功为 tasks 表增加 qa_history 列")
+                except Exception as e:
+                    print(f"❌ [MIGRATION] 增加 qa_history 列失败: {e}")
+                    self.conn.rollback()
+
             # 增量升级：将 speaker_fingerprints.json 迁移到 speakers 表
             fingerprints_json = os.path.join(PROJECT_DIR, "speaker_fingerprints.json")
             if os.path.exists(fingerprints_json):

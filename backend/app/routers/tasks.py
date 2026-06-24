@@ -287,6 +287,9 @@ def ask_podcast(task_id: str, req: QARequest):
     if task.get("status") != "completed":
         raise HTTPException(status_code=400, detail="任务尚未完成，无法进行问答")
 
+    # Load existing Q&A history from database
+    qa_history = task.get("qa_history") or []
+
     # Build transcript context
     transcript_segments = task.get("transcript", [])
     speaker_mappings = task.get("speaker_mappings", {})
@@ -314,13 +317,23 @@ def ask_podcast(task_id: str, req: QARequest):
     title = task.get("title", "未知标题")
     podcast_name = task.get("podcast_name", "未知播客")
 
+    # Build conversation context from Q&A history
+    history_context = ""
+    if qa_history:
+        recent_history = qa_history[-10:]  # Last 5 Q&A pairs (10 messages)
+        history_lines = []
+        for msg in recent_history:
+            role = "用户" if msg["role"] == "user" else "助手"
+            history_lines.append(f"{role}: {msg['content']}")
+        history_context = "\n\n以下是之前的对话历史，请参考上下文回答：\n" + "\n".join(history_lines)
+
     system_context = f"""你是一个播客内容分析助手。请根据以下播客转录文本回答用户的问题。
 如果转录文本中没有相关信息，请明确说明。
 
 播客: {title}（{podcast_name}）
 
 转录文本:
-{transcript_text}"""
+{transcript_text}{history_context}"""
 
     # Call LLM — use chunking if transcript is too long
     max_chars = 45000 if config.get("summary_mode", "local") == "local" else 80000
@@ -360,7 +373,20 @@ def ask_podcast(task_id: str, req: QARequest):
 {chr(10).join(f"【段落{i+1}】{a}" for i, a in enumerate(chunk_answers))}"""
         answer = call_llm(merge_prompt, label="播客问答-合并")
 
-    return {"answer": answer}
+    # Save Q&A to history
+    qa_history.append({"role": "user", "content": req.question})
+    qa_history.append({"role": "assistant", "content": answer})
+    db.update_task(task_id, qa_history=qa_history)
+
+    return {"answer": answer, "history": qa_history}
+
+@router.get("/{task_id}/qa")
+def get_qa_history(task_id: str):
+    """获取播客问答历史"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到该任务")
+    return {"history": task.get("qa_history") or []}
 
 @router.post("")
 def create_task(req: CreateTaskRequest):
