@@ -278,6 +278,29 @@ class PodcastTranscriber:
             print(f"❌ [🚨 熔断拦截] 声纹分割过程中报错: {e}。系统已自动降级为纯语音转文字，不包含说话人姓名区分。")
             return []
 
+    def _find_speaker(self, seg, diarization_segments: list[dict]) -> str:
+        """Match a transcript segment to the closest diarization speaker."""
+        if not diarization_segments:
+            return "UNKNOWN_SPEAKER"
+
+        seg_center = (seg.start + seg.end) / 2
+        best_match = None
+        max_overlap = 0.0
+
+        for d in diarization_segments:
+            # Exact center containment
+            if d["start"] <= seg_center <= d["end"]:
+                return d["speaker"]
+            # Fallback: highest overlap
+            overlap_start = max(seg.start, d["start"])
+            overlap_end = min(seg.end, d["end"])
+            overlap_len = overlap_end - overlap_start
+            if overlap_len > max_overlap:
+                max_overlap = overlap_len
+                best_match = d["speaker"]
+
+        return best_match or "UNKNOWN_SPEAKER"
+
     def transcribe_and_merge(self, wav_path: str, diarization_segments: list[dict], progress_callback=None, asr_mode: str = "local") -> list[dict]:
         """
         运行 faster-whisper 或在线 ASR，并将识别的段落与 pyannote 声纹时间轴交叉重叠合并
@@ -384,29 +407,7 @@ class PodcastTranscriber:
         last_progress_int = 60
         
         for seg in whisper_segments:
-            current_speaker = "UNKNOWN_SPEAKER"
-            if has_diarization:
-                # 寻找哪一个声纹切片的区间包含此文本段的中心点
-                seg_center = (seg.start + seg.end) / 2
-                best_match_speaker = None
-                max_overlap = 0.0
-                
-                for diar_seg in diarization_segments:
-                    # 精准包含中心点
-                    if diar_seg["start"] <= seg_center <= diar_seg["end"]:
-                        current_speaker = diar_seg["speaker"]
-                        break
-                    
-                    # 备选：寻找重合度最高的区间
-                    overlap_start = max(seg.start, diar_seg["start"])
-                    overlap_end = min(seg.end, diar_seg["end"])
-                    overlap_len = overlap_end - overlap_start
-                    if overlap_len > max_overlap:
-                        max_overlap = overlap_len
-                        best_match_speaker = diar_seg["speaker"]
-                else:
-                    if best_match_speaker:
-                        current_speaker = best_match_speaker
+            current_speaker = self._find_speaker(seg, diarization_segments)
             
             # 时间戳计算
             start_min, start_sec = divmod(int(seg.start), 60)
