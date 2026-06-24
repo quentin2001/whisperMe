@@ -10,10 +10,11 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import (
-    config, 
-    SHORT_DOWNLOADS_DIR, 
+    config,
+    SHORT_DOWNLOADS_DIR,
     SHORT_TRANSCRIPTS_DIR,
-    CURRENT_VERSION
+    CURRENT_VERSION,
+    PROJECT_DIR
 )
 from app.database import db
 from app.core.queue_manager import queue_manager
@@ -63,6 +64,14 @@ except ImportError:
     print("⚠️ [STARTUP] MCP SDK 未安装，跳过 MCP Server 挂载。安装命令: pip install mcp")
 except Exception as e:
     print(f"⚠️ [STARTUP] MCP Server 挂载失败: {e}")
+
+# --- 生产模式：FastAPI 直接托管前端静态文件 ---
+import pathlib as _pathlib
+_frontend_dist = PROJECT_DIR / "frontend" / "dist"
+if _frontend_dist.is_dir():
+    from fastapi.staticfiles import StaticFiles as _StaticFiles
+    app.mount("/", _StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+    print(f"✅ [STARTUP] 前端静态文件已托管: {_frontend_dist}")
 
 # --- 智能声纹特征与大模型命名推理引擎 ---
 from app.core.speaker import auto_rename_speakers, apply_interjection_labels
