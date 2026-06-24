@@ -16,6 +16,7 @@ def _patched_check_output(*args, **kwargs):
         kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
     return _original_check_output(*args, **kwargs)
 subprocess.check_output = _patched_check_output
+import re
 import socket
 import threading
 import time
@@ -301,12 +302,14 @@ class PodcastTranscriber:
 
         return best_match or "UNKNOWN_SPEAKER"
 
-    def transcribe_and_merge(self, wav_path: str, diarization_segments: list[dict], progress_callback=None, asr_mode: str = "local") -> list[dict]:
+    def transcribe_and_merge(self, wav_path: str, diarization_segments: list[dict],
+                             progress_callback=None, asr_mode: str = "local",
+                             on_segment_batch=None) -> list[dict]:
         """
         运行 faster-whisper 或在线 ASR，并将识别的段落与 pyannote 声纹时间轴交叉重叠合并
         """
-        whisper_segments = []
-        duration = 1.0
+        merged_results = []
+        last_progress_int = 60
 
         if asr_mode == "online":
             from app.config import config
@@ -322,6 +325,7 @@ class PodcastTranscriber:
             provider_segments = provider.transcribe(wav_path, diarization_segments, progress_callback)
 
             # Convert to WhisperSegmentDummy for downstream compatibility
+            whisper_segments = []
             for seg in provider_segments:
                 whisper_segments.append(WhisperSegmentDummy(seg["start"], seg["end"], seg["text"]))
 
@@ -338,11 +342,53 @@ class PodcastTranscriber:
 
             print(f"[LOG] Online ASR completed: {len(whisper_segments)} segments.")
 
+            # Online ASR: merge with diarization and batch callback
+            batch_buffer = []
+            for seg in whisper_segments:
+                current_speaker = self._find_speaker(seg, diarization_segments)
+
+                start_min, start_sec = divmod(int(seg.start), 60)
+                start_hour, start_min = divmod(start_min, 60)
+                timestamp = f"[{start_hour:02d}:{start_min:02d}:{start_sec:02d}]"
+
+                merged_seg = {
+                    "start": seg.start,
+                    "end": seg.end,
+                    "timestamp_str": timestamp,
+                    "speaker": current_speaker,
+                    "text": seg.text
+                }
+                merged_results.append(merged_seg)
+                batch_buffer.append(merged_seg)
+
+                if on_segment_batch and len(batch_buffer) >= 10:
+                    try:
+                        on_segment_batch(list(batch_buffer))
+                    except Exception as batch_ex:
+                        print(f"⚠️ [LOG] Incremental paragraph batch failed: {batch_ex}")
+                    batch_buffer = []
+
+            if on_segment_batch and batch_buffer:
+                try:
+                    on_segment_batch(list(batch_buffer))
+                except Exception as batch_ex:
+                    print(f"⚠️ [LOG] Final paragraph batch failed: {batch_ex}")
+
+            # Progress callback for online mode
+            if progress_callback:
+                try:
+                    progress_callback(75.0)
+                except Exception:
+                    pass
+
+            print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
+            return merged_results
+
         else:
             # 本地转录模式
             short_wav_path = get_short_path_name(os.path.abspath(wav_path))
             import torch
-            
+
             # 动态显存监控与资源控制
             device_to_use = self.device
             compute_type_to_use = self.compute_type
@@ -376,71 +422,78 @@ class PodcastTranscriber:
                 device=device_to_use,
                 compute_type=compute_type_to_use
             )
-            
+
             print("✨ [LOG] Whisper 模型已就绪！开始高效转汉字...")
             whisper_segments_raw, info = model.transcribe(
-                short_wav_path, 
-                beam_size=5, 
+                short_wav_path,
+                beam_size=5,
                 language="zh"
             )
-            whisper_segments = list(whisper_segments_raw)
+
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
             def clean_txt(text):
                 return re.sub(r'[^\w\s]', '', text).strip()
-            
-            deduped_whisper_segments = []
-            for seg in whisper_segments:
-                if not deduped_whisper_segments:
-                    deduped_whisper_segments.append(seg)
-                else:
-                    if clean_txt(seg.text) != clean_txt(deduped_whisper_segments[-1].text):
-                        deduped_whisper_segments.append(seg)
-                    else:
-                        deduped_whisper_segments[-1].end = seg.end
-            whisper_segments = deduped_whisper_segments
+
+            dedup_prev_text = ""
             duration = info.duration if info and info.duration else 1.0
-        
-        has_diarization = len(diarization_segments) > 0
-        merged_results = []
-        
-        # print("\n🎧 【实时瀑布流剧本输出展示开始】\n" + "="*50)
-        last_progress_int = 60
-        
-        for seg in whisper_segments:
-            current_speaker = self._find_speaker(seg, diarization_segments)
-            
-            # 时间戳计算
-            start_min, start_sec = divmod(int(seg.start), 60)
-            start_hour, start_min = divmod(start_min, 60)
-            timestamp = f"[{start_hour:02d}:{start_min:02d}:{start_sec:02d}]"
-            
-            speaker_tag = f"【{current_speaker}】"
-            line = f"{timestamp} {speaker_tag}: {seg.text}"
-            
-            # print(line)  # 控制台实时回显
-            
-            merged_results.append({
-                "start": seg.start,
-                "end": seg.end,
-                "timestamp_str": timestamp,
-                "speaker": current_speaker,
-                "text": seg.text
-            })
-            
-            # 计算渐进式进度 (从 60.0% 到 75.0%)
-            current_progress = 60.0 + (seg.end / duration) * 15.0
-            current_progress = min(current_progress, 75.0)
-            current_progress_int = int(current_progress)
-            if current_progress_int > last_progress_int:
-                last_progress_int = current_progress_int
-                if progress_callback:
+            batch_buffer = []
+
+            for seg in whisper_segments_raw:
+                # Adjacent deduplication
+                cleaned = clean_txt(seg.text)
+                if cleaned == dedup_prev_text:
+                    if merged_results:
+                        merged_results[-1]["end"] = seg.end
+                    continue
+                dedup_prev_text = cleaned
+
+                # Speaker matching via helper
+                current_speaker = self._find_speaker(seg, diarization_segments)
+
+                # Timestamp
+                start_min, start_sec = divmod(int(seg.start), 60)
+                start_hour, start_min = divmod(start_min, 60)
+                timestamp = f"[{start_hour:02d}:{start_min:02d}:{start_sec:02d}]"
+
+                merged_seg = {
+                    "start": seg.start,
+                    "end": seg.end,
+                    "timestamp_str": timestamp,
+                    "speaker": current_speaker,
+                    "text": seg.text
+                }
+                merged_results.append(merged_seg)
+                batch_buffer.append(merged_seg)
+
+                # Incremental batch callback every 10 segments
+                if on_segment_batch and len(batch_buffer) >= 10:
                     try:
-                        progress_callback(float(current_progress_int))
-                    except Exception as pe:
-                        print(f"⚠️ [LOG] 进度回调触发异常: {pe}")
-            
-        print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
-        return merged_results
+                        on_segment_batch(list(batch_buffer))
+                    except Exception as batch_ex:
+                        print(f"⚠️ [LOG] Incremental paragraph batch failed: {batch_ex}")
+                    batch_buffer = []
+
+                # Progress update
+                current_progress = 60.0 + (seg.end / max(duration, 1.0)) * 15.0
+                current_progress = min(current_progress, 75.0)
+                current_progress_int = int(current_progress)
+                if current_progress_int > last_progress_int:
+                    last_progress_int = current_progress_int
+                    if progress_callback:
+                        try:
+                            progress_callback(float(current_progress_int))
+                        except Exception as pe:
+                            print(f"⚠️ [LOG] 进度回调触发异常: {pe}")
+
+            # Flush remaining segments
+            if on_segment_batch and batch_buffer:
+                try:
+                    on_segment_batch(list(batch_buffer))
+                except Exception as batch_ex:
+                    print(f"⚠️ [LOG] Final paragraph batch failed: {batch_ex}")
+
+            print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
+            return merged_results
 
     def extract_speaker_embeddings(self, wav_path: str, diarization_segments: list[dict]) -> dict[str, list[float]]:
         """
