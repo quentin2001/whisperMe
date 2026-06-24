@@ -44,6 +44,10 @@ class RenameSpeakerRequest(BaseModel):
     speaker_id: str
     new_name: str
 
+class QARequest(BaseModel):
+    question: str
+    history: list[dict] = []  # [{"role": "user"/"assistant", "content": "..."}]
+
 # --- Helper Functions ---
 def check_low_disk_space():
     try:
@@ -263,6 +267,92 @@ def get_task_transcript(task_id: str, format: str = "text"):
         lines.append(f"[{mm:02d}:{ss:02d}] {speaker}: {text}")
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse("\n".join(lines), media_type="text/plain")
+
+@router.post("/{task_id}/qa")
+def ask_podcast(task_id: str, req: QARequest):
+    """向播客提问，基于转录文本用 LLM 回答"""
+    from app.core.llm_utils import call_llm
+
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到该任务")
+    if task.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="任务尚未完成，无法进行问答")
+
+    # Build transcript context
+    transcript_segments = task.get("transcript", [])
+    speaker_mappings = task.get("speaker_mappings", {})
+    paragraphs = db.get_paragraphs_by_podcast(task_id)
+
+    items = paragraphs if paragraphs else transcript_segments
+    if not items:
+        raise HTTPException(status_code=400, detail="无转录数据，无法进行问答")
+
+    def resolve_speaker(speaker_id):
+        return speaker_mappings.get(speaker_id, speaker_id)
+
+    # Format transcript lines
+    lines = []
+    for p in items:
+        start = p.get("start_time", 0)
+        speaker = resolve_speaker(p.get("speaker", ""))
+        text = p.get("content", "") or p.get("text", "")
+        mm, ss = int(start // 60), int(start % 60)
+        lines.append(f"[{mm:02d}:{ss:02d}] {speaker}: {text}")
+
+    transcript_text = "\n".join(lines)
+
+    # Build prompt
+    title = task.get("title", "未知标题")
+    podcast_name = task.get("podcast_name", "未知播客")
+
+    system_context = f"""你是一个播客内容分析助手。请根据以下播客转录文本回答用户的问题。
+如果转录文本中没有相关信息，请明确说明。
+
+播客: {title}（{podcast_name}）
+
+转录文本:
+{transcript_text}"""
+
+    # Call LLM — use chunking if transcript is too long
+    max_chars = 45000 if config.get("summary_mode", "local") == "local" else 80000
+
+    if len(transcript_text) <= max_chars:
+        # Short transcript: single call
+        full_prompt = system_context + f"\n\n用户问题: {req.question}"
+        answer = call_llm(full_prompt, label="播客问答")
+    else:
+        # Long transcript: chunk and merge
+        summarizer_obj = PodcastSummarizer()
+        chunks = summarizer_obj._split_transcript_into_chunks(lines, max_chars, overlap_lines=15)
+
+        chunk_answers = []
+        for i, chunk in enumerate(chunks):
+            chunk_text = "\n".join(chunk)
+            chunk_prompt = f"""你是一个播客内容分析助手。以下是播客转录文本的第{i+1}/{len(chunks)}部分。
+请根据此部分回答用户的问题。如果此部分没有相关信息，请回答"此部分无相关信息"。
+
+播客: {title}（{podcast_name}）
+
+转录文本（第{i+1}部分）:
+{chunk_text}
+
+用户问题: {req.question}"""
+            chunk_answer = call_llm(chunk_prompt, label=f"播客问答-分段{i+1}")
+            chunk_answers.append(chunk_answer)
+
+        # Merge answers
+        merge_prompt = f"""你是一个播客内容分析助手。以下是对同一个播客问题在不同段落中的回答，请综合这些回答给出一个完整、连贯的最终答案。
+如果所有段落都没有相关信息，请明确说明转录文本中没有相关内容。
+
+播客: {title}（{podcast_name}）
+用户问题: {req.question}
+
+各段落回答:
+{chr(10).join(f"【段落{i+1}】{a}" for i, a in enumerate(chunk_answers))}"""
+        answer = call_llm(merge_prompt, label="播客问答-合并")
+
+    return {"answer": answer}
 
 @router.post("")
 def create_task(req: CreateTaskRequest):
