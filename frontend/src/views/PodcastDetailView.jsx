@@ -775,7 +775,7 @@ export default function PodcastDetailView({
   });
 
   const displayTitle = activeTask.title || "Untitled Session";
-  const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing" };
+  const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing", summarizing: "Summarizing" };
   const displayStatus = statusMap[activeTask.status] || "In Progress";
   const commentsList = activeTask.metadata?.comments || [];
 
@@ -885,6 +885,19 @@ export default function PodcastDetailView({
             </div>
           </div>
           
+          {/* Transcription progress indicator */}
+          {(activeTask.status === "downloading" || activeTask.status === "transcribing") && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg">
+              <div className="w-3 h-3 border-2 border-[var(--accent-red)] border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-[var(--accent-red)] font-semibold">
+                {activeTask.status === "downloading"
+                  ? t("正在下载音频...", "Downloading audio...")
+                  : t("转录进行中...", "Transcribing...") + (paragraphs.length > 0 ? ` (${paragraphs.length} ${t("段", "paragraphs")})` : "")
+                }
+              </span>
+            </div>
+          )}
+
           <div className="flex flex-col gap-6">
             {paragraphs
               .filter(p => p.text.toLowerCase().includes(searchWord.toLowerCase()))
@@ -972,9 +985,21 @@ export default function PodcastDetailView({
                   <Sparkles size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
                 </div>
-                
-                {/* Custom Markdown renderer rendering entire summary including metrics */}
-                <MarkdownRenderer text={activeTask.summary} t={t} />
+
+                {activeTask.status === "summarizing" ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <div className="w-10 h-10 border-3 border-[var(--accent-red)] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-[var(--text-muted)] font-semibold">
+                      {t("AI 正在深度分析转录文本...", "AI is analyzing the transcript...")}
+                    </p>
+                  </div>
+                ) : activeTask.summary ? (
+                  <MarkdownRenderer text={activeTask.summary} t={t} />
+                ) : (
+                  <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
+                    <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无总结内容", "No summary available")}</span>
+                  </div>
+                )}
               </div>
             )}
 
