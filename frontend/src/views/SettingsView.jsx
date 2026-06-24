@@ -186,29 +186,30 @@ export default function SettingsView({
               </div>
 
               {configData.asr_mode === "local" && (
-                <>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                    <input
-                      type="text"
-                      value={configData.local_whisper_model_path || ""}
-                      onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
-                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
-                      placeholder="/path/to/whisper/models/large-v3.bin"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("HF Token (人声分割分段)", "HF Token (Diarization)")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                    <input
-                      type="password"
-                      value={configData.hf_token || ""}
-                      onChange={(e) => handleConfigChange("hf_token", e.target.value)}
-                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`}
-                      placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    />
-                  </div>
-                </>
+                <div className="flex flex-col gap-2 animate-fade-in">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                  <input
+                    type="text"
+                    value={configData.local_whisper_model_path || ""}
+                    onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
+                    className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
+                    placeholder="/path/to/whisper/models/large-v3.bin"
+                  />
+                </div>
               )}
+
+              {/* HF Token 始终显示 — 声纹分割(PyAnnote)在任何 ASR 模式下都需要 */}
+              <div className="flex flex-col gap-2 animate-fade-in">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("HF Token (人声分割分段)", "HF Token (Speaker Diarization)")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                <input
+                  type="password"
+                  value={configData.hf_token || ""}
+                  onChange={(e) => handleConfigChange("hf_token", e.target.value)}
+                  className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`}
+                  placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                />
+                <p className="text-xs text-[var(--text-muted)]">{t("用于下载声纹识别模型，无论 ASR 是本地还是在线模式都需要", "Required for speaker diarization, needed in both local and online ASR modes")}</p>
+              </div>
 
               {configData.asr_mode === "online" && (
                 <>
