@@ -101,6 +101,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const audioPlayerRef = useRef(null);
   const activeTaskRef = useRef(null);
+  const playbackPositions = useRef({});
 
   const [checkingVersion, setCheckingVersion] = useState(false);
   const fetchVersion = async (force = false) => {
@@ -251,6 +252,8 @@ export default function App() {
 
   useEffect(() => {
     setIsAudioMissing(false);
+    setCurrentTime(0);
+    setDuration(0);
     if (activeTaskId) {
       fetchTaskDetail(activeTaskId);
       const detailInterval = setInterval(() => {
@@ -559,13 +562,25 @@ export default function App() {
 
       {/* Hidden Audio Player for Detail View */}
       {activeTab === "detail" && activeTask && activeTask.audio_url && (
-         <audio 
+         <audio
             ref={audioPlayerRef}
             src={`${BACKEND_URL}${activeTask.audio_url}`}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
-            onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
+            onTimeUpdate={(e) => {
+                setCurrentTime(e.target.currentTime);
+                if (activeTaskId) {
+                    playbackPositions.current[activeTaskId] = e.target.currentTime;
+                }
+            }}
             onDurationChange={(e) => setDuration(e.target.duration)}
+            onLoadedMetadata={(e) => {
+                const savedPos = activeTaskId ? playbackPositions.current[activeTaskId] : 0;
+                if (savedPos && savedPos > 0) {
+                    e.target.currentTime = savedPos;
+                    setCurrentTime(savedPos);
+                }
+            }}
             onCanPlay={(e) => { e.target.playbackRate = playbackRate; }}
             onError={() => setIsAudioMissing(true)}
             className="hidden"
