@@ -1,6 +1,6 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-20 · Session `adc707df`
+> 最后更新：2026-06-24 · Session `2026-06-24`
 
 ---
 
@@ -12,9 +12,10 @@ whisperMe 采用经典的前后端分离 **SPA + REST API** 架构，部署于�
 graph TB
     subgraph Frontend ["🖥️ Frontend (Vite + React)"]
         A[App.jsx — SPA 路由与全局状态]
+        A2[contexts/ThemeContext — 暗色模式管理]
         B[views/ — 页面级业务视图]
         C[components/ — 侧边栏与表单件]
-        D[index.css — 设计令牌 / 扩展式滚动条]
+        D[index.css — CSS 变量 / 暗色主题 / 滚动条]
     end
 
     subgraph Backend ["⚙️ Backend (FastAPI + Uvicorn)"]
@@ -32,8 +33,7 @@ graph TB
 
     subgraph Storage ["💾 本地存储"]
         O[config.json — 全局配置文件]
-        P[whisperMe.db — SQLite 数据库]
-        Q[speaker_fingerprints.json — 声纹指纹库]
+        P[whisperMe.db — SQLite 数据库（含 speakers 声纹表）]
         R[prompt.json — AI 总结 Prompt 模板]
         S[downloads/ — 原始音频文件]
     end

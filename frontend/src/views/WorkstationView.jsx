@@ -33,23 +33,23 @@ function CustomDropdown({ label, value, options, onChange }) {
 
   return (
     <div className="flex items-center gap-2" ref={dropdownRef}>
-      <span className="text-[11px] font-extrabold text-[#5d3f3e]/60 uppercase tracking-widest">{label}</span>
+      <span className="text-[11px] font-extrabold text-[var(--text-secondary)]/60 uppercase tracking-widest">{label}</span>
       <div className="relative">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-36 flex items-center justify-between bg-[#f2ede6] border px-3 py-1.5 rounded-lg text-xs font-bold text-[#5d3f3e] transition-all text-left outline-none cursor-pointer ${
+          className={`w-36 flex items-center justify-between bg-[var(--bg-hover)] border px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-secondary)] transition-all text-left outline-none cursor-pointer ${
             isOpen 
               ? "border-[#f62440] ring-1 ring-[#f62440]" 
-              : "border-[#e7bcbb]/20 hover:border-[#f62440]/50"
+              : "border-[var(--border-primary)]/20 hover:border-[#f62440]/50"
           }`}
         >
           <span className="truncate">{selectedOption.label}</span>
-          <ChevronDown size={14} className={`text-[#5d3f3e]/60 transition-transform duration-200 ${isOpen ? "rotate-180 text-[#f62440]" : ""}`} />
+          <ChevronDown size={14} className={`text-[var(--text-secondary)]/60 transition-transform duration-200 ${isOpen ? "rotate-180 text-[var(--accent-red)]" : ""}`} />
         </button>
 
         {isOpen && (
-          <div className="absolute left-0 mt-1 w-36 bg-[#f2ede6] border border-[#e7bcbb]/40 rounded-lg shadow-lg z-50 py-0 overflow-hidden animate-fade-in">
+          <div className="absolute left-0 mt-1 w-36 bg-[var(--bg-hover)] border border-[var(--border-primary)]/40 rounded-lg shadow-lg z-50 py-0 overflow-hidden animate-fade-in">
             {options.map((opt) => {
               const active = opt.value === value;
               return (
@@ -62,8 +62,8 @@ function CustomDropdown({ label, value, options, onChange }) {
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-all cursor-pointer border-0 outline-none block ${
                     active 
-                      ? "bg-[#f62440] text-white" 
-                      : "text-[#5d3f3e] bg-transparent hover:bg-[#ffdad6]/40 hover:text-[#f62440]"
+                      ? "bg-[var(--accent-red)] text-white" 
+                      : "text-[var(--text-secondary)] bg-transparent hover:bg-[var(--accent-red-light)]/40 hover:text-[var(--accent-red)]"
                   }`}
                 >
                   {opt.label}
@@ -189,12 +189,12 @@ export default function WorkstationView({
       <div className="max-w-[1280px] mx-auto p-10 font-sans w-full">
         {/* Top Header controls */}
       <div className="mb-8">
-        <h2 className="text-4xl font-extrabold tracking-tight text-[#1d1c18] font-display">{t("工作台", "Workstation")}</h2>
-        <p className="text-sm text-[#5d5a55]/80 mt-1 font-medium">{t("在多轨可视化工作台中选择并解析您的音频档案。", "Select and parse any acoustic trace inside the advanced multi-track visualizer.")}</p>
+        <h2 className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">{t("工作台", "Workstation")}</h2>
+        <p className="text-sm text-[var(--text-muted)]/80 mt-1 font-medium">{t("在多轨可视化工作台中选择并解析您的音频档案。", "Select and parse any acoustic trace inside the advanced multi-track visualizer.")}</p>
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-[#f9f3ea]/50 border border-[#e7bcbb]/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="bg-[var(--bg-secondary)]/50 border border-[var(--border-primary)]/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         {/* Left: Filter select controls */}
         <div className="flex flex-wrap items-center gap-4">
           {/* Imported Date Filter */}
@@ -241,11 +241,11 @@ export default function WorkstationView({
         {/* Right: Layout Switcher */}
         <div className="flex items-center gap-3 self-end sm:self-auto">
           {/* Layout controls toggle */}
-          <div className="flex items-center bg-[#f2ede6] p-0.5 rounded-lg border border-[#e7bcbb]/20">
+          <div className="flex items-center bg-[var(--bg-hover)] p-0.5 rounded-lg border border-[var(--border-primary)]/20">
             <button
               onClick={() => setViewMode("grid")}
               className={`p-1.5 rounded-md transition-all cursor-pointer border-0 outline-none ${
-                viewMode === "grid" ? "bg-white text-[#f62440]" : "text-[#5d3f3e]/60 bg-transparent"
+                viewMode === "grid" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-secondary)]/60 bg-transparent"
               }`}
             >
               <LayoutGrid size={14} />
@@ -253,7 +253,7 @@ export default function WorkstationView({
             <button
               onClick={() => setViewMode("list")}
               className={`p-1.5 rounded-md transition-all cursor-pointer border-0 outline-none ${
-                viewMode === "list" ? "bg-white text-[#f62440]" : "text-[#5d3f3e]/60 bg-transparent"
+                viewMode === "list" ? "bg-[var(--bg-card)] text-[var(--accent-red)]" : "text-[var(--text-secondary)]/60 bg-transparent"
               }`}
             >
               <List size={14} />
@@ -269,7 +269,7 @@ export default function WorkstationView({
             <div
               key={session.id}
               onClick={() => onOpenSession(session.rawTask)}
-              className="bg-white border border-[#e7bcbb]/40 rounded-xl overflow-hidden hover:border-[#f62440]/50 hover:shadow-sm transition-all flex flex-col group cursor-pointer"
+              className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl overflow-hidden hover:border-[#f62440]/50 hover:shadow-sm transition-all flex flex-col group cursor-pointer"
             >
               {/* Media Thumbnail Container */}
               <div className="aspect-[4/3] bg-neutral-900 relative overflow-hidden shrink-0">
@@ -296,7 +296,7 @@ export default function WorkstationView({
                       }
                     }
                   }}
-                  className="absolute top-3 left-3 bg-black/75 hover:bg-[#f62440] hover:text-white backdrop-blur-xs text-white/80 p-1.5 rounded-full transition-all border-0 outline-none cursor-pointer z-10"
+                  className="absolute top-3 left-3 bg-black/75 hover:bg-[var(--accent-red)] hover:text-white backdrop-blur-xs text-white/80 p-1.5 rounded-full transition-all border-0 outline-none cursor-pointer z-10"
                   title={t("删除任务", "Delete Task")}
                 >
                   <Trash2 size={13} />
@@ -304,7 +304,7 @@ export default function WorkstationView({
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <div 
-                    className="w-12 h-12 bg-[#f62440] hover:bg-[#bb0028] text-white flex items-center justify-center rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300"
+                    className="w-12 h-12 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-300"
                   >
                     <Play size={18} fill="white" className="ml-0.5" />
                   </div>
@@ -315,9 +315,9 @@ export default function WorkstationView({
               <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-start">
-                    <h3 className="font-bold text-base text-[#1d1c18] font-display leading-snug group-hover:text-[#f62440] transition-colors w-full">
+                    <h3 className="font-bold text-base text-[var(--text-primary)] font-display leading-snug group-hover:text-[var(--accent-red)] transition-colors w-full">
                       {session.rawTask.podcast_name && (
-                        <span className="text-[#f62440] font-extrabold mr-1.5">
+                        <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
                           {session.rawTask.podcast_name}
                           <span className="text-[#e7bcbb] font-normal ml-1.5">|</span>
                         </span>
@@ -326,14 +326,14 @@ export default function WorkstationView({
                     </h3>
                   </div>
 
-                  <div className="flex flex-col gap-1 text-[11px] text-[#5d5a55] mt-2 font-semibold select-none">
+                  <div className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)] mt-2 font-semibold select-none">
                     <div className="flex items-center gap-1.5">
-                      <Calendar size={12} className="text-[#bf0029]" />
+                      <Calendar size={12} className="text-[var(--accent-red)]" />
                       <span title="进入系统时间">{t("导入于: ", "Imported: ")}{session.date}</span>
                     </div>
                     {session.rawTask.metadata && session.rawTask.metadata.pub_date && (
-                      <div className="flex items-center gap-1.5 text-[#f62440]" title="播客本身发布时间">
-                        <Calendar size={12} className="text-[#bf0029]" />
+                      <div className="flex items-center gap-1.5 text-[var(--accent-red)]" title="播客本身发布时间">
+                        <Calendar size={12} className="text-[var(--accent-red)]" />
                         <span>{t("发布于: ", "Published: ")}{(() => {
                           try {
                             const pd = new Date(session.rawTask.metadata.pub_date);
@@ -360,37 +360,37 @@ export default function WorkstationView({
             <div
               key={session.id}
               onClick={() => onOpenSession(session.rawTask)}
-              className="flex items-center justify-between p-4 bg-white border border-[#e7bcbb]/40 hover:border-[#f62440]/55 rounded-xl cursor-pointer hover:shadow-xs transition-all"
+              className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[#f62440]/55 rounded-xl cursor-pointer hover:shadow-xs transition-all"
             >
               <div className="flex items-center gap-4">
                 <img
                   src={session.thumbnail}
                   alt=""
                   referrerPolicy="no-referrer"
-                  className="w-14 h-11 object-cover rounded-md border border-[#e7bcbb]/20 shrink-0"
+                  className="w-14 h-11 object-cover rounded-md border border-[var(--border-primary)]/20 shrink-0"
                 />
                 <div>
-                  <h3 className="font-bold text-sm text-[#1d1c18] font-display leading-snug">
+                  <h3 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug">
                     {session.rawTask.podcast_name && (
-                      <span className="text-[#f62440] font-extrabold mr-1.5">
+                      <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
                         {session.rawTask.podcast_name}
                         <span className="text-[#e7bcbb] font-normal ml-1.5">|</span>
                       </span>
                     )}
                     <span>{session.title}</span>
                   </h3>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-semibold text-[#5d5a55] select-none">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-semibold text-[var(--text-muted)] select-none">
                     <span>{t("时长：", "Duration: ")}{session.duration}</span>
                     <span className="text-[#e7bcbb]/40">•</span>
                     <div className="flex items-center gap-1">
-                      <Calendar size={11} className="text-[#bf0029]" />
+                      <Calendar size={11} className="text-[var(--accent-red)]" />
                       <span>{t("导入于: ", "Imported: ")}{session.date}</span>
                     </div>
                     {session.rawTask.metadata && session.rawTask.metadata.pub_date && (
                       <>
                         <span className="text-[#e7bcbb]/40">•</span>
-                        <div className="flex items-center gap-1 text-[#f62440]">
-                          <Calendar size={11} className="text-[#bf0029]" />
+                        <div className="flex items-center gap-1 text-[var(--accent-red)]">
+                          <Calendar size={11} className="text-[var(--accent-red)]" />
                           <span>{t("发布于: ", "Published: ")}{formatDateToYYYYMMDD(session.rawTask.metadata.pub_date)}</span>
                         </div>
                       </>
@@ -405,7 +405,7 @@ export default function WorkstationView({
                     e.stopPropagation();
                     onOpenSession(session.rawTask);
                   }}
-                  className="bg-[#f62440] hover:bg-[#bb0028] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all cursor-pointer border-0 outline-none"
+                  className="bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all cursor-pointer border-0 outline-none"
                 >
                   {t("打开", "Open")}
                 </button>
@@ -419,7 +419,7 @@ export default function WorkstationView({
                       }
                     }
                   }}
-                  className="p-1.5 hover:bg-[#ffdad6]/50 text-[#5d3f3e]/60 hover:text-[#f62440] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
+                  className="p-1.5 hover:bg-[var(--accent-red-light)]/50 text-[var(--text-secondary)]/60 hover:text-[var(--accent-red)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
                   title={t("删除任务", "Delete Task")}
                 >
                   <Trash2 size={15} />

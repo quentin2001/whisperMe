@@ -5,14 +5,69 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Light theme colors */
+    --bg-primary: #fef9f2;
+    --bg-secondary: #f9f3ea;
+    --bg-card: #ffffff;
+    --bg-hover: #f2ede6;
+    --bg-active: #f2ede6;
+    --bg-input: #fef9f2;
+
+    --text-primary: #1d1c18;
+    --text-secondary: #5d3f3e;
+    --text-muted: #5d5a55;
+    --text-accent: #bf0029;
+
+    --border-primary: #e7bcbb;
+    --border-hover: #f62440;
+
+    --accent-red: #f62440;
+    --accent-red-dark: #bb0028;
+    --accent-red-light: #ffdad6;
+    --accent-orange: #f27121;
+    --accent-gold: #f0e2b7;
+
+    --scrollbar-thumb: #e5dfd3;
+    --scrollbar-hover: #bf0029;
+  }
+
+  .dark {
+    --bg-primary: #141218;
+    --bg-secondary: #1c1a22;
+    --bg-card: #22202a;
+    --bg-hover: #2a2834;
+    --bg-active: #32303c;
+    --bg-input: #1c1a22;
+
+    --text-primary: #e8e4ef;
+    --text-secondary: #a8a0b4;
+    --text-muted: #8a8494;
+    --text-accent: #ff6a7a;
+
+    --border-primary: #3a3644;
+    --border-hover: #ff6a7a;
+
+    --accent-red: #ff6a7a;
+    --accent-red-dark: #e05566;
+    --accent-red-light: #3a2028;
+    --accent-orange: #f2a05c;
+    --accent-gold: #4a4030;
+
+    --scrollbar-thumb: #3a3644;
+    --scrollbar-hover: #ff6a7a;
+  }
+
   body {
-    background-color: #fef9f2;
-    color: #1d1c18;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     font-family: "smiley-sans", "Inter", "Geist", system-ui, sans-serif;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
+
   input:focus, textarea:focus {
-    border-color: #f62440 !important;
+    border-color: var(--accent-red) !important;
   }
 }
 
@@ -38,17 +93,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e5dfd3;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
-  border: 2px solid transparent; /* Page background match to look thin */
+  border: 2px solid transparent;
   background-clip: padding-box;
   transition: background 0.2s ease, border-width 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:active {
-  background: #bf0029; /* Turns red when hovered or dragged, matching brand theme */
-  border-width: 0px; /* Expands to full width */
+  background: var(--scrollbar-hover);
+  border-width: 0px;
 }
 
 /* Fix textarea scrollbar clipping rounded corners */
@@ -71,7 +126,14 @@ input:not([type="checkbox"]):not([type="radio"]):hover, textarea:hover, select:h
   transition: border-color 0.2s ease;
 }
 input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus {
-  border-color: #f62440 !important;
+  border-color: var(--accent-red) !important;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]):hover, .dark textarea:hover, .dark select:hover {
+  border-color: rgba(255, 106, 122, 0.5) !important;
+}
+.dark input:not([type="checkbox"]):not([type="radio"]):focus, .dark textarea:focus, .dark select:focus {
+  border-color: var(--accent-red) !important;
 }
 
 /* Add support for font families matching the AIStudio Geist font families */
@@ -130,7 +192,32 @@ input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:f
   }
 }
 
+.dark .highlight-flash {
+  animation: requiredHighlightDark 1.5s ease-in-out 2;
+}
+
+@keyframes requiredHighlightDark {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 106, 122, 0);
+    border-color: rgba(58, 54, 68, 0.4);
+  }
+  25%, 75% {
+    box-shadow: 0 0 0 4px rgba(255, 106, 122, 0.35);
+    border-color: #ff6a7a;
+    background-color: rgba(255, 106, 122, 0.05);
+  }
+}
+
 .highlight-flash {
   animation: requiredHighlight 1.5s ease-in-out 2;
 }
 
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}

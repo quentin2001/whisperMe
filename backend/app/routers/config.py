@@ -6,7 +6,7 @@ from app.config import (
     save_config,
     load_config as load_config_dict
 )
-from app.core.prompt_manager import load_prompt, save_prompt
+from app.core.prompt_manager import load_prompt, save_prompt, get_templates, get_template_prompt
 from app.core.notifier import PodcastNotifier
 from app.core import logger
 print = logger.info
@@ -126,3 +126,16 @@ def get_prompt():
 def set_prompt(req: dict):
     save_prompt(req)
     return {"status": "ok"}
+
+@router.get("/prompt/templates")
+def list_prompt_templates():
+    """列出所有内置 Prompt 模板（供前端下拉选择器使用）"""
+    return get_templates()
+
+@router.get("/prompt/template/{template_id}")
+def get_prompt_template(template_id: str):
+    """获取指定模板的 Prompt 内容"""
+    prompt = get_template_prompt(template_id)
+    if prompt is None:
+        raise HTTPException(status_code=404, detail=f"模板 '{template_id}' 不存在")
+    return {"id": template_id, "prompt": prompt}

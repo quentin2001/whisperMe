@@ -37,8 +37,13 @@ frontend/.svelte-kit/
 frontend/.next/
 frontend/build/
 
-# 8. Local Scratch scripts
+# 8. Local Scratch scripts & Design prototypes
 scratch/
+frontend/*.html
+!frontend/index.html
+
+# 9. Database migration backups
+backend/app/*_backup.py
 
 # 9. Editor & OS Specific Files
 .vscode/

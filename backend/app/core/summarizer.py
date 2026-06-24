@@ -216,8 +216,12 @@ class PodcastSummarizer:
 
         # 6. 动态加载 Prompt，支持前端实时编辑
         prompt_dict = load_prompt()
-        base_prompt = prompt_dict.get("base_prompt", "")
-        action_prompt = prompt_dict.get("action_prompt", "")
+        user_prompt = prompt_dict.get("prompt", "")
+        # 兼容旧格式：如果有 base_prompt + action_prompt，拼接使用
+        if not user_prompt:
+            base_prompt = prompt_dict.get("base_prompt", "")
+            action_prompt = prompt_dict.get("action_prompt", "")
+            user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
 
         # 公共数据块（不含转录文本）
         meta_block = f"""
@@ -256,15 +260,17 @@ class PodcastSummarizer:
 {chunk_text}
 ---
 """
-                    chunk_prompt = f"""{base_prompt}
-
-{chunk_data}
+                    chunk_suffix = f"""
 
 请针对以上第 {i+1}/{total_chunks} 段转录内容，生成一份**该段落的局部总结报告**。要求：
 1. 严格遵守上方的核心防伪守则。
 2. 按照标准报告结构输出，但仅覆盖本段中讨论的内容。
 3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。
 4. 在报告最末尾增加一行：`本段覆盖时间范围：{chunk_lines[0][:12] if chunk_lines else '?'} — {chunk_lines[-1][:12] if chunk_lines else '?'}`"""
+                    chunk_prompt = user_prompt.replace("{{PODCAST_DATA}}", chunk_data + chunk_suffix)
+                    if "{{PODCAST_DATA}}" in chunk_prompt:
+                        # placeholder 已替换，无需额外操作
+                        pass
                     print(f"📝 [LOG] 正在总结第 {i+1}/{total_chunks} 段...")
                     partial = self._call_llm(chunk_prompt, api_url, headers, target_model)
                     partial_summaries.append(partial)
@@ -284,7 +290,7 @@ class PodcastSummarizer:
 {all_partial}
 ---
 
-{action_prompt}"""
+请将以上各段总结合并为一份**完整、连贯、无重复**的最终播客价值总结分析报告，按照标准报告结构组织，去除重复内容，保留所有核心观点、金句和可执行建议。"""
                 print(f"🔗 [LOG] 正在合并 {total_chunks} 段总结为最终报告...")
                 summary_md = self._call_llm(merge_prompt, api_url, headers, target_model)
                 print("🟢 [LOG] 长播客分段总结报告生成完成！")
@@ -298,7 +304,7 @@ class PodcastSummarizer:
 {full_transcript_text}
 ---
 """
-                prompt = f"{base_prompt}\n{data_block}\n{action_prompt}"
+                prompt = user_prompt.replace("{{PODCAST_DATA}}", data_block)
                 print(f"📝 [LOG] 转录文本长度正常 ({len(full_transcript_text)}字)，使用单次总结模式")
                 summary_md = self._call_llm(prompt, api_url, headers, target_model)
                 print("🟢 [LOG] 大模型总结报告生成顺利完成！")

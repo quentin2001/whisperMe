@@ -5,10 +5,12 @@ import WorkstationView from "./views/WorkstationView";
 import PodcastDetailView from "./views/PodcastDetailView";
 import SettingsView from "./views/SettingsView";
 import { initialLogs } from "./data.js";
+import { useTheme } from "./contexts/ThemeContext.jsx";
 
 const BACKEND_URL = "http://127.0.0.1:8001";
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard', 'workstation', 'detail', 'config'
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [detailSourceTab, setDetailSourceTab] = useState("dashboard"); // 'dashboard' or 'workstation'
@@ -80,8 +82,7 @@ export default function App() {
 
   // Prompt 编辑状态
   const [promptData, setPromptData] = useState({
-    base_prompt: "",
-    action_prompt: ""
+    prompt: ""
   });
   const [promptSaveStatus, setPromptSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
 
@@ -196,42 +197,15 @@ export default function App() {
 
   const handleResetPrompt = () => {
     if (window.confirm(t("确定要恢复默认 Prompt 模板吗？这会覆盖您当前的输入。", "Are you sure you want to restore the default Prompt templates? This will overwrite your current configuration."))) {
-      const defaultPrompt = {
-        base_prompt: `请根据下面提供的【播客单集 Shownotes】、【听众热门评论】和【播客对话转录文本】，生成一份详尽、结构清晰的【播客价值总结分析报告】。
-
-核心防伪守则（必须严格遵守，否则视为失败）：
-1. 严禁臆测发散：所有分析结论、嘉宾立场、议题提炼及评级，必须100%基于下方提供的事实源数据。严禁使用你自身固有知识库中的外部信息去扩展或脑补播客中未提及的事情或技术细节。
-2. 拒绝幻觉，空值如实报告：如果播客转录本中完全没有提及某人、某事或某个观点，哪怕该词出现在了 Shownotes 简介里，也绝对不得在总结中编造其对话内容，必须如实标注转录文本中未讨论或未提及。
-3. 精准引用：提炼核心观点和发言人立场时，必须直接引用（或高度提炼）转录文本中的原话、金句或提及的具体事例，并指明是谁说的。
-4. 客观呈现听众反馈：舆情分析部分必须完全基于热门听众评论列表中的实际留言，不得凭空编造听众情感走向。`,
-        action_prompt: `请以 Markdown 格式输出以下结构的内容（严禁输出结构外的发散废话，直接输出报告正文）：
-
-## 1. 播客概要与含金量评级
-- **核心主旨**：用2-3句话精准总结这期播客实际讨论的核心主题（拒绝大话空话，紧扣转录事实）。
-- **目标受众**：根据播客讨论内容的专业深度，说明适合哪些细分人群收听。
-- **含金量评级与判定理由**：请给出评级（A+ / A / B / C / D 之一），并从内容信息密度、观点的独特性和知识实用度三个维度，基于转录中的干货多寡简述判定理由。
-- **推荐等级**：是否值得花时间复听（值得去听 / 仅看总结即可 / 建议避坑）。
-
-## 2. 核心观点与议题提炼
-请梳理出播客实际讨论的3-5个核心议题。对每个议题：
-- **议题名称**
-- **核心论点**：结合不同人的发言总结其达成的共识或分歧。
-- **关键论据/金句**：必须包含转录中发言人提到过的原话、金句或他们讲到的具体案例。
-
-## 3. 发言人画像与立场分析
-- **角色定位**：说明都有谁参与了说话，谁是主持人（Host），谁是嘉宾（Guest）。
-- **立场与风格**：简述各位发言人的核心立场、讨论风格以及观点倾向，切忌根据发言人的名气脑补其背景，只分析其在此单集中的言论表现。
-- **互动氛围**：他们之间的互动如何（比如是和谐互补，还是存在观点的交锋摩擦）。
-
-## 4. 听众口碑与评论区舆情分析
-- **听众主要反馈**：评论区大家最赞同的观点是什么？有没有提出不同的质疑？（必须从提供的评论列表中提取，无评论则写暂无评论数据）。
-- **评论情感极性**：正向期待为主 / 中立探讨 / 存在争议偏见。
-- **社会共鸣点**：这期播客勾起了听众什么共鸣或情绪。
-
-## 5. 事实一致性与局限性声明
-请在此处特别说明：本报告有哪些内容是简介（Shownotes）中提到但转录对话中实际并未展开讨论的？（若有，请逐一列出；若无，写 Shownotes 提及内容与实际转录文本一致）。`
-      };
-      setPromptData(defaultPrompt);
+      // Reset to empty, then fetch default from backend
+      fetch(`${BACKEND_URL}/api/prompt/template/standard`)
+        .then(res => res.json())
+        .then(data => {
+          setPromptData({ prompt: data.prompt || "" });
+        })
+        .catch(() => {
+          setPromptData({ prompt: "" });
+        });
     }
   };
 
@@ -454,7 +428,7 @@ export default function App() {
   };
 
   return (
-    <div id="application-layout-frame" className="flex h-screen w-screen overflow-hidden bg-[#fef9f2]">
+    <div id="application-layout-frame" className="flex h-screen w-screen overflow-hidden bg-[var(--bg-primary)] transition-colors duration-300">
       {/* Persistent Left Menu Sidebar */}
       <Sidebar
         versionInfo={versionInfo}
@@ -491,7 +465,7 @@ export default function App() {
       />
 
       {/* Main split screens panel area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#fef9f2]" id="primary-content-workspace">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)] transition-colors duration-300" id="primary-content-workspace">
         {activeTab === "detail" && activeTask ? (
           /* Active full screen transcript parser */
           <PodcastDetailView
@@ -565,12 +539,12 @@ export default function App() {
             )}
 
             {activeTab === "config" && (
-              <SettingsView 
+              <SettingsView
                 versionInfo={versionInfo}
                 configData={configData}
                 handleConfigChange={handleConfigChange}
                 handleSaveConfig={handleSaveConfig}
-                onResetData={handleResetData} 
+                onResetData={handleResetData}
                 promptData={promptData}
                 setPromptData={setPromptData}
                 promptSaveStatus={promptSaveStatus}
@@ -578,6 +552,8 @@ export default function App() {
                 handleResetPrompt={handleResetPrompt}
                 onCheckVersion={fetchVersion}
                 checkingVersion={checkingVersion}
+                theme={theme}
+                toggleTheme={toggleTheme}
                 t={t}
               />
             )}
@@ -603,66 +579,66 @@ export default function App() {
       {/* Ingest Modal */}
       {isIngestModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] p-6 animate-fade-in">
-          <div className="bg-white border border-[#e7bcbb]/50 rounded-xl max-w-lg w-full relative flex flex-col shadow-2xl">
-            <div className="p-6 border-b border-[#e7bcbb]/30 flex justify-between items-center bg-[#f9f3ea]/50 rounded-t-xl">
-              <h3 className="text-xl font-bold font-display text-[#1d1c18] flex items-center gap-2">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/50 rounded-xl max-w-lg w-full relative flex flex-col shadow-2xl transition-colors duration-300">
+            <div className="p-6 border-b border-[var(--border-primary)]/30 flex justify-between items-center bg-[var(--bg-secondary)]/50 rounded-t-xl">
+              <h3 className="text-xl font-bold font-display text-[var(--text-primary)] flex items-center gap-2">
                 {t("新建转录任务", "New Transcription")}
               </h3>
-              <button onClick={() => setIsIngestModalOpen(false)} className="text-[#5d3f3e]/60 hover:text-[#f62440] transition-colors cursor-pointer border-0 bg-transparent text-lg">
+              <button onClick={() => setIsIngestModalOpen(false)} className="text-[var(--text-secondary)]/60 hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg">
                 ✕
               </button>
             </div>
-            
+
             <div className="p-6 flex flex-col gap-4">
-              <p className="text-sm text-[#5d5a55]/85">
+              <p className="text-sm text-[var(--text-muted)]/85">
                 {t("选择 ASR 模式并提供单集播客链接或上传本地音频文件。", "Select ASR mode and provide either an episode link or upload a local audio file.")}
               </p>
 
               <div className="flex gap-4 items-center">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#5d3f3e]/70">{t("ASR 模式：", "ASR MODE:")}</span>
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
-                  <input type="radio" checked={asrMode === "online"} onChange={() => setAsrMode("online")} className="accent-[#f62440]" /> {t("在线 API", "ONLINE API")}
+                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)]/70">{t("ASR 模式：", "ASR MODE:")}</span>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
+                  <input type="radio" checked={asrMode === "online"} onChange={() => setAsrMode("online")} className="accent-[var(--accent-red)]" /> {t("在线 API", "ONLINE API")}
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1d1c18]">
-                  <input type="radio" checked={asrMode === "local"} onChange={() => setAsrMode("local")} className="accent-[#f62440]" /> {t("本地离线", "LOCAL OFFLINE")}
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
+                  <input type="radio" checked={asrMode === "local"} onChange={() => setAsrMode("local")} className="accent-[var(--accent-red)]" /> {t("本地离线", "LOCAL OFFLINE")}
                 </label>
               </div>
 
               {asrMode === "online" ? (
                 <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
-                  <input 
-                    type="text" 
-                    placeholder={t("粘贴播客 URL...", "Paste podcast URL...")} 
-                    value={newUrl} 
-                    onChange={(e) => setNewUrl(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder={t("粘贴播客 URL...", "Paste podcast URL...")}
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
                     disabled={loading}
-                    className="w-full bg-white border border-[#e7bcbb]/40 focus:border-[#f62440] focus:ring-1 focus:ring-[#f62440] rounded-lg px-4 py-3 text-sm text-[#1d1c18] placeholder-[#5d3f3e]/40 outline-none transition-colors"
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 focus:border-[var(--accent-red)] focus:ring-1 focus:ring-[var(--accent-red)] rounded-lg px-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)]/40 outline-none transition-colors"
                   />
-                  
-                  <button 
-                    type="submit" 
-                    disabled={loading || !newUrl.trim()} 
-                    className="w-full bg-[#f62440] hover:bg-[#bb0028] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-0 outline-none"
+
+                  <button
+                    type="submit"
+                    disabled={loading || !newUrl.trim()}
+                    className="w-full bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-0 outline-none"
                   >
                     {loading ? t("正在初始化...", "INITIATING...") : t("获取音频", "FETCH AUDIO")}
                   </button>
                 </form>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <button 
-                    onClick={() => fileInputRef.current?.click()} 
-                    disabled={uploading || loading} 
-                    className="w-full border-2 border-dashed border-[#e7bcbb] hover:border-[#f62440] hover:bg-[#ffdad6]/10 text-[#5d3f3e]/70 hover:text-[#f62440] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || loading}
+                    className="w-full border-2 border-dashed border-[var(--border-primary)] hover:border-[var(--accent-red)] hover:bg-[var(--accent-red-light)]/10 text-[var(--text-secondary)]/70 hover:text-[var(--accent-red)] py-8 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer bg-transparent"
                   >
                     <span className="text-3xl mb-1">☁️</span>
                     <span className="text-xs font-bold">{uploading ? t("正在上传...", "UPLOADING...") : t("浏览本地文件", "BROWSE FILES")}</span>
                   </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleLocalFileUpload} 
-                    accept=".mp3,.wav,.m4a,.aac,.flac,.ogg" 
-                    className="hidden" 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleLocalFileUpload}
+                    accept=".mp3,.wav,.m4a,.aac,.flac,.ogg"
+                    className="hidden"
                   />
                 </div>
               )}

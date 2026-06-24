@@ -1,5 +1,46 @@
 # whisperMe — 变更日志 (Changelog)
 
+## Session `2026-06-24` — P0/P1 功能全量实现 + 暗色模式
+
+### 🎯 P0 核心功能
+
+- **导出 SRT/VTT/Text/JSON**：新增 `GET /api/tasks/{task_id}/transcript?format=srt|vtt|text|json` 端点，支持四种格式的转录文本导出，前端详情页提供 SRT/VTT 下载按钮。
+- **说话人系统重构**：声纹库从 `speaker_fingerprints.json` 迁移到 SQLite `speakers` 表，支持 CRUD、合并、忘记操作；新增动态阈值机制（根据 sample_count 在 0.75-0.83 之间自适应）；前端显示说话人置信度颜色标识。
+- **引用提取**：在 DEFAULT_ACTION_PROMPT 中新增第 6 节「提及引用与资源索引」，自动提取金句、书籍、影视、工具、人物、关键数据。
+
+### 🚀 P1 增强功能
+
+- **并行转录**：`queue_manager.py` 从单线程重写为可配置线程池，支持 CAS 式任务获取；`max_concurrent_tasks` 配置项（0=自动检测 GPU 显存，1=串行，2-3=并行）。
+- **长播客分段总结**：`summarizer.py` 新增 `_split_transcript_into_chunks()` 方法，超长转录自动分段（带 15 行重叠），分段总结后合并为最终报告。
+- **批量转录**：新增 `POST /api/tasks/batch` 端点，一次最多提交 20 个 URL。
+- **通知优化**：桌面通知包含播客名称 + 标题 + 时长；错误通知截断至 80 字符。
+- **API 接口开放**：梳理并稳定 7 个核心 API 端点，为 MCP/Skill 集成做准备。
+
+### 🌙 暗色模式
+
+- **ThemeContext**：新建 `contexts/ThemeContext.jsx`，管理亮/暗主题状态，持久化到 `localStorage`，支持跟随系统偏好。
+- **CSS 变量体系**：`index.css` 定义 `--bg-primary`、`--bg-card`、`--text-primary`、`--accent-red` 等 20+ CSS 变量，`.dark` 选择器切换暗色值。
+- **全组件适配**：App.jsx、Sidebar、LibraryView、PodcastDetailView、WorkstationView、SettingsView 全部从硬编码十六进制色迁移到 CSS 变量。
+- **设置页开关**：SettingsView 新增外观设置卡片，含深色模式切换开关。
+
+### 📝 Prompt 模板系统
+
+- **单一 Prompt 格式**：合并原有 `base_prompt` + `action_prompt` 为单一 Prompt，使用 `{{PODCAST_DATA}}` 占位符标记数据注入位置。
+- **预设模板**：`prompt_manager.py` 内置 3 个模板——标准（standard）、简洁（concise）、深度（deep），前端可一键选用。
+- **后端 API**：新增 `GET /api/prompt/templates`（列出模板）和 `GET /api/prompt/template/{id}`（获取模板内容）。
+- **前端整合**：SettingsView 将两个 Prompt 编辑器合并为一个，新增模板快速选择按钮组。
+- **向后兼容**：`load_prompt()` 自动将旧格式 `{base_prompt, action_prompt}` 迁移为新格式 `{prompt}`。
+- **summarizer.py 适配**：单次总结和分段总结模式均使用 `user_prompt.replace("{{PODCAST_DATA}}", data_block)` 组装最终 Prompt。
+
+### 🔧 其他改进
+
+- **端口迁移**：因 Windows TCP 残留占住 8000 端口，前后端临时切换至 8001。
+- **Speaker embedding 维度兼容**：修复 256 维 vs 512 维声纹 embedding 的 numpy 点积报错。
+- **前端进度显示**：任务进度从 `session.progress` 改为 `Math.round(session.progress)`，去掉多余小数位。
+- **路由顺序修复**：`/speakers/*` 路由移到 `/{task_id}` 之前，避免 FastAPI 路径参数拦截。
+
+---
+
 ## Session `2026-06-23` — 网络代理配置优化
 
 ### 🌐 代理分流配置
