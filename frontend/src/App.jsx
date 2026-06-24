@@ -254,6 +254,7 @@ export default function App() {
     setIsAudioMissing(false);
     setCurrentTime(0);
     setDuration(0);
+    setIsPlaying(false);
     if (activeTaskId) {
       fetchTaskDetail(activeTaskId);
       const detailInterval = setInterval(() => {

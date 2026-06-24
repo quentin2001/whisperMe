@@ -779,7 +779,7 @@ export default function LibraryView({
 
                   <div className="flex items-center gap-1 text-[var(--text-muted)]">
                     <button
-                      className="p-1.5 hover:bg-[var(--bg-hover)]/50 rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
+                      className="p-1.5 hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)] rounded-full transition-all cursor-pointer border-0 outline-none bg-transparent"
                       onClick={(e) => {
                         e.stopPropagation();
                         onOpenSession(session.rawTask);
