@@ -10,3 +10,4 @@ pyannote.audio==3.1.1
 plyer
 psutil
 websocket-client
+pyyaml

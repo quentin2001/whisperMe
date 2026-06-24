@@ -211,6 +211,48 @@ def get_task_transcript(task_id: str, format: str = "text"):
         from fastapi.responses import PlainTextResponse
         return PlainTextResponse("\n\n".join(lines), media_type="text/vtt", headers={"Content-Disposition": f"attachment; filename=transcript.vtt"})
 
+    if format == "markdown":
+        from fastapi.responses import PlainTextResponse
+        import yaml
+
+        title = task.get("title", "未知标题")
+        podcast = task.get("podcast_name", "未知播客")
+        meta = task.get("metadata", {}) or {}
+        pub_date = meta.get("pub_date", "")
+        duration = meta.get("duration", "")
+        url = task.get("url", "")
+        summary = task.get("summary", "")
+
+        frontmatter = {
+            "title": title,
+            "podcast": podcast,
+            "date": pub_date,
+            "duration": duration,
+            "url": url,
+        }
+        fm_str = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+        doc = f"---\n{fm_str}---\n\n"
+        doc += f"# {title}\n\n"
+        doc += f"> {podcast}"
+        if pub_date:
+            doc += f" · {pub_date}"
+        if duration:
+            doc += f" · {duration}"
+        doc += "\n\n"
+
+        if summary:
+            doc += f"## AI Summary\n\n{summary}\n"
+        else:
+            doc += "*暂无 AI 总结*\n"
+
+        safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60]
+        return PlainTextResponse(
+            doc,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.md"'}
+        )
+
     # 默认 text 格式
     lines = []
     for p in items:
