@@ -17,7 +17,7 @@ BACKEND_DIR = ROOT_DIR / "backend"
 
 def ensure_icon():
     """确保 logo.ico 存在"""
-    ico_path = ROOT_DIR / "logo.ico"
+    ico_path = ROOT_DIR / "assets" / "logo.ico"
     if not ico_path.exists():
         print("🎨 生成图标...")
         subprocess.run(

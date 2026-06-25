@@ -6,8 +6,10 @@ import signal
 import threading
 from datetime import datetime
 
-# 定义主要目录
+# 定义主要目录（自动适配 scripts/ 子目录 vs 根目录）
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if not os.path.isdir(os.path.join(ROOT_DIR, "backend")):
+    ROOT_DIR = os.path.dirname(ROOT_DIR)
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 LOGS_DIR = os.path.join(ROOT_DIR, "logs")

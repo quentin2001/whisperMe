@@ -17,6 +17,9 @@ if getattr(sys, 'frozen', False):
     ROOT_DIR = os.path.dirname(sys.executable)
 else:
     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    # 在 repo 中 scripts/launcher.py → 需要跳到项目根目录
+    if not os.path.isdir(os.path.join(ROOT_DIR, "backend")):
+        ROOT_DIR = os.path.dirname(ROOT_DIR)
 
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
 PORT = 9101

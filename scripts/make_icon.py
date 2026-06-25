@@ -4,8 +4,11 @@
 from PIL import Image, ImageDraw
 import os
 
-def create_icon(output_path="logo.ico"):
+def create_icon(output_path=None):
     """根据 logo.svg 的波形样式生成多尺寸 .ico"""
+    if output_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        output_path = os.path.join(os.path.dirname(script_dir), "assets", "logo.ico")
     sizes = [256, 128, 64, 48, 32, 16]
 
     # 渐变色：#8a2387 → #e94057 → #f27121

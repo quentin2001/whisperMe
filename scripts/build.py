@@ -18,7 +18,7 @@ if sys.platform == "win32":
     if hasattr(sys.stderr, "buffer"):
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="ignore")
 
-ROOT_DIR = Path(__file__).parent.resolve()
+ROOT_DIR = Path(__file__).parent.parent.resolve()  # scripts/.. → project root
 RELEASE_DIR = ROOT_DIR / "release" / "whisperMe"
 FRONTEND_DIR = ROOT_DIR / "frontend"
 
@@ -87,8 +87,14 @@ def copy_files():
     )
     print(f"  ✅ backend/")
 
-    # 3. 启动器
-    for f in ["launcher.py", "start.bat", "start.sh"]:
+    # 3. 启动器（从 scripts/ 复制）
+    for f in ["launcher.py", "start.sh"]:
+        src = ROOT_DIR / "scripts" / f
+        if src.exists():
+            shutil.copy2(src, RELEASE_DIR / f)
+            print(f"  ✅ {f}")
+    # start.bat 保留在根目录
+    for f in ["start.bat", "stop.bat"]:
         src = ROOT_DIR / f
         if src.exists():
             shutil.copy2(src, RELEASE_DIR / f)
