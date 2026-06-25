@@ -149,17 +149,20 @@ def run_podcast_pipeline(task_id: str, url: str):
 
         def progress_callback(current_progress):
             check_cancelled(task_id)
-            db.update_task(task_id, progress=current_progress)
+            db.update_task_field(task_id, progress=current_progress)
 
-        # 增量段落写入回调
-        accumulated_segments = []
+        # 增量段落写入回调（仅处理新区段，最终兜底做全量重聚类）
+        paragraph_count = [0]  # 用 list 包装，在闭包内可修改
 
         def on_segment_batch(new_segments):
-            """每 10 个段落触发一次，增量写入数据库"""
-            accumulated_segments.extend(new_segments)
+            """每 10 个段落触发一次，增量写入数据库（仅新段落）"""
+            nonlocal paragraph_count
             try:
-                paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, accumulated_segments)
+                paragraphs = transcriber.cluster_segments_to_paragraphs(
+                    task_id, new_segments, id_offset=paragraph_count[0]
+                )
                 db.add_paragraphs(paragraphs)
+                paragraph_count[0] += len(paragraphs)
             except Exception as batch_ex:
                 print(f"⚠️ [LOG] 增量段落写入失败: {batch_ex}")
 
@@ -186,6 +189,7 @@ def run_podcast_pipeline(task_id: str, url: str):
 
         # Step 4.5: 提取声纹特征，并进行智能特征及上下文改名
         check_cancelled(task_id)
+        t_rename_start = time.time()  # 在 try 块外初始化，防止 except 中 NameError
         try:
             print("⏳ [LOG] 正在提取发言人声纹特征向量...")
             speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
@@ -229,7 +233,6 @@ def run_podcast_pipeline(task_id: str, url: str):
                     except Exception as para_ex:
                         print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
             
-            t_rename_start = time.time()
             auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
         except Exception as emb_ex:
             timing_stats['发言人智能推断'] = time.time() - t_rename_start

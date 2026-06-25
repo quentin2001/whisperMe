@@ -545,7 +545,7 @@ class PodcastTranscriber:
             print(f"⚠️ [LOG 警告] 提取声纹特征特征时出错: {e}")
             return {}
 
-    def cluster_segments_to_paragraphs(self, podcast_id: str, segments: list[dict]) -> list[dict]:
+    def cluster_segments_to_paragraphs(self, podcast_id: str, segments: list[dict], id_offset: int = 0) -> list[dict]:
         import json
         if not segments:
             return []
@@ -619,7 +619,7 @@ class PodcastTranscriber:
                 })
                 
             paragraphs.append({
-                "id": f"{podcast_id}-p{idx}",
+                "id": f"{podcast_id}-p{id_offset + idx}",
                 "podcast_id": podcast_id,
                 "speaker": cl["speaker"],
                 "content": raw_content.strip(),

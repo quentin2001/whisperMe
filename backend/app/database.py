@@ -490,6 +490,27 @@ class LocalDatabase:
             self.conn.commit()
         return new_task
 
+    def update_task_field(self, task_id: str, **kwargs) -> None:
+        """轻量级字段更新（不 SELECT 全行，仅 UPDATE SET）。
+        适用于 progress、status 等高频更新字段。"""
+        if not kwargs:
+            return
+        from datetime import datetime
+        kwargs["updated_at"] = datetime.now().isoformat()
+        set_clauses = []
+        values = []
+        for key, val in kwargs.items():
+            set_clauses.append(f"{key}=?")
+            if isinstance(val, (dict, list)):
+                values.append(json.dumps(val, ensure_ascii=False))
+            else:
+                values.append(val)
+        values.append(task_id)
+        sql = f"UPDATE tasks SET {', '.join(set_clauses)} WHERE id=?"
+        with self.write_lock:
+            self.conn.execute(sql, values)
+            self.conn.commit()
+
     def update_task(self, task_id: str, **kwargs):
         with self.write_lock:
             c = self.conn.cursor()
