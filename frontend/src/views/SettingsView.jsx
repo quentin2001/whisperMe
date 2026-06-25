@@ -69,6 +69,22 @@ export default function SettingsView({
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isFlashing, setIsFlashing] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
+  const [hfTokenStatus, setHfTokenStatus] = useState(null);
+  const [hfChecking, setHfChecking] = useState(false);
+
+  const handleVerifyHF = async () => {
+    setHfChecking(true);
+    setHfTokenStatus(null);
+    try {
+      const res = await fetch(`${API}/api/settings/hf-token-status`);
+      const data = await res.json();
+      setHfTokenStatus(data);
+    } catch (e) {
+      setHfTokenStatus({ status: "unknown", message: "网络错误" });
+    } finally {
+      setHfChecking(false);
+    }
+  };
 
   // Prompt template system
   const [templates, setTemplates] = useState([]);
@@ -209,6 +225,24 @@ export default function SettingsView({
                   placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 />
                 <p className="text-xs text-[var(--text-muted)]">{t("用于下载声纹识别模型，无论 ASR 是本地还是在线模式都需要", "Required for speaker diarization, needed in both local and online ASR modes")}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleVerifyHF}
+                    disabled={hfChecking}
+                    className="px-3 py-1.5 text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {hfChecking ? <Loader2 size={12} className="animate-spin inline mr-1" /> : <ShieldAlert size={12} className="inline mr-1" />}
+                    {t("验证", "Verify")}
+                  </button>
+                  {hfTokenStatus && (
+                    hfTokenStatus.status === "valid"
+                      ? <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Check size={12} />{t("有效", "Valid")}</span>
+                      : hfTokenStatus.status === "invalid"
+                      ? <span className="text-xs font-bold text-[var(--accent-red)] flex items-center gap-1"><AlertCircle size={12} />{t("无效", "Invalid")}</span>
+                      : <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><AlertCircle size={12} />{t("未配置", "Not Set")}</span>
+                  )}
+                </div>
               </div>
 
               {configData.asr_mode === "online" && (

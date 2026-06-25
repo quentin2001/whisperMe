@@ -2,7 +2,7 @@ import os
 import time
 import traceback
 import urllib.parse
-from app.config import config
+from app.config import config, HF_TOKEN
 from app.database import db
 from app.core.downloader import PodcastDownloader
 from app.core.transcriber import PodcastTranscriber
@@ -142,6 +142,11 @@ def run_podcast_pipeline(task_id: str, url: str):
         t_diarization_start = time.time()
         diar_data = transcriber.run_diarization(standardized_wav)
         timing_stats['声纹分割'] = time.time() - t_diarization_start
+
+        # 如果 HF Token 缺失/无效，标记到 task metadata 供前端展示
+        if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30):
+            db.update_task_field(task_id, hf_token_missing=True)
+
         db.update_task(task_id, progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并

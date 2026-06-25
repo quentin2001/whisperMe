@@ -1,4 +1,5 @@
 import os
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.config import (
@@ -126,6 +127,29 @@ def get_prompt():
 def set_prompt(req: dict):
     save_prompt(req)
     return {"status": "ok"}
+
+@router.get("/settings/hf-token-status")
+def get_hf_token_status():
+    """验证 HuggingFace Token 是否有效（调用 hf-mirror.com 镜像 API）"""
+    token = config.get("hf_token", "").strip()
+    if not token or len(token) < 30:
+        return {"status": "missing", "message": "未配置 HuggingFace Token"}
+
+    try:
+        with httpx.Client(timeout=10.0, trust_env=True) as client:
+            resp = client.get(
+                "https://hf-mirror.com/api/whoami-v2",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"status": "valid", "username": data.get("name", "unknown")}
+            elif resp.status_code == 401:
+                return {"status": "invalid", "message": "Token 无效或已过期"}
+            else:
+                return {"status": "unknown", "message": f"验证失败 (HTTP {resp.status_code})"}
+    except Exception as e:
+        return {"status": "unknown", "message": f"无法验证（网络异常）: {str(e)[:80]}"}
 
 @router.get("/prompt/templates")
 def list_prompt_templates():
