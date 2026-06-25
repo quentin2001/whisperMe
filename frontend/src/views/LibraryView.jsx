@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Search, SlidersHorizontal, Mic, Square, Cloud, Play,
   Trash2, BarChart3, Database, Plus, Calendar, FastForward, Compass,
-  Sun, Moon, Monitor
+  Sun, Moon, Monitor, AlertCircle
 } from "lucide-react";
 import { API_BASE, proxyImage } from "../constants.js";
 import { useTheme } from "../contexts/ThemeContext.jsx";
@@ -267,6 +267,9 @@ export default function LibraryView({
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState("00:00");
   const [syncing, setSyncing] = useState(false);
+  const [hfBannerDismissed, setHfBannerDismissed] = useState(
+    () => localStorage.getItem("whisperme_hf_banner_dismissed") === "true"
+  );
   const { themeMode, cycleTheme } = useTheme();
 
   const checkIsConfigured = () => {
@@ -560,6 +563,32 @@ export default function LibraryView({
   return (
     <div id="library-view-section" className="flex-1 overflow-y-auto w-full">
       <div className="max-w-[1280px] mx-auto p-10 font-sans w-full">
+        {/* HF Token 未配置引导横幅 */}
+        {!hfBannerDismissed && (!configData?.hf_token || configData.hf_token.length < 30) && (
+          <div className="mb-6 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-2 text-sm font-semibold text-yellow-600">
+              <AlertCircle size={16} />
+              <span>{t("尚未配置声纹识别 Token，说话人识别功能不可用。", "Speaker identification unavailable — HF Token not configured.")}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => typeof onJumpToSettings === "function" && onJumpToSettings()}
+                className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-700 text-xs font-bold rounded-lg transition-colors cursor-pointer border-0"
+              >
+                {t("前往设置", "Configure")}
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem("whisperme_hf_banner_dismissed", "true");
+                  setHfBannerDismissed(true);
+                }}
+                className="px-3 py-1.5 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border-0 bg-transparent"
+              >
+                {t("暂不配置", "Dismiss")}
+              </button>
+            </div>
+          </div>
+        )}
         {/* Top Search bar/Header controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>

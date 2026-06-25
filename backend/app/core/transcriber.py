@@ -70,13 +70,21 @@ class ModelCacheManager:
 
             print(f"🚀 [LOG] 正在加载 Whisper 模型: {model_path_or_size} (设备: {device.upper()} | 精度: {compute_type})")
             from faster_whisper import WhisperModel
-            
+
+            # CPU 模式下优化 CTranslate2 线程参数
+            model_kwargs = dict(
+                device=device,
+                compute_type=compute_type,
+            )
+            if device == "cpu":
+                model_kwargs["cpu_threads"] = 6  # R5 5600 物理核心数，通用甜点值
+                model_kwargs["num_workers"] = 1
+
             try:
                 # 尝试以 local_files_only=True 加载本地配置路径
                 model = WhisperModel(
-                    model_path_or_size, 
-                    device=device, 
-                    compute_type=compute_type, 
+                    model_path_or_size,
+                    **model_kwargs,
                     local_files_only=True
                 )
             except Exception as e:
@@ -84,8 +92,7 @@ class ModelCacheManager:
                 print(f"⚠️ [LOG] 从本地加载模型失败: {e}。尝试从 Hugging Face 在线下载并载入...")
                 model = WhisperModel(
                     model_path_or_size,
-                    device=device,
-                    compute_type=compute_type,
+                    **model_kwargs,
                     local_files_only=False
                 )
 

@@ -3,7 +3,7 @@ import {
   Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
   MessageSquare, History, Calendar, FileText, Users, Compass, Download,
-  GitMerge, Trash2
+  GitMerge, Trash2, AlertCircle
 } from "lucide-react";
 import { API_BASE, proxyImage } from "../constants.js";
 import { alert, confirm } from "../components/Dialog.jsx";
@@ -1073,6 +1073,14 @@ export default function PodcastDetailView({
                   : t("转录进行中...", "Transcribing...") + (paragraphs.length > 0 ? ` (${paragraphs.length} ${t("段", "paragraphs")})` : "")
                 }
               </span>
+            </div>
+          )}
+
+          {/* HF Token 缺失降级提示 */}
+          {activeTask.hf_token_missing && (
+            <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs font-semibold text-yellow-600">
+              <AlertCircle size={14} />
+              <span>{t("本次转录未启用说话人识别（HuggingFace Token 未配置）。", "Speaker identification was skipped — HuggingFace Token not configured.")}</span>
             </div>
           )}
 
