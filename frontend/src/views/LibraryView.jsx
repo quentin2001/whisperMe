@@ -4,7 +4,7 @@ import {
   Trash2, BarChart3, Database, Plus, Calendar, FastForward, Compass,
   Sun, Moon, Monitor
 } from "lucide-react";
-import { API_BASE } from "../constants.js";
+import { API_BASE, proxyImage } from "../constants.js";
 import { useTheme } from "../contexts/ThemeContext.jsx";
 import { alert, confirm } from "../components/Dialog.jsx";
 
@@ -334,6 +334,8 @@ export default function LibraryView({
       uiStatus = "IN_PROGRESS";
     } else if (task.status === "failed") {
       uiStatus = "FAILED";
+    } else if (task.status === "cancelled") {
+      uiStatus = "CANCELLED";
     }
 
     let parsedDate = "TODAY";
@@ -361,7 +363,7 @@ export default function LibraryView({
       duration: task.duration || "--:--",
       status: uiStatus,
       speaker: task.speaker || "V. Valerius",
-      thumbnail: task.image_url || task.thumbnail || defaultThumbs[index % defaultThumbs.length],
+      thumbnail: proxyImage(task.image_url || task.thumbnail) || defaultThumbs[index % defaultThumbs.length],
       tags: Array.isArray(task.tags) && task.tags.length > 0 ? task.tags : ["Acoustic", "AI Workstation"],
       progress: task.progress ?? 0,
       rawTask: task
@@ -756,6 +758,14 @@ export default function LibraryView({
                       {session.status === 'IN_PROGRESS' ? (
                         <span className="bg-[var(--accent-red-light)] text-[var(--accent-red)] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
                           {session.rawTask.status === 'pending' ? t("排队中", "Queued") : `${t("处理中", "In Progress")} (${Math.round(session.progress)}%)`}
+                        </span>
+                      ) : session.status === 'FAILED' ? (
+                        <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
+                          {t("失败", "Failed")}
+                        </span>
+                      ) : session.status === 'CANCELLED' ? (
+                        <span className="bg-gray-500/20 text-gray-400 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
+                          {t("已取消", "Cancelled")}
                         </span>
                       ) : (
                         <span className="bg-[var(--accent-gold)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">

@@ -489,6 +489,26 @@ def cancel_task(task_id: str):
     
     return {"success": False, "message": f"当前任务状态为 {task.get('status')}，不可取消。"}
 
+
+@router.post("/{task_id}/retry")
+def retry_task(task_id: str):
+    """重新执行失败或已取消的任务"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    status = task.get("status")
+    if status not in ("failed", "cancelled"):
+        raise HTTPException(status_code=400, detail=f"当前任务状态为 {status}，仅支持重试失败或已取消的任务")
+
+    # 重置任务状态为 pending，清除错误信息和进度
+    db.update_task(task_id, status="pending", progress=0.0, error_message="")
+    # 重新加入队列
+    queue_manager.add_task(task_id, task.get("url", ""))
+    print(f"🔄 [LOG] 任务 {task_id} 已重新加入队列。")
+    return {"success": True, "message": "任务已重新加入队列", "task_id": task_id}
+
+
 @router.post("/{task_id}/redownload")
 def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
     task = db.get_task(task_id)

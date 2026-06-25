@@ -5,7 +5,7 @@ import {
   MessageSquare, History, Calendar, FileText, Users, Compass, Download,
   GitMerge, Trash2
 } from "lucide-react";
-import { API_BASE } from "../constants.js";
+import { API_BASE, proxyImage } from "../constants.js";
 import { alert, confirm } from "../components/Dialog.jsx";
 
 // ==================== 📝 Inline Markdown Parser ====================
@@ -491,6 +491,7 @@ export default function PodcastDetailView({
   const [editingSpeakerName, setEditingSpeakerName] = useState("");
   const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [mergingSpeakerId, setMergingSpeakerId] = useState(null);
   const [mergeTargetId, setMergeTargetId] = useState(null);
 
@@ -607,6 +608,50 @@ export default function PodcastDetailView({
       await alert(t("启动音频重新下载时发生网络错误。", "Network error triggering audio re-download."));
     } finally {
       setIsTriggeringRestore(false);
+    }
+  };
+
+  // 网络错误检测与友好提示
+  const getNetworkErrorHint = (errorMsg) => {
+    if (!errorMsg) return null;
+    const msg = errorMsg.toLowerCase();
+    if (msg.includes("timeout") || msg.includes("超时")) {
+      return { type: "timeout", tip: t("网络请求超时，请检查网络连接是否稳定。", "Network request timed out. Please check your internet connection.") };
+    }
+    if (msg.includes("dns") || msg.includes("resolve") || msg.includes("name resolution")) {
+      return { type: "dns", tip: t("DNS 解析失败，请检查网络或尝试切换 DNS（如 8.8.8.8）。", "DNS resolution failed. Check your network or try switching DNS (e.g. 8.8.8.8).") };
+    }
+    if (msg.includes("connection refused") || msg.includes("connect") || msg.includes("网络")) {
+      return { type: "network", tip: t("网络连接失败，请检查代理设置或网络状态。", "Connection failed. Please check your proxy settings or network status.") };
+    }
+    if (msg.includes("ssl") || msg.includes("certificate") || msg.includes("cert")) {
+      return { type: "ssl", tip: t("SSL 证书错误，请检查系统时间或代理配置。", "SSL certificate error. Check system time or proxy configuration.") };
+    }
+    if (msg.includes("403") || msg.includes("forbidden") || msg.includes("access denied")) {
+      return { type: "access", tip: t("访问被拒绝（403），该资源可能有地区限制，请尝试使用代理。", "Access denied (403). The resource may be region-restricted. Try using a proxy.") };
+    }
+    if (msg.includes("429") || msg.includes("rate limit")) {
+      return { type: "rate", tip: t("请求过于频繁（429），请稍后再试。", "Too many requests (429). Please try again later.") };
+    }
+    return null;
+  };
+
+  // 重试失败/已取消的任务
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/retry`, { method: "POST" });
+      if (res.ok) {
+        if (onRefreshTask) onRefreshTask();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        await alert(data.detail || t("重试失败，请刷新后重试。", "Retry failed. Please refresh and try again."));
+      }
+    } catch (err) {
+      console.error("Error retrying task:", err);
+      await alert(t("重试时发生网络错误。", "Network error while retrying."));
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -910,14 +955,35 @@ export default function PodcastDetailView({
               <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">
                 {displayTitle}
               </h1>
-              <span className={`${activeTask.status === "failed" ? "bg-red-500/20 text-red-400" : "bg-[var(--accent-gold)] text-[var(--text-secondary)]"} text-[10px] font-extrabold tracking-widest px-2.5 py-0.5 rounded-sm uppercase`}>
+              <span className={`${activeTask.status === "failed" ? "bg-red-500/20 text-red-400" : activeTask.status === "cancelled" ? "bg-gray-500/20 text-gray-400" : "bg-[var(--accent-gold)] text-[var(--text-secondary)]"} text-[10px] font-extrabold tracking-widest px-2.5 py-0.5 rounded-sm uppercase`}>
                 {displayStatus}
               </span>
-              {activeTask.status === "failed" && activeTask.error_message && (
-                <span className="text-xs text-red-400 truncate max-w-md" title={activeTask.error_message}>
-                  {activeTask.error_message}
-                </span>
+              {(activeTask.status === "failed" || activeTask.status === "cancelled") && (
+                <button
+                  onClick={handleRetry}
+                  disabled={isRetrying}
+                  className="flex items-center gap-1 text-xs text-[var(--accent-gold)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+                  title={t("重新执行此任务", "Retry this task")}
+                >
+                  <RefreshCw size={12} className={isRetrying ? "animate-spin" : ""} />
+                  {isRetrying ? t("重试中...", "Retrying...") : t("重试", "Retry")}
+                </button>
               )}
+              {activeTask.status === "failed" && activeTask.error_message && (() => {
+                const hint = getNetworkErrorHint(activeTask.error_message);
+                return (
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-xs text-red-400 truncate max-w-md" title={activeTask.error_message}>
+                      {activeTask.error_message}
+                    </span>
+                    {hint && (
+                      <span className="text-xs text-amber-400/80 flex items-center gap-1">
+                        <span>💡</span> {hint.tip}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
               {activeTask.url && (
                 <a
                   href={activeTask.url}
@@ -1253,7 +1319,7 @@ export default function PodcastDetailView({
             {activeTask.image_url ? (
               <>
                 <img
-                  src={activeTask.image_url}
+                  src={proxyImage(activeTask.image_url)}
                   alt=""
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover absolute inset-0"

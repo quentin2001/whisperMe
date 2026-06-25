@@ -1,5 +1,49 @@
 # whisperMe — 变更日志 (Changelog)
 
+## Session `2026-06-25` — 生产打包 + 离线化 + 健壮性
+
+### 📦 生产打包（Windows）
+- **PyInstaller 编译**: `launcher.py` → 单文件 `whisperMe.exe`，带 logo 图标
+- **Python 嵌入式**: Python 3.12.4 embeddable，无需系统安装 Python
+- **FFmpeg 内置**: 自动发现 `ffmpeg/ffmpeg.exe`，用户无需配置
+- **发布包**: `whisperMe-Windows-x64-v1.3.1.zip`（~137MB），解压即用
+- **GitHub Actions**: `.github/workflows/release.yml` 自动构建 Windows + macOS 包
+
+### 🎨 前端离线化
+- **Tailwind CSS v4 编译**: 从 CDN 切换到 `@tailwindcss/vite` 插件编译打包，CSS 58KB 自包含
+- **字体本地化**: smiley-sans 字体从 CDN 移至 `frontend/public/fonts/smiley-sans.woff2`，`@font-face` 本地加载
+- **移除所有外部 CDN 依赖**: Google Fonts、Material Symbols、Tailwind CDN 全部去除
+- **`import.meta.env.DEV` 动态 API_BASE**: 开发模式用完整 URL，生产模式留空
+
+### 🔧 启动器改进
+- **端口冲突检测**: `launcher.py` 启动前检查 9101 端口，占用了弹窗提醒
+- **PID 文件管理**: `.whisperMe.pid` 记录进程 ID，支持 `stop.bat` / `stop.sh` 停止
+- **跨平台支持**: `start.bat` (Windows) + `start.sh` (macOS)
+
+### 🖼️ 图片代理
+- **`GET /api/proxy/image?url=...`** : 后端代理 CDN 图片，解决浏览器直连 `image.xyzcdn.net` 失败问题
+- **`proxyImage()` 工具函数**: `constants.js` 统一处理图片 URL
+
+### ♻️ 失败任务重试
+- **`POST /api/tasks/{id}/retry`**: 重置失败/已取消任务为 pending 并重新入队
+- **网络错误智能提示**: 前端检测 timeout/DNS/SSL/403/429 等错误，给出中文修复建议
+- **状态显示一致**: `failed`（红色）、`cancelled`（灰色）在列表页和详情页统一展示
+
+### 🤖 MCP Server
+- **`/mcp` 端点**: 8 个工具（list_tasks, get_task, search_tasks, create_task, export_transcript, ask_podcast, get_system_status, get_config）
+- **可选依赖**: 需 `mcp` 包，未安装时自动降级跳过
+
+### 🗣️ 说话人识别说明
+- 在线模式包不包含 torch / pyannote.audio（~2GB），说话人识别仅本地模式可用
+- `config.py` lazy import numpy，避免在线包启动崩溃
+
+### 🐛 Bug 修复
+- 转录/总结为空时 pipeline 正确标记 `failed`（之前误标记 `completed`）
+- HF Token 字段在在线/本地模式均可见（之前隐藏在本地模式条件下）
+- `python-multipart` 和 `plyer` 添加到发布依赖
+
+---
+
 ## Session `2026-06-24` — P0/P1 功能全量实现 + 暗色模式
 
 ### 🎯 P0 核心功能

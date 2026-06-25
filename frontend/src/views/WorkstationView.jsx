@@ -3,6 +3,7 @@ import {
   List, LayoutGrid, Calendar, Play, MoreVertical, ChevronDown, Trash2
 } from "lucide-react";
 import { confirm } from "../components/Dialog.jsx";
+import { proxyImage } from "../constants.js";
 
 const parseDurationToMinutes = (durationStr) => {
   if (!durationStr || typeof durationStr !== "string") return 0;
@@ -147,7 +148,7 @@ export default function WorkstationView({
       duration: task.duration || "00:00",
       status: task.status === "completed" ? "COMPLETED" : task.status === "failed" ? "FAILED" : "IN_PROGRESS",
       speaker: task.speaker || (index % 2 === 0 ? "V. Valerius" : "E. Black"),
-      thumbnail: task.image_url || task.thumbnail || defaultThumbs[index % defaultThumbs.length],
+      thumbnail: proxyImage(task.image_url || task.thumbnail) || defaultThumbs[index % defaultThumbs.length],
       tags: Array.isArray(task.tags) && task.tags.length > 0 ? task.tags : ["Ambient", "Narrative"],
       rawTask: task
     };

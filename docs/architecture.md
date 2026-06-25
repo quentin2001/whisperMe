@@ -1,6 +1,6 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-24 · Session `2026-06-24`
+> 最后更新：2026-06-25 · Session `2026-06-25`
 
 ---
 
@@ -79,42 +79,48 @@ whisperMe/
 │       ├── prompt.json        # 内部 Prompt 备份
 │       ├── routers/           # 模块化路由层
 │       │   ├── __init__.py
-│       │   ├── tasks.py       # 任务管理 API
+│       │   ├── tasks.py       # 任务管理 API（含重试、问答、导出）
 │       │   ├── config.py      # 系统设置 API
-│       │   ├── system.py      # 系统状态 & 性能 API
+│       │   ├── system.py      # 系统状态 & 性能 API & 图片代理
 │       │   └── boards.py      # 知识卡片 & 看板 API
-│       └── core/
-│           ├── downloader.py      # 小宇宙 / Bilibili 下载器
-│           ├── transcriber.py     # Whisper / MiMo ASR 转录引擎 (VRAM 缓存)
-│           ├── summarizer.py      # Ollama / 在线 LLM 总结器
-│           ├── notifier.py        # 邮件 & Windows 桌面通知
-│           ├── queue_manager.py   # SQLite 驱动后台持久队列
-│           ├── prompt_manager.py  # Prompt 模板 IO
-│           ├── speaker.py         # 声纹识别与智能推理核心
-│           └── pipeline.py        # 流水线作业调度核心
+│       ├── core/
+│       │   ├── downloader.py      # 小宇宙 / Bilibili / 网易云下载器
+│       │   ├── transcriber.py     # Whisper / MiMo ASR 转录引擎 (VRAM 缓存)
+│       │   ├── summarizer.py      # Ollama / 在线 LLM 总结器
+│       │   ├── notifier.py        # 邮件 & 桌面通知
+│       │   ├── queue_manager.py   # SQLite 驱动后台持久队列
+│       │   ├── prompt_manager.py  # Prompt 模板 IO
+│       │   ├── speaker.py         # 声纹识别与智能推理核心
+│       │   ├── llm_utils.py       # 共享 LLM 调用工具
+│       │   ├── ffmpeg.py          # FFmpeg 自动发现
+│       │   └── pipeline.py        # 流水线作业调度（含 fail 校验）
+│       └── mcp_server.py          # MCP Server（8 工具 + 资源 + 提示词）
 │
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.js
+│   ├── vite.config.js         # Vite + React + Tailwind CSS v4 插件
 │   └── src/
 │       ├── main.jsx           # React 挂载入口
-│       ├── App.jsx            # SPA 容器组件，负责全局导航与状态轮询
-│       ├── App.css            # 辅助样式
-│       ├── index.css          # 核心 CSS / 设计令牌 / 扩展式滚动条
+│       ├── App.jsx            # SPA 容器组件
+│       ├── index.css          # 核心 CSS / 设计令牌 / @font-face / @theme
+│       ├── constants.js       # API_BASE + proxyImage 工具函数
 │       ├── components/        # 功能型局部件
 │       │   ├── Sidebar.jsx    # 品牌侧边栏导航
-│       │   └── Topbar.jsx     # 系统标题顶栏
+│       │   ├── Topbar.jsx     # 系统标题顶栏
+│       │   └── Dialog.jsx     # 对话框组件
 │       └── views/             # 视图级业务模块
-│           ├── LibraryView.jsx       # 播客库主视图，含存储量显示与录音入口
-│           ├── WorkstationView.jsx   # 播客工作台网格与列表切换视图
-│           ├── PodcastDetailView.jsx # 详情拖拽分析页，含三页签划分与发言人管理模态框
-│           └── SettingsView.jsx      # 系统高级配置表单视图
+│           ├── LibraryView.jsx       # 播客库主视图
+│           ├── WorkstationView.jsx   # 播客工作台视图
+│           ├── PodcastDetailView.jsx # 详情页（含 Q&A 标签 + 重试按钮）
+│           └── SettingsView.jsx      # 系统配置视图
+│   └── public/
+│       └── fonts/                 # 本地字体（smiley-sans.woff2）
 │
 ├── downloads/                 # 下载的原始音频
-├── transcripts/               # 转录结果 JSON
 ├── temp_sandbox/              # 临时沙盒目录
-├── hf_cache_models/           # HuggingFace 模型缓存
-├── models/                    # 本地模型文件
+├── ffmpeg/                    # 内置 FFmpeg 二进制
+├── launcher.py                # 跨平台后台启动器（端口检测 + PID 管理）
+├── build.py                   # 发布构建脚本
 └── docs/                      # 项目文档
 ```
 
@@ -133,9 +139,9 @@ whisperMe/
 
 ### 3.2 routers/ — 模块化 API 控制器层
 路由结构解耦，子接口在主模块中通过挂载 `APIRouter` 注册：
-*   **tasks.py (任务管理 API)**：负责播客任务的增删改查、重新下载、物理文件清理、智能命名保存以及重生成总结等核心生命周期逻辑。新增 `POST /api/tasks/{task_id}/cancel` 中断及取消逻辑。
+*   **tasks.py (任务管理 API)**：负责播客任务的增删改查、失败重试（`POST /{id}/retry`）、播客问答（`POST /{id}/qa`，支持长转录分段）、取消、重新下载、物理文件清理、导出（SRT/VTT/Text/JSON/Markdown）等核心生命周期逻辑。
 *   **config.py (配置设置 API)**：负责读取、修改并回写全局 `config.json`，以及 Prompt 推送词模板的读取和热修改。
-*   **system.py (系统状态 API)**：负责本地硬件信息（CPU、RAM、GPU、VRAM）实时拉取，支持版本检测及性能哨兵后台调度。
+*   **system.py (系统状态 API)**：负责本地硬件信息（CPU、RAM、GPU、VRAM）实时拉取，版本检测，性能哨兵后台调度，以及 **图片代理**（`GET /api/proxy/image`）解决 CDN 不可达问题。
 *   **boards.py (看板卡片 API)**：负责知识段落、脑洞对撞机、连线链接、复习卡片、看板布局的全套 CRUD 及艾宾浩斯复习曲线算法。
 
 ### 3.3 core/ — 核心业务处理管道
@@ -163,10 +169,11 @@ whisperMe/
 
 ### 4.1 技术栈
 
-- **Vite** — 构建工具
+- **Vite 8** — 构建工具
 - **React 19** — UI 框架
-- **Vanilla CSS** — 全局样式，使用 CSS Custom Properties (设计令牌)
-- **无第三方 UI 库** — 所有组件均为自研
+- **Tailwind CSS v4** — 编译打包（`@tailwindcss/vite` 插件），CSS 变量 + `@theme` 块
+- **smiley-sans** — 本地 WOFF2 字体，`@font-face` 加载
+- **无第三方 UI 库** — 所有组件均为自研，图标使用 lucide-react
 
 ### 4.2 页面结构
 

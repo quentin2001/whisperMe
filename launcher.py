@@ -23,6 +23,34 @@ PORT = 9101
 URL = f"http://localhost:{PORT}"
 
 
+def check_port_in_use(port: int) -> bool:
+    """检查端口是否已被占用"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            return s.connect_ex(("127.0.0.1", port)) == 0
+    except Exception:
+        return False
+
+
+def show_port_conflict_message(port: int):
+    """端口冲突时向用户显示提示"""
+    msg = (
+        f"whisperMe 启动失败：端口 {port} 已被占用。\n\n"
+        "可能的原因：\n"
+        "1. whisperMe 已经在运行中（请勿重复启动）\n"
+        "2. 其他程序占用了该端口\n\n"
+        "如需重启，请先运行 stop.bat / stop.sh 停止现有实例。"
+    )
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, msg, "whisperMe", 0x10)
+        except Exception:
+            pass
+    print(msg)
+
+
 def find_python():
     """查找可用的 Python 解释器"""
     # 打包后的嵌入式 Python
@@ -55,6 +83,11 @@ def wait_for_server(timeout=30):
 
 
 def main():
+    # 检查端口是否已被占用
+    if check_port_in_use(PORT):
+        show_port_conflict_message(PORT)
+        sys.exit(1)
+
     python_exe = find_python()
 
     # 检查前端静态文件

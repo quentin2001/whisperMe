@@ -1,8 +1,60 @@
-@import url('https://npm.elemecdn.com/@font/font-smiley-sans/style.css');
+@font-face {
+  font-family: "smiley-sans";
+  src: url("/fonts/smiley-sans.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #bb0028;
+  --color-primary-container: #e61337;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #fffbff;
+  --color-secondary: #6e5c3e;
+  --color-secondary-container: #f9dfb9;
+  --color-on-secondary-container: #746243;
+  --color-surface: #fef9f2;
+  --color-on-surface: #1d1c18;
+  --color-surface-variant: #e6e2db;
+  --color-on-surface-variant: #5d3f3e;
+  --color-surface-container: #f2ede6;
+  --color-surface-container-low: #f8f3ec;
+  --color-surface-container-high: #ece7e1;
+  --color-surface-container-highest: #e6e2db;
+  --color-outline: #926e6d;
+  --color-outline-variant: #e7bcbb;
+  --color-background: #fef9f2;
+  --color-on-background: #1d1c18;
+  --color-surface-dim: #ded9d3;
+  --color-surface-bright: #fef9f2;
+  --color-surface-container-lowest: #ffffff;
+  --color-inverse-surface: #32302c;
+  --color-inverse-on-surface: #f5f0e9;
+  --color-surface-tint: #bf0029;
+  --color-primary-fixed: #ffdad8;
+  --color-primary-fixed-dim: #ffb3b1;
+  --color-on-primary-fixed: #410007;
+  --color-on-primary-fixed-variant: #92001d;
+  --color-secondary-fixed: #f9dfb9;
+  --color-secondary-fixed-dim: #dbc39f;
+  --color-on-secondary-fixed: #261903;
+  --color-on-secondary-fixed-variant: #554428;
+  --color-tertiary-fixed: #eee1cb;
+  --color-tertiary-fixed-dim: #d1c5b0;
+  --color-on-tertiary-fixed: #211b0d;
+  --color-on-tertiary-fixed-variant: #4e4635;
+  --color-tertiary: #635b4a;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #7d7461;
+  --color-on-tertiary-container: #fffbff;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-inverse-primary: #ffb3b1;
+}
 
 @layer base {
   :root {

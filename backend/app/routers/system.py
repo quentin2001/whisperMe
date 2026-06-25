@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import json
 import threading
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from app.config import config, STORAGE_BASE, CURRENT_VERSION
 from app.core.queue_manager import queue_manager
 
@@ -300,6 +300,33 @@ def check_software_version(force: bool = False):
         "release_url": VERSION_CHECK_CACHE["release_url"],
         "release_notes": VERSION_CHECK_CACHE["release_notes"]
     }
+
+
+@router.get("/proxy/image")
+def proxy_image(url: str):
+    """代理图片请求，解决浏览器无法直接访问某些 CDN 的问题"""
+    if not url:
+        return Response(status_code=400, content="Missing url parameter")
+
+    try:
+        import httpx
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
+            resp = client.get(url, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": ""
+            })
+            if resp.status_code == 200:
+                content_type = resp.headers.get("content-type", "image/jpeg")
+                return Response(
+                    content=resp.content,
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"}
+                )
+            return Response(status_code=resp.status_code)
+    except Exception as e:
+        print(f"⚠️ [PROXY] 图片代理失败: {url} - {e}")
+        return Response(status_code=502)
+
 
 # --- 启动函数 ---
 def start_system_background_tasks():
