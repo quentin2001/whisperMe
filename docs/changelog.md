@@ -1,5 +1,48 @@
 # whisperMe — 变更日志 (Changelog)
 
+## Session `2026-06-26` — 性能优化 + 字体升级 + 项目整理
+
+### 🚀 RTX 3070 ASR 性能优化 (WP-1)
+- **自适应 compute_type**: 按 GPU 总显存自动选择 float16 / int8_float16 / int8
+- **默认模型升级**: `large-v3` → `large-v3-turbo`（速度 ~6x 提升）
+- **VAD 静音过滤**: Silero VAD filter，跳过静音段推理
+- **MP3 直读**: Whisper 直接读取原始 MP3，省去 WAV 转码
+- **MiMo 并发**: ThreadPoolExecutor(4 workers) + 分片从 60s → 120s
+
+### 🔧 架构加固 (WP-2/3/4/6)
+- **update_task_field**: 轻量 SQLite UPDATE，避免全行 SELECT
+- **t_rename_start 修复**: 移出 try 块避免 NameError
+- **声纹维度校验**: merge_speakers 前检查 embedding 维度一致性
+- **双级置信度**: HIGH ≥ 0.85 才增加声纹信任度计数
+- **沙盒收窄**: 环境变量仅劫持 TEMP/TMP（之前覆盖 7 个）
+
+### 🎨 字体系统升级
+- **中文**: 得意黑 (smiley-sans) → **思源黑体** (Noto Sans SC, 1.1 MB WOFF2)
+- **英文**: **Outfit** (14 KB WOFF2) — 恢复项目最初的英文搭配
+- 全部自托管 `frontend/public/fonts/`，零外部请求
+
+### 📦 打包双版本
+- **ZIP 完整包**: `whisperMe-Windows-x64-v1.4.0.zip` (4.1 MB)
+- **单文件 EXE**: `whisperMe.exe` (113.8 MB)，双击即用，无需 Python
+- 新入口 `backend/run_server.py`：品牌横幅 + uvicorn 内进程运行
+- 启动器品牌化输出（横幅、状态、停止提示）
+
+### 📁 项目目录整理
+- `scripts/` — 所有构建和启动脚本集中
+- `assets/` — 图标资源
+- `docs/` — 全部文档（含 DESIGN.md, CONTRIBUTING.md）
+- 根目录精简至 11 个文件
+
+### 🧹 仓库清理
+- 磁盘回收 ~740 MB（temp_sandbox + 旧 release + CDN 原型页面）
+- Git 二进制从 4.1 MB → 2.5 MB（仅字体）
+- .gitignore 规则完善（amen_break 音频 + backend/data/）
+- 删除旧 prompt.json / 空数据库文件 / 备份文件
+
+### 📝 文档同步
+- README.md 更新项目结构和启动方式
+- CLAUDE.md 重构为最新目录结构和功能清单
+
 ## Session `2026-06-25` — 生产打包 + 离线化 + 健壮性
 
 ### 📦 生产打包（Windows）

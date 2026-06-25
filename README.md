@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo.svg" width="88" height="88" alt="whisperMe" />
+  <img src="./assets/logo.svg" width="88" height="88" alt="whisperMe" />
 </p>
 
 <h1 align="center">whisperMe</h1>
@@ -100,11 +100,24 @@ cp config.example.json config.json
 
 ### 4. 启动
 
-**方式一：一键启动（Windows）**
+**方式一：一键启动（开发）**
 
-双击 `一键启动.bat`，自动拉起前后端服务。
+```bash
+python scripts/start_project.py
+# 自动拉起后端 (9101) + 前端 (9173)，Ctrl+C 停止
+```
 
-**方式二：手动启动**
+**方式二：生产模式（后台运行）**
+
+```bash
+# Windows
+双击 start.bat → 自动启动后台服务 + 打开浏览器
+
+# 停止
+双击 stop.bat
+```
+
+**方式三：手动启动**
 
 ```bash
 # 终端 1 — 后端（端口 9101）
@@ -116,7 +129,16 @@ cd frontend
 npm run dev
 ```
 
-启动后浏览器打开 **http://localhost:9173**，粘贴一条播客链接即可开始。
+**方式四：单文件 EXE（小白用户）**
+
+```bash
+# 构建（需 PyInstaller）
+python scripts/build.py
+
+# 然后双击 release/whisperMe.exe 即可
+```
+
+启动后浏览器打开 **http://localhost:9173**（或生产模式 9101），粘贴一条播客链接即可开始。
 
 <br />
 
@@ -145,45 +167,82 @@ npm run dev
 
 ```
 whisperMe/
-├── config.example.json         # 配置模板（脱敏）
-├── config.json                 # 运行时配置（本地，git 忽略）
-├── start_project.py            # 一键启动脚本
-├── 一键启动.bat                 # Windows 双击启动入口
+├── CLAUDE.md                    # Claude Code 项目指令
+├── README.md                    # 使用文档
+├── VERSION                      # 版本号（当前 v1.4.0）
+├── config.example.json          # 配置模板（脱敏）
+├── config.json                  # 运行时配置（本地，git 忽略）
+├── prompt.json                  # AI 总结 Prompt 模板
+├── start.bat / stop.bat         # 生产模式启停（Windows 用户入口）
+│
+├── assets/
+│   ├── logo.svg                 # SVG 图标
+│   └── logo.ico                 # Windows .ico 图标
+│
+├── scripts/
+│   ├── build.py                 # 发布构建脚本（ZIP + EXE）
+│   ├── build_exe.py             # PyInstaller 单文件 exe 构建
+│   ├── make_icon.py             # 图标生成
+│   ├── launcher.py              # 生产模式启动器
+│   ├── start_project.py         # 开发模式启动器
+│   ├── start.sh / stop.sh       # macOS/Linux 启停
+│   └── clean_temp.bat           # 临时文件清理
 │
 ├── backend/
-│   ├── run.py                  # 后端入口
-│   ├── requirements.txt        # Python 依赖
+│   ├── run.py                   # 开发模式后端入口（uvicorn --reload）
+│   ├── run_server.py            # 生产自包含入口（PyInstaller 用）
+│   ├── requirements.txt         # Python 依赖
 │   └── app/
-│       ├── config.py           # Pydantic v2 配置校验
-│       ├── database.py         # SQLite WAL 数据库
-│       ├── main.py             # FastAPI 路由挂载
-│       ├── routers/            # API 路由层
-│       │   ├── tasks.py        #   任务管理
-│       │   ├── config.py       #   系统设置
-│       │   ├── system.py       #   系统状态
-│       │   └── boards.py       #   知识卡片
-│       └── core/               # 核心业务
-│           ├── pipeline.py     #   流水线调度
-│           ├── speaker.py      #   声纹识别与推理
-│           ├── transcriber.py  #   ASR 转录引擎
-│           ├── downloader.py   #   音频下载器
-│           ├── summarizer.py   #   LLM 总结器
-│           ├── notifier.py     #   通知推送
-│           ├── queue_manager.py#   任务队列
-│           └── prompt_manager.py#  Prompt 模板
+│       ├── config.py            # Pydantic v2 配置校验
+│       ├── database.py          # SQLite WAL 数据库
+│       ├── main.py              # FastAPI 应用与路由挂载
+│       ├── routers/             # API 路由层
+│       │   ├── tasks.py         #   任务管理 + 上传
+│       │   ├── config.py        #   系统设置
+│       │   ├── system.py        #   系统状态与性能
+│       │   └── boards.py        #   知识卡片
+│       └── core/                # 核心业务
+│           ├── pipeline.py      #   流水线调度
+│           ├── speaker.py       #   声纹识别与推理
+│           ├── transcriber.py   #   ASR 转录引擎
+│           ├── downloader.py    #   音频下载器
+│           ├── summarizer.py    #   LLM 总结器
+│           ├── network.py       #   DoH DNS 直连
+│           ├── compat.py        #   平台兼容层
+│           ├── notifier.py      #   通知推送
+│           ├── queue_manager.py #   任务队列
+│           ├── prompt_manager.py#   Prompt 模板管理
+│           └── asr_providers/   #   在线 ASR 提供商
 │
 ├── frontend/
+│   ├── index.html               # HTML 入口
+│   ├── public/
+│   │   ├── logo.svg             # 网站图标
+│   │   └── fonts/               # 自托管字体 WOFF2
+│   │       ├── noto-sans-sc-400.woff2
+│   │       ├── noto-sans-sc-700.woff2
+│   │       ├── outfit-400.woff2
+│   │       ├── outfit-600.woff2
+│   │       └── outfit-700.woff2
 │   └── src/
-│       ├── App.jsx             # SPA 主组件
-│       ├── index.css           # CSS 变量 & 全局样式
-│       ├── components/         # UI 组件（Sidebar/Topbar/Dialog）
-│       ├── contexts/           # ThemeContext（暗色模式）
-│       └── views/              # 页面视图
+│       ├── App.jsx              # SPA 主组件
+│       ├── index.css            # CSS 变量 & 字体声明
+│       ├── constants.js         # API 基础路径 + 工具函数
+│       ├── components/          # UI 组件（Sidebar/Dialog）
+│       ├── contexts/            # ThemeContext（暗色模式）
+│       └── views/               # 页面视图
 │
-└── docs/
-    ├── architecture.md         # 系统架构设计
-    ├── user_guide.md           # 使用手册 & 配置指南
-    └── changelog.md            # 变更日志
+├── docs/
+│   ├── architecture.md          # 系统架构设计
+│   ├── user_guide.md            # 使用手册
+│   ├── changelog.md             # 变更日志
+│   ├── DESIGN.md                # 设计规范
+│   ├── CONTRIBUTING.md          # 贡献指南
+│   └── superpowers/             # 开发计划与规范
+│
+└── release/                     # 构建产物（git 忽略）
+    ├── whisperMe.exe             #   PyInstaller 单文件
+    └── whisperMe-Windows-x64-vX.X.X.zip  # ZIP 分发包
 ```
 
 <br />
