@@ -12,11 +12,14 @@ config.json
 # 2. Local Databases & User Data
 tasks_db.json
 speaker_fingerprints.json
+backend/data/
 
 # 3. Audio Cache, Sandbox & Exports
 downloads/
 temp_sandbox/
 transcripts/
+# Test/example audio (not needed for production)
+frontend/public/amen_break*
 
 # 4. Large Machine Learning Models & Cache
 models/
@@ -51,7 +54,7 @@ frontend/*.html
 # 9. Database migration backups
 backend/app/*_backup.py
 
-# 9. Editor & OS Specific Files
+# 10. Editor & OS Specific Files
 .vscode/
 .idea/
 .DS_Store
@@ -62,7 +65,7 @@ Thumbs.db
 *.sln
 *.swp
 
-# 10. Logs and Backups
+# 11. Logs and Backups
 logs/
 *.bak
 *.db
