@@ -219,6 +219,34 @@ def print_summary():
     print(f"{'='*50}")
 
 
+def build_exe():
+    """调用 PyInstaller 构建单个 .exe（可选，需安装 PyInstaller）"""
+    try:
+        import PyInstaller  # noqa: F401
+    except ImportError:
+        print("\n⚠️  PyInstaller 未安装，跳过 exe 构建。")
+        print("   安装: pip install pyinstaller")
+        return None
+
+    print(f"\n🔨 构建全量单文件 exe ...")
+    exe_script = ROOT_DIR / "scripts" / "build_exe.py"
+    result = subprocess.run(
+        [sys.executable, str(exe_script)],
+        cwd=str(ROOT_DIR),
+    )
+    if result.returncode != 0:
+        print("⚠️  exe 构建失败（可能是 PyInstaller 配置问题）")
+        return None
+
+    # 找生成的 exe
+    version = get_version()
+    exe_name = "whisperMe.exe" if sys.platform == "win32" else "whisperMe"
+    exe_path = ROOT_DIR / "release" / exe_name
+    if exe_path.exists():
+        return exe_path
+    return None
+
+
 def main():
     version = get_version()
     print(f"🔨 whisperMe v{version} 构建脚本")
@@ -233,6 +261,13 @@ def main():
     create_version_info()
     create_zip()
     print_summary()
+
+    # 可选：构建全量单文件 exe
+    exe_path = build_exe()
+    if exe_path:
+        exe_mb = os.path.getsize(exe_path) / (1024 * 1024)
+        print(f"\n✅ 单文件 exe 构建完成: {exe_path} ({exe_mb:.1f} MB)")
+        print(f"   发布包内容: ZIP 完整包 + 单文件 exe")
 
 
 if __name__ == "__main__":

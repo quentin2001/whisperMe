@@ -83,6 +83,13 @@ def wait_for_server(timeout=30):
 
 
 def main():
+    # 品牌横幅
+    print()
+    print("  ╔══════════════════════════════════════════════╗")
+    print("  ║         whisperMe · AI 播客转录工作台       ║")
+    print("  ╚══════════════════════════════════════════════╝")
+    print()
+
     # 检查端口是否已被占用
     if check_port_in_use(PORT):
         show_port_conflict_message(PORT)
@@ -93,8 +100,8 @@ def main():
     # 检查前端静态文件
     frontend_dist = os.path.join(ROOT_DIR, "frontend", "dist")
     if not os.path.isdir(frontend_dist):
-        print(f"[whisperMe] 前端静态文件不存在: {frontend_dist}")
-        print(f"  请先运行: cd frontend && npm run build")
+        print(f"  ⚠️  前端静态文件不存在: {frontend_dist}")
+        print(f"     请先运行: cd frontend && npm run build")
         sys.exit(1)
 
     # 设置环境变量
@@ -116,9 +123,10 @@ def main():
         "--port", str(PORT),
     ]
 
+    print(f"  ⏳ 正在启动服务...")
+
     with open(log_file, "a", encoding="utf-8") as log:
         if sys.platform == "win32":
-            # Windows: CREATE_NO_WINDOW 隐藏子进程窗口
             server = subprocess.Popen(
                 cmd,
                 cwd=BACKEND_DIR,
@@ -128,7 +136,6 @@ def main():
                 creationflags=0x08000000,
             )
         else:
-            # macOS/Linux: 标准后台进程
             server = subprocess.Popen(
                 cmd,
                 cwd=BACKEND_DIR,
@@ -138,17 +145,20 @@ def main():
                 start_new_session=True,
             )
 
-    # 写入 PID 文件（方便后续停止）
+    # 写入 PID 文件
     pid_file = os.path.join(ROOT_DIR, ".whisperMe.pid")
     with open(pid_file, "w") as f:
         f.write(str(server.pid))
 
     # 等待服务就绪
     if wait_for_server():
-        # 打开浏览器
+        print(f"  🟢 服务已启动: {URL}")
+        print(f"  📁 日志文件:    {log_file}")
+        print(f"  🛑 停止方式:    运行 stop.bat 或访问 {URL}/api/shutdown")
+        print()
         webbrowser.open(URL)
     else:
-        print(f"[whisperMe] 启动超时，请查看日志: {log_file}")
+        print(f"  ❌ 启动超时，请查看日志: {log_file}")
         sys.exit(1)
 
     # 启动器自身退出，服务器继续在后台运行
