@@ -843,6 +843,11 @@ class LocalDatabase:
             if isinstance(src_emb, str): src_emb = json.loads(src_emb)
             if isinstance(tgt_emb, str): tgt_emb = json.loads(tgt_emb)
 
+            # 维度校验：防止 zip 静默截断产生错误的合并结果
+            if len(src_emb) != len(tgt_emb):
+                print(f"⚠️ [LOG WARNING] 声纹维度不匹配 src={len(src_emb)} tgt={len(tgt_emb)}，取消合并")
+                return False
+
             src_count = source.get("sample_count", 1)
             tgt_count = target.get("sample_count", 1)
             total = src_count + tgt_count

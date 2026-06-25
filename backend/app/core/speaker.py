@@ -63,12 +63,16 @@ def match_speakers_with_voiceprints(speaker_embeddings: dict) -> tuple:
                     best_count = info.get("sample_count", 1)
 
             # 动态阈值：出现次数越多，阈值越宽松
+            HIGH_CONFIDENCE_THRESHOLD = 0.85
             threshold = get_dynamic_threshold(best_count)
             if max_sim >= threshold and best_match:
                 mappings[sp_id] = best_match
                 confidence[sp_id] = {"score": round(max_sim, 4), "source": "voiceprint"}
-                # 匹配成功，更新出现次数和最近见过时间
-                db.upsert_speaker(best_match, fingerprints[best_match]["embedding"], sample_count=best_count + 1)
+                # 仅高置信匹配增加信任度计数，避免低质量匹配导致阈值正反馈退化
+                if max_sim >= HIGH_CONFIDENCE_THRESHOLD:
+                    db.upsert_speaker(best_match, fingerprints[best_match]["embedding"], sample_count=best_count + 1)
+                else:
+                    db.upsert_speaker(best_match, fingerprints[best_match]["embedding"], sample_count=best_count)
                 print(f"🎯 [LOG] 声纹库匹配成功 - {sp_id} → {best_match} (相似度: {max_sim:.3f}, 阈值: {threshold}, 出现次数: {best_count})")
         return mappings, confidence
     except Exception as e:

@@ -193,11 +193,9 @@ SHORT_TEMP_DIR = get_short_path_name(TEMP_SANDBOX_DIR)
 SHORT_HF_CACHE_DIR = get_short_path_name(HF_CACHE_DIR)
 
 if sys.platform == "win32":
-    # Windows: 重置环境变量，锁死本地英文临时区（规避中文用户名路径问题）
-    for env_key in ["TEMP", "TMP", "USERPROFILE", "HOMEPATH", "APPDATA", "LOCALAPPDATA"]:
+    # 只重定向临时目录，不劫持用户目录（避免 .matplotlib/.cache/NVIDIA/torch 写入 temp_sandbox）
+    for env_key in ["TEMP", "TMP"]:
         os.environ[env_key] = SHORT_TEMP_DIR
-    # HOME 在 Windows 上影响较小，但仍需设置以兼容部分工具
-    os.environ["HOME"] = SHORT_TEMP_DIR
 else:
     # macOS/Linux: 只设置 TEMP/TMP，不动 HOME（会破坏子进程的配置解析）
     os.environ["TEMP"] = str(TEMP_SANDBOX_DIR)

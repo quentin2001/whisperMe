@@ -9,7 +9,7 @@ class PodcastSummarizer:
         # 动态读取配置，实现热更新
         pass
 
-    def _split_transcript_into_chunks(self, lines: list[str], max_chars: int, overlap_lines: int = 20) -> list[list[str]]:
+    def _split_transcript_into_chunks(self, lines: list[str], max_chars: int, overlap_lines: int = 15) -> list[list[str]]:
         """
         将转录文本行列表分段，每段不超过 max_chars 字符，段间有 overlap_lines 行重叠
         """
@@ -182,9 +182,6 @@ class PodcastSummarizer:
 3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。
 4. 在报告最末尾增加一行：`本段覆盖时间范围：{chunk_lines[0][:12] if chunk_lines else '?'} — {chunk_lines[-1][:12] if chunk_lines else '?'}`"""
                     chunk_prompt = user_prompt.replace("{{PODCAST_DATA}}", chunk_data + chunk_suffix)
-                    if "{{PODCAST_DATA}}" in chunk_prompt:
-                        # placeholder 已替换，无需额外操作
-                        pass
                     print(f"📝 [LOG] 正在总结第 {i+1}/{total_chunks} 段...")
                     partial = self._call_llm(chunk_prompt, api_url, headers, target_model)
                     partial_summaries.append(partial)
