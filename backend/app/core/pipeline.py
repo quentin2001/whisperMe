@@ -166,7 +166,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         asr_mode = task.get("asr_mode", "local")
         t_transcribe_start = time.time()
         merged_transcript = transcriber.transcribe_and_merge(
-            standardized_wav,
+            local_mp3,  # Whisper 直读原始 MP3，不再需要 WAV 预处理
             diar_data,
             progress_callback=progress_callback,
             asr_mode=asr_mode,

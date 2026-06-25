@@ -54,7 +54,7 @@ class AppConfigModel(BaseModel):
     ffmpeg_path: str = ""
     ffmpeg_bin_dir: str = ""
     local_whisper_model_path: str = ""
-    local_whisper_model_size: str = "large-v3"
+    local_whisper_model_size: str = "large-v3-turbo"
     local_model_idle_timeout: int = 300
     hf_token: str = ""
     ollama_url: str = "http://localhost:11434"

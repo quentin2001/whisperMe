@@ -116,7 +116,23 @@ class PodcastTranscriber:
             self.device = "cuda"
         except Exception:
             pass
-        self.compute_type = "float16" if self.device == "cuda" else "float32"
+        # 自适应精度策略：基于 GPU 总显存（不是 free）智能选择 compute_type
+        if self.device == "cuda":
+            try:
+                import torch
+                free_bytes, total_bytes = torch.cuda.mem_get_info()
+                total_gb = total_bytes / (1024 ** 3)
+                if total_gb >= 10:
+                    self.compute_type = "float16"
+                elif total_gb >= 4:
+                    self.compute_type = "int8_float16"  # RTX 3070 8GB 甜点值
+                else:
+                    self.compute_type = "int8"
+                print(f"🖥️ [LOG] GPU 总显存: {total_gb:.1f}GB → compute_type={self.compute_type}")
+            except Exception:
+                self.compute_type = "float16"  # 无法检测时保守选择
+        else:
+            self.compute_type = "int8"  # CPU 上用 INT8 加速
         print(f"🖥️ [LOG] 初始化转录引擎 - 默认运行设备: {self.device.upper()} | 运算精度: {self.compute_type}")
 
     def run_diarization(self, wav_path: str) -> list[dict]:
@@ -326,7 +342,9 @@ class PodcastTranscriber:
             whisper_segments_raw, info = model.transcribe(
                 short_wav_path,
                 beam_size=5,
-                language="zh"
+                language="zh",
+                vad_filter=True,
+                vad_parameters={"min_silence_duration_ms": 500},
             )
 
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
