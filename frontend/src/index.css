@@ -1,7 +1,34 @@
+/* === 思源黑体 · Noto Sans SC === */
 @font-face {
-  font-family: "smiley-sans";
-  src: url("/fonts/smiley-sans.woff2") format("woff2");
-  font-weight: 400 700;
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto-sans-sc-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto-sans-sc-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* === 英文 · Outfit === */
+@font-face {
+  font-family: "Outfit";
+  src: url("/fonts/outfit-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Outfit";
+  src: url("/fonts/outfit-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Outfit";
+  src: url("/fonts/outfit-700.woff2") format("woff2");
+  font-weight: 700;
   font-display: swap;
 }
 
@@ -145,7 +172,7 @@
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: "smiley-sans", "Inter", "Geist", system-ui, sans-serif;
+    font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
     overflow-x: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
@@ -233,15 +260,15 @@ input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:f
 
 /* Add support for font families matching the AIStudio Geist font families */
 .font-display {
-  font-family: "smiley-sans", "Geist", "Inter", system-ui, sans-serif;
+  font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
 }
 
 .font-sans {
-  font-family: "smiley-sans", "Inter", "Geist", system-ui, sans-serif;
+  font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
 }
 
 .font-mono {
-  font-family: "Geist Mono", monospace;
+  font-family: "JetBrains Mono", "Courier New", monospace;
 }
 
 /* Premium Audio visualizer wave animation */
