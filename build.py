@@ -155,11 +155,20 @@ def copy_ffmpeg():
     print(f"  ✅ ffmpeg/")
 
 
+def get_version():
+    """从项目根目录 VERSION 文件读取版本号"""
+    version_file = ROOT_DIR / "VERSION"
+    if version_file.exists():
+        return version_file.read_text(encoding="utf-8").strip()
+    return "1.4.0"
+
+
 def create_version_info():
     """生成版本信息文件"""
+    version = get_version()
     version_file = RELEASE_DIR / "VERSION.txt"
     version_file.write_text(
-        f"whisperMe\n"
+        f"whisperMe v{version}\n"
         f"Build: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"Platform: {sys.platform}\n",
         encoding="utf-8",
@@ -167,30 +176,52 @@ def create_version_info():
     print(f"  ✅ VERSION.txt")
 
 
+def create_zip():
+    """将 release 目录打包为 zip"""
+    version = get_version()
+    zip_name = f"whisperMe-Windows-x64-v{version}.zip"
+    zip_path = ROOT_DIR / "release" / zip_name
+
+    release_parent = ROOT_DIR / "release"
+    import zipfile
+
+    print(f"\n📦 打包: {zip_name} ...")
+    with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as zf:
+        for dirpath, dirnames, filenames in os.walk(str(RELEASE_DIR)):
+            for fn in filenames:
+                full_path = os.path.join(dirpath, fn)
+                arcname = os.path.relpath(full_path, str(release_parent))
+                zf.write(full_path, arcname)
+
+    zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
+    print(f"  ✅ {zip_name} ({zip_size_mb:.1f} MB)")
+
+
 def print_summary():
     """打印构建摘要"""
     # 统计目录大小
     total_size = 0
+    file_count = 0
     for dirpath, dirnames, filenames in os.walk(str(RELEASE_DIR)):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             total_size += os.path.getsize(fp)
+            file_count += 1
 
+    version = get_version()
     size_mb = total_size / (1024 * 1024)
+    zip_name = f"whisperMe-Windows-x64-v{version}.zip"
     print(f"\n{'='*50}")
-    print(f"  构建完成!")
+    print(f"  构建完成! v{version}")
     print(f"  输出目录: {RELEASE_DIR}")
-    print(f"  总大小: {size_mb:.1f} MB")
+    print(f"  文件数: {file_count} | 大小: {size_mb:.1f} MB")
+    print(f"  ZIP: release/{zip_name}")
     print(f"{'='*50}")
-    print(f"\n  下一步:")
-    print(f"  1. 将 Python 嵌入式包放入 release/whisperMe/python/")
-    print(f"  2. 安装依赖: pip install -r backend/requirements.txt --target python/")
-    print(f"  3. 将 ffmpeg 放入 release/whisperMe/ffmpeg/")
-    print(f"  4. 打包成 zip 发布")
 
 
 def main():
-    print("🔨 whisperMe 构建脚本")
+    version = get_version()
+    print(f"🔨 whisperMe v{version} 构建脚本")
     print(f"   平台: {sys.platform}")
     print(f"   目标: {RELEASE_DIR}")
 
@@ -200,6 +231,7 @@ def main():
     create_requirements()
     copy_ffmpeg()
     create_version_info()
+    create_zip()
     print_summary()
 
 
