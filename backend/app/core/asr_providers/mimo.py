@@ -9,7 +9,7 @@ import time
 import httpx
 from app.config import config, get_short_path_name
 from app.core.asr_providers.base import ASRProvider
-from app.core.transcriber import doh_dns_bypass
+from app.core.network import doh_dns_bypass
 
 
 class MiMoASRProvider(ASRProvider):

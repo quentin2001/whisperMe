@@ -10,13 +10,6 @@ CURL_CMD = "curl.exe" if sys.platform == "win32" else "curl"
 # --ssl-no-revoke 仅 Windows Schannel 支持
 CURL_SSL_ARGS = ["--ssl-no-revoke"] if sys.platform == "win32" else []
 
-_original_run = subprocess.run
-def _patched_run(*args, **kwargs):
-    if sys.platform == 'win32' and 'creationflags' not in kwargs:
-        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
-    return _original_run(*args, **kwargs)
-subprocess.run = _patched_run
-
 import httpx
 from bs4 import BeautifulSoup
 import yt_dlp
@@ -27,7 +20,7 @@ from app.config import (
     TEMP_SANDBOX_DIR,
     get_short_path_name
 )
-from app.core.transcriber import doh_dns_bypass
+from app.core.network import doh_dns_bypass, resolve_host_via_doh
 
 # 递归在嵌套字典/列表中搜索特定键
 def find_nested_key(data, target_key):

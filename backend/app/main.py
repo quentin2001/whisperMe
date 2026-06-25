@@ -16,6 +16,9 @@ from app.config import (
     CURRENT_VERSION,
     PROJECT_DIR
 )
+from app.core.compat import patch_subprocess_no_window
+patch_subprocess_no_window()
+
 from app.database import db
 from app.core.queue_manager import queue_manager
 
