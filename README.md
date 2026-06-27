@@ -12,6 +12,12 @@
   粘贴一条播客链接 → 自动下载、转录、识别说话人、AI 总结
 </p>
 
+<p align="center">
+  <a href="https://github.com/quentin2001/whisperMe/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest_Release-00C7B7?style=for-the-badge&logo=github" alt="Download Latest Release" />
+  </a>
+</p>
+
 <br />
 
 ---
@@ -129,14 +135,12 @@ cd frontend
 npm run dev
 ```
 
-**方式四：跨平台 ZIP 分发包**
+**方式四：跨平台免安装包（推荐给小白与 Agent）**
 
-```bash
-# 构建
-python scripts/build.py
-
-# 进入 release/whisperMe/ 目录运行 start.bat 或 start.sh
-```
+不需要克隆代码，不需要编译前端，直接前往 **[Releases 页面](https://github.com/quentin2001/whisperMe/releases/latest)** 下载最新的 `whisperMe-CrossPlatform-vX.X.X.zip`。
+解压后，执行：
+- Windows: 双击 `start.bat`
+- macOS/Linux: 终端运行 `bash scripts/start.sh`
 
 启动后浏览器打开 **http://localhost:9173**（或生产模式 9101），粘贴一条播客链接即可开始。
 
