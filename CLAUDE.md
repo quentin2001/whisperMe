@@ -81,15 +81,15 @@ docs/                # 详细文档（architecture/user_guide/changelog/DESIGN/C
 - 前端: 9173（Vite dev server）
 - 开发启动: `python scripts/start_project.py`（前后端双进程）
 - 生产启动: 双击 `start.bat`（Windows）或运行 `scripts/start.sh`（macOS）
-- 单文件启动: 双击 `release/whisperMe.exe`（PyInstaller 一键打包）
+- **Agent CLI**: `python scripts/whisperme-cli.py` (全能命令行控制桥，供大模型 Agent 如 Hermes 离线配置与托管)
 - 停止: `stop.bat` / `stop.sh` 或访问 `/api/shutdown`
 
 ## 三种启动路径
-| 方式 | 入口 | 用户 | 前端 | 需要 Python |
-|------|------|------|------|-------------|
-| **开发** | `python scripts/start_project.py` | 开发者 | Vite dev (9173) | ✅ |
-| **ZIP** | 双击 `start.bat` | 进阶用户 | FastAPI 托管 (9101) | ✅ |
-| **EXE** | 双击 `whisperMe.exe` | 小白用户 | FastAPI 托管 (9101) | ❌ |
+| 方式 | 入口 | 用户 | 前端 |
+|------|------|------|------|
+| **开发** | `python scripts/start_project.py` | 开发者 | Vite dev (9173) |
+| **Agent / 生产** | `whisperme-cli server start` 或 `start.bat` | Agent/进阶用户 | FastAPI 托管 (9101) |
+| **EXE(已弱化)** | 双击 `whisperMe.exe` | 仅遗留备用 | FastAPI 托管 (9101) |
 
 ## 两种运行模式
 | 模式 | 包大小 | torch | 声纹识别 | 适用场景 |

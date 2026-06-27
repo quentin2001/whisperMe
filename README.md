@@ -129,16 +129,33 @@ cd frontend
 npm run dev
 ```
 
-**方式四：单文件 EXE（小白用户）**
+**方式四：跨平台 ZIP 分发包**
 
 ```bash
-# 构建（需 PyInstaller）
+# 构建
 python scripts/build.py
 
-# 然后双击 release/whisperMe.exe 即可
+# 进入 release/whisperMe/ 目录运行 start.bat 或 start.sh
 ```
 
 启动后浏览器打开 **http://localhost:9173**（或生产模式 9101），粘贴一条播客链接即可开始。
+
+<br />
+
+---
+
+<br />
+
+## 🤖 与你的 AI Agent (Hermes/OpenClaw) 联动
+
+如果你在本地运行了 AI Agent，你可以让它成为 whisperMe 的全职管家。
+你出门在外，只需在微信/Telegram里给你的 Agent 发一个播客链接，它就会自动在你的电脑上操纵 whisperMe 完成转录，并把总结发回你的微信。
+
+**如何接入？**
+只需让你的 Agent 读取本项目根目录下的 `AGENT.md` 文件。它会自动学会所有部署、配置和操控指令。
+
+**你可以这样对你的 Agent 说：**
+> "帮我准备好本地目录下的 whisperMe，然后转录这期播客链接。"
 
 <br />
 

@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import socket
+import argparse
 import subprocess
 import webbrowser
 
@@ -86,12 +87,30 @@ def wait_for_server(timeout=30):
 
 
 def main():
-    # 品牌横幅
-    print()
-    print("  ╔══════════════════════════════════════════════╗")
-    print("  ║         whisperMe · AI 播客转录工作台       ║")
-    print("  ╚══════════════════════════════════════════════╝")
-    print()
+    # 启用 Windows 10 ANSI 支持
+    if sys.platform == "win32":
+        os.system("")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--foreground", action="store_true", help="前台运行模式")
+    args = parser.parse_args()
+
+    # 炫酷的动态渐变 Logo (基于 assets/logo.svg 的波浪造型)
+    logo = [
+        "  \033[38;2;138;35;135m       .           .           .       \033[0m",
+        "  \033[38;2;186;47;111m      / \\         / \\         / \\      \033[0m",
+        "  \033[38;2;233;64;87m     /   \\       /   \\       /   \\     \033[0m",
+        "  \033[38;2;242;113;33m  --'     '-----'     '-----'     '--  \033[0m",
+        "",
+        "  \033[1;38;2;233;64;87m         __    _                       __  ___     \033[0m",
+        "  \033[1;38;2;233;64;87m   _      __/ /_  (_)________  ___  _____ /  |/  /___  \033[0m",
+        "  \033[1;38;2;242;113;33m  | | /| / / __ \\/ __ \\/ ___/ / _ \\/ ___// /|_/ / _ \\ \033[0m",
+        "  \033[1;38;2;242;113;33m  | |/ |/ / / / / / / / /__  /  __/ /   / /  / /  __/ \033[0m",
+        "  \033[1;38;2;242;113;33m  |__/|__/_/ /_/_/ /_/\\___/  \\___/_/   /_/  /_/\\___/  \033[0m",
+        "  ",
+        "  \033[3m\033[38;2;138;35;135m         A I   P o d c a s t   W o r k s p a c e     \033[0m"
+    ]
+    print("\n" + "\n".join(logo) + "\n")
 
     # 检查端口是否已被占用
     if check_port_in_use(PORT):
@@ -128,25 +147,32 @@ def main():
 
     print(f"  ⏳ 正在启动服务...")
 
-    with open(log_file, "a", encoding="utf-8") as log:
-        if sys.platform == "win32":
-            server = subprocess.Popen(
-                cmd,
-                cwd=BACKEND_DIR,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                env=env,
-                creationflags=0x08000000,
-            )
-        else:
-            server = subprocess.Popen(
-                cmd,
-                cwd=BACKEND_DIR,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                env=env,
-                start_new_session=True,
-            )
+    if args.foreground:
+        server = subprocess.Popen(
+            cmd,
+            cwd=BACKEND_DIR,
+            env=env,
+        )
+    else:
+        with open(log_file, "a", encoding="utf-8") as log:
+            if sys.platform == "win32":
+                server = subprocess.Popen(
+                    cmd,
+                    cwd=BACKEND_DIR,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    env=env,
+                    creationflags=0x08000000,
+                )
+            else:
+                server = subprocess.Popen(
+                    cmd,
+                    cwd=BACKEND_DIR,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    env=env,
+                    start_new_session=True,
+                )
 
     # 写入 PID 文件
     pid_file = os.path.join(ROOT_DIR, ".whisperMe.pid")
@@ -164,8 +190,17 @@ def main():
         print(f"  ❌ 启动超时，请查看日志: {log_file}")
         sys.exit(1)
 
-    # 启动器自身退出，服务器继续在后台运行
-    sys.exit(0)
+    if args.foreground:
+        print("\n  👉 提示: 请保持此窗口打开。按 Ctrl+C 随时停止服务...")
+        try:
+            server.wait()
+        except KeyboardInterrupt:
+            server.terminate()
+            print("\n  🛑 服务已优雅退出。")
+        sys.exit(0)
+    else:
+        # 启动器自身退出，服务器继续在后台运行
+        sys.exit(0)
 
 
 if __name__ == "__main__":

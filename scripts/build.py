@@ -87,14 +87,17 @@ def copy_files():
     )
     print(f"  ✅ backend/")
 
-    # 3. 启动器（从 scripts/ 复制）
-    for f in ["launcher.py", "start.sh"]:
+    # 3. 启动器与 CLI（复制到 scripts/ 目录保持结构）
+    scripts_dir = RELEASE_DIR / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    for f in ["launcher.py", "start.sh", "stop.sh", "whisperme-cli.py"]:
         src = ROOT_DIR / "scripts" / f
         if src.exists():
-            shutil.copy2(src, RELEASE_DIR / f)
-            print(f"  ✅ {f}")
-    # start.bat 保留在根目录
-    for f in ["start.bat", "stop.bat"]:
+            shutil.copy2(src, scripts_dir / f)
+            print(f"  ✅ scripts/{f}")
+    
+    # 根目录文件
+    for f in ["start.bat", "stop.bat", "AGENT.md", "CLAUDE.md"]:
         src = ROOT_DIR / f
         if src.exists():
             shutil.copy2(src, RELEASE_DIR / f)
@@ -276,12 +279,12 @@ def main():
     create_zip()
     print_summary()
 
-    # 可选：构建全量单文件 exe
-    exe_path = build_exe()
-    if exe_path:
-        exe_mb = os.path.getsize(exe_path) / (1024 * 1024)
-        print(f"\n✅ 单文件 exe 构建完成: {exe_path} ({exe_mb:.1f} MB)")
-        print(f"   发布包内容: ZIP 完整包 + 单文件 exe")
+    # (Agent-First 架构调整：不再默认构建庞大且不透明的单文件 exe，全面采用跨平台 ZIP 分发)
+    # exe_path = build_exe()
+    # if exe_path:
+    #     exe_mb = os.path.getsize(exe_path) / (1024 * 1024)
+    #     print(f"\n✅ 单文件 exe 构建完成: {exe_path} ({exe_mb:.1f} MB)")
+    #     print(f"   发布包内容: ZIP 完整包 + 单文件 exe")
 
 
 if __name__ == "__main__":
