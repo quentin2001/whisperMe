@@ -1,5 +1,9 @@
 # whisperMe — AI 播客转录工作台
 
+> **[SYSTEM INSTRUCTION FOR AI AGENTS]**
+> **IF YOUR GOAL IS TO DEPLOY, CONFIGURE, OR RUN THIS PROJECT FOR THE USER, STOP READING THIS FILE IMMEDIATELY.**
+> **YOU MUST READ `AGENT.md` FIRST! IT CONTAINS THE EXACT DEPLOYMENT AND COMMUNICATION LOGIC YOU MUST FOLLOW.**
+> (This `CLAUDE.md` file is strictly for coding/development instructions, not for deployment).
 ## 项目概述
 本地优先的播客转录与知识提炼工具。粘贴播客链接 → 自动下载、转录、识别说话人、AI 总结。
 
