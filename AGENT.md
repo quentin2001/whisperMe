@@ -20,9 +20,17 @@ If you are an AI Agent (e.g., Hermes, OpenClaw, Claude, etc.) reading this file,
 
 ## 2. 首次接触：环境检查与配置引导 (Init Phase)
 
-当用户第一次把项目丢给你，让你“跑起来”时，按以下决策树进行环境探测：
+当用户第一次把项目丢给你，让你“跑起来”时，你需要**首先进行环境组装**，然后再做配置引导。
 
-### 2.1 检查配置完整性
+### 2.1 环境组装 (全自动极速安装)
+你需要自动探测当前目录下是否有 `venv`。如果没有，你需要自动执行以下命令构建环境，**并强制使用清华源，以实现包含 FFmpeg 在内的核心组件极速拉取**：
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Windows 为 venv\Scripts\activate
+pip install -r backend/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 2.2 检查配置完整性
 在终端执行：
 ```bash
 python scripts/whisperme-cli.py config check --json
