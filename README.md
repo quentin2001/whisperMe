@@ -138,6 +138,9 @@ npm run dev
 **方式四：跨平台免安装包（推荐给小白与 Agent）**
 
 不需要克隆代码，不需要编译前端，直接前往 **[Releases 页面](https://github.com/quentin2001/whisperMe/releases/latest)** 下载最新的 `whisperMe-CrossPlatform-vX.X.X.zip`。
+
+> [!WARNING]
+> **防坑指南**：在下载列表里，请认准并只点击 `whisperMe-CrossPlatform-xxx.zip`。**千万不要**点击下方的 `Source code (zip)`，源码包里没有编译好的前端页面，下载后无法直接运行！
 解压后，执行：
 - Windows: 双击 `start.bat`
 - macOS/Linux: 终端运行 `bash scripts/start.sh`
