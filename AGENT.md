@@ -30,53 +30,30 @@ source venv/bin/activate  # Windows 为 venv\Scripts\activate
 pip install -r backend/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-### 2.2 检查配置完整性
-在终端执行：
-```bash
-python scripts/whisperme-cli.py config check --json
-```
-
-如果返回 `{"ready": false}`，说明配置不完整。你需要主动向用户发起引导对话：
-
-**对话模板 (请将以下逻辑转化为自然语言与用户沟通)：**
-> "为了让 whisperMe 运转，我们需要配置两个大模型：
-> 
-> **第一步：ASR 大模型 (负责把音频听写成文字)**
-> 你想用哪种？
-> 1. 在线 API（如：小米 MiMo 免费版、OpenAI Whisper API）。速度快，对电脑无要求。
-> 2. 本地算力（如：本地运行 faster-whisper）。需要你有 NVIDIA 显卡，完全断网可用。
-> 
-> **第二步：文本 LLM 大模型 (负责阅读文字并提取金句)**
-> 你想用哪种？
-> 1. 在线 API（如：DeepSeek, 阿里通义, OpenAI）。极度聪明，需要提供 API Key。
-> 2. 本地算力（如：你电脑上的 Ollama 或 LMStudio）。本地处理，完全隐私保护。"
-
-根据用户的回答，在后台静默执行配置注入：
-```bash
-# 例子：用户选在线 ASR 和在线 LLM，且提供了 Key
-python scripts/whisperme-cli.py config set asr_mode=online online_asr_provider=mimo summary_mode=online online_summary_api_key=sk-xxxx online_summary_base_url=https://api.deepseek.com/v1
-```
-
-### 2.2 启动后台服务
-配置完成后，启动服务：
+### 2.2 直接启动后台服务
+环境组装完毕后，不要停顿，直接使用 CLI 启动后台服务：
 ```bash
 python scripts/whisperme-cli.py server start
 ```
-*注意：此命令会自动在后台运行（daemon 模式），不会卡住你的终端。完成后你会收到启动成功的输出。*
+*注意：此命令会自动在后台运行（daemon 模式），不会卡住你的终端。*
 
-### 2.3 检查与引导 Prompt 自定义 (个性化设定)
-服务启动后，调用接口检查当前的 Prompt：
-```bash
-python scripts/whisperme-cli.py prompt show --json
-```
-如果这是首次启动，这行命令会自动为您在本地生成一份默认的 `prompt.json`。
-你需要顺势告诉用户：
-> "对了，我已经为您生成了一份默认的『AI总结提示词』。如果您对总结的口吻、格式有特殊要求（比如要求用繁体字、要求像脱口秀演员一样总结），随时可以告诉我，我会帮您修改全局 Prompt 规则。"
+### 2.3 向用户汇报并提供“三大核心配置”指引 (非常重要)
+服务启动成功后，你**必须**向用户发送一段完整、友好的指引语。请将以下内容转化为自然语言发给用户：
 
-如果用户提出了要求，你可以直接在后台修改：
-```bash
-python scripts/whisperme-cli.py prompt set "请根据以下内容生成..."
-```
+> "🎉 **whisperMe 已为您成功部署并在后台运行！** 您现在可以直接在浏览器打开 http://localhost:9173 访问。
+> 
+> 💡 **温馨提示：在正式开始转录播客前，项目需要进行三大核心能力的配置。** 您可以直接前往网页的『设置』页面手动填写，或者把您的密钥发给我，我用命令行帮您秒配：
+> 
+> 1. **🎙️ ASR 语音识别 (必须配置其一)**：
+>    - **在线 API（推荐，速度极快）**：支持小米 MiMo 或 OpenAI 等。需要您提供对应的 API KEY。
+>    - **本地算力（完全免费隐私）**：使用您的电脑显卡离线运行。
+> 2. **🧠 LLM 总结大模型 (必须配置其一)**：
+>    - **在线 API（最聪明）**：如 DeepSeek、OpenAI。需要您提供对应的 API KEY。
+>    - **本地大模型（完全隐私）**：如本地运行的 Ollama 或 LMStudio。
+> 3. **🔑 HuggingFace Token (可选)**：
+>    - 如果您刚才选择了**本地 ASR**，系统需要下载声纹模型，这要求您提供一个免费的 HuggingFace Read Token。如果您全用在线 API，则不需要这个。
+> 
+> *另外，我已经为您加载了默认的『脱口秀/播客总结提示词』，如果您需要换个总结口味（比如改成纯学术总结），随时告诉我！*"
 
 ---
 
