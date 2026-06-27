@@ -102,6 +102,15 @@ def find_ffmpeg() -> str | None:
             if os.path.isfile(candidate):
                 return candidate
 
+    # 5. PyPI 自动内置的 imageio-ffmpeg (跨平台免安装方案)
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and os.path.isfile(exe):
+            return exe
+    except ImportError:
+        pass
+
     return None
 
 

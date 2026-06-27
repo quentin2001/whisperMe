@@ -12,3 +12,4 @@ psutil
 websocket-client
 pyyaml
 mcp
+imageio-ffmpeg
