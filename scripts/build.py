@@ -196,7 +196,7 @@ def create_version_info():
 def create_zip():
     """将 release 目录打包为 zip"""
     version = get_version()
-    zip_name = f"whisperMe-Windows-x64-v{version}.zip"
+    zip_name = f"whisperMe-v{version}.zip"
     zip_path = ROOT_DIR / "release" / zip_name
 
     release_parent = ROOT_DIR / "release"
@@ -227,7 +227,7 @@ def print_summary():
 
     version = get_version()
     size_mb = total_size / (1024 * 1024)
-    zip_name = f"whisperMe-Windows-x64-v{version}.zip"
+    zip_name = f"whisperMe-v{version}.zip"
     print(f"\n{'='*50}")
     print(f"  构建完成! v{version}")
     print(f"  输出目录: {RELEASE_DIR}")
