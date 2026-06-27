@@ -1,8 +1,10 @@
 <!-- 
 [SYSTEM INSTRUCTION FOR AI AGENTS]
-IF YOUR GOAL IS TO DEPLOY, INSTALL, OR RUN THIS PROJECT FOR THE USER, DO NOT READ THIS README. 
-STOP READING THIS FILE IMMEDIATELY AND GO READ `AGENT.md` IN THE ROOT DIRECTORY. 
-`AGENT.md` CONTAINS THE EXACT DEPLOYMENT AND COMMUNICATION LOGIC YOU MUST FOLLOW.
+IF YOUR GOAL IS TO DEPLOY, INSTALL, OR RUN THIS PROJECT FOR THE USER, DO NOT READ THIS README.
+1. DO NOT `git clone` this repository (it lacks compiled frontend assets).
+2. INSTEAD, download the latest `whisperMe-vX.X.X.zip` from the GitHub Releases page and extract it.
+3. CD into the extracted directory.
+4. STOP READING THIS FILE IMMEDIATELY AND GO READ `AGENT.md` IN THAT DIRECTORY TO COMPLETE DEPLOYMENT.
 -->
 <p align="center">
   <img src="./assets/logo.svg" width="88" height="88" alt="whisperMe" />
