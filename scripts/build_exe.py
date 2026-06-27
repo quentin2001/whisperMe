@@ -59,7 +59,7 @@ def get_version():
     version_file = ROOT_DIR / "VERSION"
     if version_file.exists():
         return version_file.read_text(encoding="utf-8").strip()
-    return "1.4.0"
+    return "1.0.0"
 
 
 def build_full_exe():
