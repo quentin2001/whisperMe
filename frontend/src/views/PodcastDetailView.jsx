@@ -1326,6 +1326,11 @@ export default function PodcastDetailView({
           <div className="w-11 h-11 bg-[var(--accent-red)] rounded-lg overflow-hidden shadow-sm shrink-0 relative">
             {activeTask.image_url ? (
               <>
+                <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight absolute inset-0">
+                  <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
+                    {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
+                  </span>
+                </div>
                 <img
                   src={proxyImage(activeTask.image_url)}
                   alt=""
@@ -1333,11 +1338,6 @@ export default function PodcastDetailView({
                   className="w-full h-full object-cover absolute inset-0"
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
-                <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight absolute inset-0">
-                  <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
-                    {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
-                  </span>
-                </div>
               </>
             ) : (
               <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight">

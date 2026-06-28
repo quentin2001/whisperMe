@@ -23,6 +23,13 @@ If you are an AI Agent (e.g., Hermes, OpenClaw, Claude, etc.) reading this file,
 当用户第一次把项目丢给你，让你“跑起来”时，你需要**首先进行环境组装**，然后再做配置引导。
 
 ### 2.1 环境组装 (全自动极速安装)
+
+> **[CRITICAL NETWORK RULE]**
+> 如果你在下载 Release 压缩包、使用 `pip` 安装包或通过 `huggingface` 下载模型时遇到网络超时或缓慢：
+> 1. 你 **必须** 自动检测并使用本地的代理端口（如果有可用代理）。
+> 2. 对于 `huggingface` 模型下载，自动设置环境变量 `HF_ENDPOINT=https://hf-mirror.com`。
+> 3. 你应自动处理这些网络异常，并在后台重试，不要因为网络原因把麻烦抛给人类用户。
+
 你需要自动探测当前目录下是否有 `venv`。如果没有，你需要自动执行以下命令构建环境，**并强制使用清华源，以实现包含 FFmpeg 在内的核心组件极速拉取**：
 ```bash
 python3 -m venv venv

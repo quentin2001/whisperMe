@@ -70,8 +70,8 @@ class AppConfigModel(BaseModel):
     asr_mode: str = "online"
     online_asr_provider: str = "mimo"
     online_api_key: str = ""
-    online_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
-    online_model: str = "mimo-v2.5-asr"
+    online_base_url: str = Field(default="")
+    online_model: str = Field(default="")
     custom_asr_endpoint: str = ""
     custom_asr_method: str = "POST"
     custom_asr_headers: str = "{}"
@@ -82,12 +82,13 @@ class AppConfigModel(BaseModel):
     custom_asr_chunk_duration: int = 60
     summary_mode: str = "online"
     online_summary_api_key: str = ""
-    online_summary_base_url: str = "https://api.openai.com/v1"
-    online_summary_model: str = "gpt-4o-mini"
+    online_summary_base_url: str = Field(default="")
+    online_summary_model: str = Field(default="")
     enable_llm_semantic_sewing: bool = False
     webhook_url: str = ""
     custom_storage_dir: str = ""
     language: str = "en"
+    enable_autostart_windows: bool = False
     enable_auto_cleanup: bool = False
     cleanup_threshold_days: int = 30
     max_concurrent_tasks: int = 0  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
@@ -246,8 +247,8 @@ OLLAMA_MODEL = config.get("ollama_model", "qwen2.5:7b-instruct")
 
 SUMMARY_MODE = config.get("summary_mode", "online")
 ONLINE_SUMMARY_API_KEY = config.get("online_summary_api_key", "").strip()
-ONLINE_SUMMARY_BASE_URL = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
-ONLINE_SUMMARY_MODEL = config.get("online_summary_model", "gpt-4o-mini").strip()
+ONLINE_SUMMARY_BASE_URL = config.get("online_summary_base_url", "").strip()
+ONLINE_SUMMARY_MODEL = config.get("online_summary_model", "").strip()
 
 # 获取短路径版本，给 C++ 底层库直接使用
 SHORT_LOCAL_WHISPER_MODEL_PATH = get_short_path_name(LOCAL_WHISPER_MODEL_PATH)

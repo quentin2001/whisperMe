@@ -153,8 +153,7 @@ npm run dev
 - Windows: 双击 `start.bat`
 - macOS/Linux: 终端运行 `bash scripts/start.sh`
 
-启动后浏览器打开 **http://localhost:9173**（或生产模式 9101），粘贴一条播客链接即可开始。
-
+启动后浏览器会自动打开 **http://127.0.0.1:9101**，粘贴一条播客链接即可开始。
 <br />
 
 ---

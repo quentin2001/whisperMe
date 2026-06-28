@@ -1,14 +1,19 @@
 @echo off
-chcp 65001 >nul 2>&1
 cd /d "%~dp0"
 
-REM 通过 PID 文件停止服务
+echo Stopping whisperMe service...
+
 if exist .whisperMe.pid (
     set /p PID=<.whisperMe.pid
     taskkill /F /PID %PID% >nul 2>&1
     del .whisperMe.pid
-    echo whisperMe 服务已停止。
-) else (
-    echo whisperMe 未在运行（没有找到 PID 文件）。
 )
+
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :9101 ^| findstr /i LISTENING') do (
+    if not "%%a"=="0" (
+        taskkill /F /PID %%a >nul 2>&1
+    )
+)
+
+echo whisperMe service stopped successfully.
 pause

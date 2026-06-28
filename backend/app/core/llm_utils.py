@@ -20,8 +20,10 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
         The LLM's response text.
 
     Raises:
-        Exception: If the LLM API returns a non-200 status.
+        HTTPException: If the LLM API returns a non-200 status.
     """
+    from fastapi import HTTPException
+
     if not summary_mode:
         summary_mode = config.get("summary_mode", "local")
 
@@ -50,8 +52,12 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
     }
 
     with httpx.Client(timeout=timeout, trust_env=False) as client:
-        response = client.post(api_url, json=payload, headers=headers)
+        try:
+            response = client.post(api_url, json=payload, headers=headers)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"LLM 网络连接错误: {str(e)}")
+            
         if response.status_code != 200:
-            raise Exception(f"LLM API error (code {response.status_code}): {response.text}")
+            raise HTTPException(status_code=500, detail=f"LLM API error (code {response.status_code}): {response.text}")
         result = response.json()
         return result["choices"][0]["message"]["content"].strip()

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power } from "lucide-react";
 import { API_BASE } from "../constants.js";
 
 function SettingsDropdown({ value, options, onChange }) {
@@ -214,36 +214,6 @@ export default function SettingsView({
                 </div>
               )}
 
-              {/* HF Token 始终显示 — 声纹分割(PyAnnote)在任何 ASR 模式下都需要 */}
-              <div className="flex flex-col gap-2 animate-fade-in">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("HF Token (人声分割分段)", "HF Token (Speaker Diarization)")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                <input
-                  type="password"
-                  value={configData.hf_token || ""}
-                  onChange={(e) => handleConfigChange("hf_token", e.target.value)}
-                  className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`}
-                  placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                />
-                <p className="text-xs text-[var(--text-muted)]">{t("用于下载声纹识别模型，无论 ASR 是本地还是在线模式都需要", "Required for speaker diarization, needed in both local and online ASR modes")}</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleVerifyHF}
-                    disabled={hfChecking}
-                    className="px-3 py-1.5 text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {hfChecking ? <Loader2 size={12} className="animate-spin inline mr-1" /> : <ShieldAlert size={12} className="inline mr-1" />}
-                    {t("验证", "Verify")}
-                  </button>
-                  {hfTokenStatus && (
-                    hfTokenStatus.status === "valid"
-                      ? <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Check size={12} />{t("有效", "Valid")}</span>
-                      : hfTokenStatus.status === "invalid"
-                      ? <span className="text-xs font-bold text-[var(--accent-red)] flex items-center gap-1"><AlertCircle size={12} />{t("无效", "Invalid")}</span>
-                      : <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><AlertCircle size={12} />{t("未配置", "Not Set")}</span>
-                  )}
-                </div>
-              </div>
 
               {configData.asr_mode === "online" && (
                 <>
@@ -275,6 +245,46 @@ export default function SettingsView({
                 </>
               )}
             </div>
+
+
+            {/* Hugging Face Authorization Card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-red)]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
+              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
+                <ShieldAlert size={18} className="text-[var(--accent-red)]" />
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("Hugging Face 授权", "Hugging Face Authorization")}</h3>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("HF Token (人声分割必需)", "HF Token (Speaker Diarization)")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                <input
+                  type="password"
+                  value={configData.hf_token || ""}
+                  onChange={(e) => handleConfigChange("hf_token", e.target.value)}
+                  className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`}
+                  placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                />
+                <p className="text-xs text-[var(--text-muted)]">{t("必须配置此 Token 才能下载核心的声纹识别模型。只需要 Read (只读) 权限的免费 Token。", "Required to download the speaker diarization model. A free Read-only token is sufficient.")}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={handleVerifyHF}
+                    disabled={hfChecking}
+                    className="px-3 py-1.5 text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {hfChecking ? <Loader2 size={12} className="animate-spin inline mr-1" /> : <ShieldAlert size={12} className="inline mr-1" />}
+                    {t("验证 Token", "Verify Token")}
+                  </button>
+                  {hfTokenStatus && (
+                    hfTokenStatus.status === "valid"
+                      ? <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Check size={12} />{t("有效", "Valid")}</span>
+                      : hfTokenStatus.status === "invalid"
+                      ? <span className="text-xs font-bold text-[var(--accent-red)] flex items-center gap-1"><AlertCircle size={12} />{t("无效", "Invalid")}</span>
+                      : <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><AlertCircle size={12} />{t("未配置", "Not Set")}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
 
             {/* Card 2: LLM Summary Settings */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
@@ -467,6 +477,31 @@ export default function SettingsView({
               </div>
             </div>
 
+            {/* Windows Autostart Card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 transition-colors duration-300">
+              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 text-[var(--accent-red)]">
+                <Power size={16} />
+                <h3 className="font-bold text-sm text-[var(--text-primary)]">{t("开机自启动", "Auto Start on Boot")}</h3>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={configData.enable_autostart_windows || false}
+                      onChange={(e) => handleConfigChange("enable_autostart_windows", e.target.checked)}
+                    />
+                    <div className={`block w-10 h-6 rounded-full transition-colors ${configData.enable_autostart_windows ? 'bg-[var(--accent-red)]' : 'bg-[var(--border-primary)]'}`}></div>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configData.enable_autostart_windows ? 'transform translate-x-4' : ''}`}></div>
+                  </div>
+                  <span className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-red)] transition-colors">
+                    {t("随系统开机自动后台运行", "Start automatically in background on system boot")}
+                  </span>
+                </label>
+              </div>
+            </div>
+
             {/* Notifications Card */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
               <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
@@ -516,23 +551,7 @@ export default function SettingsView({
                 </div>
               )}
             </div>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 text-[var(--accent-red)]">
-                <Globe size={16} />
-                <h3 className="font-bold text-sm text-[var(--text-primary)]">{t("系统语言设置", "System Language Preference")}</h3>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("语言选择", "Select Language")}</label>
-                <SettingsDropdown
-                  value={configData.language || "en"}
-                  onChange={(val) => handleConfigChange("language", val)}
-                  options={[
-                    { value: "zh-CN", label: t("简体中文 (ZH-CN)", "CHINESE (ZH-CN)") },
-                    { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
-                  ]}
-                />
-              </div>
-            </div>
+
 
             {/* Audio Auto-Cleanup Panel */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 animate-fade-in transition-colors duration-300">

@@ -219,10 +219,31 @@ def cmd_server(args):
                 if sys.platform == "win32":
                     subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
                 else:
+                    import signal
                     os.kill(pid, signal.SIGTERM)
                 PID_FILE.unlink()
             except Exception:
                 pass
+                
+        # 终极兜底：强杀占用该端口的残留进程 (避免 PID 文件丢失导致无法重启)
+        try:
+            if sys.platform == "win32":
+                out = subprocess.check_output(f"netstat -ano | findstr :{API_PORT}", shell=True).decode()
+                for line in out.strip().split('\n'):
+                    if "LISTENING" in line or "LISTENING" in line.upper():
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            pid = parts[-1]
+                            if pid != "0":
+                                subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+            else:
+                import signal
+                out = subprocess.check_output(f"lsof -i:{API_PORT} -t", shell=True).decode()
+                for pid in out.strip().split('\n'):
+                    if pid:
+                        os.kill(int(pid), signal.SIGKILL)
+        except Exception:
+            pass
                 
         print_result({"status": "stopped", "message": "服务已停止"}, as_json=args.json)
         

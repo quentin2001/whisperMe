@@ -65,10 +65,10 @@ docs/                # 详细文档（architecture/user_guide/changelog/DESIGN/C
 | 播客问答 | ✅ | `POST /api/tasks/{id}/qa` 基于转录文本的 LLM 问答 |
 | MCP Server | ✅ | `/mcp` 端点，8 个工具 + 资源 + 提示词（需 `mcp` 包） |
 | 在线模式 | ✅ | 零 torch 依赖启动包（~137MB），MiMo ASR + 在线 LLM |
-| HF Token 验证 | ✅ | `GET /api/settings/hf-token-status` + 前端状态徽章 + 引导横幅 |
+| HF Token 验证 | ✅ | 独立组件 + `GET /api/settings/hf-token-status` + 引导横幅 |
 | GPU 自适应精度 | ✅ | compute_type 按显存自动选 float16/int8_float16/int8 |
 | VAD 静音过滤 | ✅ | Silero VAD filter 跳过静音段推理 |
-| MiMo 并发分片 | ✅ | ThreadPoolExecutor(max_workers=4) 并发 ASR 请求 |
+| 全平台自启动 | ✅ | Windows (Startup Bat) + macOS (LaunchAgents plist) 后台静默自启 |
 | 代码去重 | ✅ | network.py（DoH DNS 直连）+ compat.py（Windows 子进程无窗口） |
 
 ## 编码规范
@@ -80,13 +80,13 @@ docs/                # 详细文档（architecture/user_guide/changelog/DESIGN/C
 - 配置: config.json（git 忽略），config.example.json（脱敏模板）
 - **前端网络**: 图片通过 `/api/proxy/image` 代理加载，`constants.js` 中的 `proxyImage()` 统一处理
 
-## 端口配置
-- 后端: 9101
-- 前端: 9173（Vite dev server）
+## 端口配置 (已前后端同源统一)
+- **生产统一端口**: 9101 (FastAPI 托管前端编译产物)
+- 开发前端端口: 9173（Vite dev server，仅开发时使用）
 - 开发启动: `python scripts/start_project.py`（前后端双进程）
 - 生产启动: 双击 `start.bat`（Windows）或运行 `scripts/start.sh`（macOS）
 - **Agent CLI**: `python scripts/whisperme-cli.py` (全能命令行控制桥，供大模型 Agent 如 Hermes 离线配置与托管)
-- 停止: `stop.bat` / `stop.sh` 或访问 `/api/shutdown`
+- 停止: `stop.bat` / `stop.sh` 或访问 `/api/shutdown` (底层会自动通过 taskkill/lsof 强杀 9101)
 
 ## 三种启动路径
 | 方式 | 入口 | 用户 | 前端 |

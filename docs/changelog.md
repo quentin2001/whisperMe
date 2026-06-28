@@ -1,7 +1,18 @@
 # whisperMe — 变更日志 (Changelog)
 
-## Session `2026-06-26` — 性能优化 + 字体升级 + 项目整理
+## Session `2026-06-28` — Bug 修复与体验优化
 
+### 🐛 缺陷修复
+- **端口强杀 (stop.bat/stop.sh)**: 完全重写停止脚本，除了检查 `.whisperMe.pid` 之外，增加底层端口占用强制清理逻辑（Windows 依赖 `netstat/taskkill`，macOS/Linux 依赖 `lsof/kill`），彻底解决启动时 `9101 端口被占用` 的问题。
+- **长文本 LLM OOM 处理**: 修复 `call_llm` 因 Ollama 崩溃抛出原生 Exception 导致前端 JSON 解析失败的问题。现在会将其封装为 `HTTPException` 抛出，前端可以优雅地向用户展示真实的 LLM 错误原因（如 context length 超限）。
+- **前端 UI 修复**: 修复了播客详情页左下角播放控制栏中，播客封面图加载成功后，默认的首字母兜底文字依然悬浮在图片上方导致重叠的视觉 Bug。
+
+### ✨ 体验优化
+- **全平台自启动支持**: 后台新增对 macOS `launchctl` (LaunchAgents) 的支持，前端文案由“Windows 开机自动后台运行”更名为跨平台的“随系统开机自动后台运行”。
+- **前后端同源**: 梳理文档和架构，彻底明确生产环境下统一采用 `9101` 端口，前端静态页面通过 FastAPI 直出，根绝 CORS 问题，实现零配置双击即用。
+- **设置面板分离**: 将 `HF Token` 配置从 ASR 引擎设置卡片中独立拆分为专用的 `Hugging Face Authorization` 认证卡片，并修复了“系统语言偏好”组件被错误复制两份的问题。
+
+## Session `2026-06-26` — 性能优化 + 字体升级 + 项目整理
 ### 🚀 RTX 3070 ASR 性能优化 (WP-1)
 - **自适应 compute_type**: 按 GPU 总显存自动选择 float16 / int8_float16 / int8
 - **默认模型升级**: `large-v3` → `large-v3-turbo`（速度 ~6x 提升）
