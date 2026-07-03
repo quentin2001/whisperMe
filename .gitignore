@@ -72,3 +72,8 @@ logs/
 *.db-shm
 *.db-wal
 
+# 12. Local Logo Conversion Assets (Keep git repo clean and light)
+frontend/public/logo-*.png
+frontend/public/logo-*.webp
+frontend/public/favicon-32.png
+
