@@ -36,6 +36,14 @@ class ASRProvider(ABC):
         """返回 Provider 的显示名称，用于前端 UI 展示"""
         pass
 
+    @property
+    def supports_native_timestamps(self) -> bool:
+        """
+        是否原生支持精确到段落/词的时间戳。
+        如果为 True 且声纹关闭，流水线将跳过 WAV 预处理，直接分片上传。
+        """
+        return False
+
     # ==================== 共享工具方法 ====================
 
     @staticmethod

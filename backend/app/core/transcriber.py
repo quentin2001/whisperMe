@@ -28,6 +28,9 @@ class ModelCacheManager:
         self.device = None
         self.compute_type = None
         self.last_used_time = 0.0
+        
+        self.pyannote_diarization = None
+        self.pyannote_embedding = None
         self.lock = threading.Lock()
         self._watcher_thread = None
         self.running = False
@@ -53,6 +56,9 @@ class ModelCacheManager:
                         self.model_path = None
                         self.device = None
                         self.compute_type = None
+                        
+                        self.pyannote_diarization = None
+                        self.pyannote_embedding = None
                         
                         import gc
                         import sys
@@ -109,6 +115,57 @@ class ModelCacheManager:
             self.last_used_time = time.time()
             return model
 
+    def get_pyannote_diarization(self, device: str):
+        self.start_watcher()
+        with self.lock:
+            if self.pyannote_diarization is not None:
+                print("🎯 [LOG] 命中 PyAnnote Diarization 内存缓存！")
+                self.last_used_time = time.time()
+                import torch
+                self.pyannote_diarization.to(torch.device(device))
+                return self.pyannote_diarization
+            
+            print("📡 [LOG] 正在加载 PyAnnote 3.1 声纹模型管道...")
+            import torch
+            from pyannote.audio import Pipeline
+            pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1", 
+                use_auth_token=HF_TOKEN
+            )
+            pipeline.to(torch.device(device))
+            self.pyannote_diarization = pipeline
+            self.last_used_time = time.time()
+            return pipeline
+
+    def get_pyannote_embedding(self, device: str):
+        self.start_watcher()
+        with self.lock:
+            if self.pyannote_embedding is not None:
+                print("🎯 [LOG] 命中 PyAnnote Embedding 内存缓存！")
+                self.last_used_time = time.time()
+                import torch
+                # Embedding model's Inference object wraps the Model, we recreate Inference later
+                # We just cache the Model
+                return self.pyannote_embedding
+                
+            print("📡 [LOG] 正在加载 PyAnnote 声纹特征提取模型...")
+            from pyannote.audio import Model
+            model = Model.from_pretrained("pyannote/embedding", use_auth_token=HF_TOKEN)
+            self.pyannote_embedding = model
+            self.last_used_time = time.time()
+            return model
+            
+    def preload_models(self):
+        if config.get("preload_models", True):
+            if HF_TOKEN and len(HF_TOKEN) >= 30:
+                print("⏳ [LOG] 预加载 PyAnnote 模型...")
+                try:
+                    self.get_pyannote_diarization("cpu")
+                    self.get_pyannote_embedding("cpu")
+                    print("✅ [LOG] PyAnnote 模型预加载成功！")
+                except Exception as e:
+                    print(f"⚠️ [LOG] 预加载失败: {e}")
+
 model_cache_manager = ModelCacheManager()
 
 
@@ -148,9 +205,9 @@ class PodcastTranscriber:
             self.compute_type = "int8"  # CPU 上用 INT8 加速
         print(f"🖥️ [LOG] 初始化转录引擎 - 默认运行设备: {self.device.upper()} | 运算精度: {self.compute_type}")
 
-    def run_diarization(self, wav_path: str) -> list[dict]:
+    def run_diarization_and_embedding(self, wav_path: str) -> tuple[list[dict], dict[str, list[float]]]:
         """
-        运行 pyannote.audio 进行声纹识别与说话人分割
+        运行 pyannote.audio 进行声纹识别与说话人分割，并在同一批次直接从内存中提取特征向量
         """
         # 对路径进行短路径安全处理，防御 C++ 库路径崩溃
         short_wav_path = get_short_path_name(os.path.abspath(wav_path))
@@ -158,11 +215,19 @@ class PodcastTranscriber:
         # 验证 Hugging Face Token 长度是否合理
         if not HF_TOKEN or len(HF_TOKEN) < 30:
             print("⚠️ [LOG 严重警告] 检测到未配置或无效的 Hugging Face Token。自动触发熔断降级：跳过声纹角色切分，直接进入语音文本识别！")
-            return []
+            return [], {}
 
         try:
             import torch
-            from pyannote.audio import Pipeline
+            import torchaudio
+            from pyannote.audio import Pipeline, Inference
+            from pyannote.core import Segment
+            import numpy as np
+            
+            # 直接将音频加载到内存，避免后续二次读取
+            waveform, sample_rate = torchaudio.load(short_wav_path)
+            audio_in_memory = {"waveform": waveform, "sample_rate": sample_rate}
+            
             # 动态可用显存监控，实现硬件级别的热熔断 CPU 降级机制
             device_to_use = self.device
             if device_to_use == "cuda":
@@ -177,17 +242,10 @@ class PodcastTranscriber:
                 except Exception as mem_ex:
                     print(f"⚠️ [LOG] 获取 GPU 显存失败: {mem_ex}")
 
-            print("📡 [LOG] 正在从 hf-mirror 镜像源加载 PyAnnote 3.1 声纹模型管道...")
-            pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1", 
-                use_auth_token=HF_TOKEN
-            )
+            pipeline = model_cache_manager.get_pyannote_diarization(device_to_use)
             
-            # 将模型载入目标设备
-            pipeline.to(torch.device(device_to_use))
-            
-            print(f"⏳ [LOG] 声纹网络分析中... 运行设备: {device_to_use.upper()} | 音频路径: {short_wav_path}")
-            diarization = pipeline(short_wav_path)
+            print(f"⏳ [LOG] 声纹网络分析中... 运行设备: {device_to_use.upper()} | 音频已加载至内存")
+            diarization = pipeline(audio_in_memory)
             
             diarization_list = []
             for turn, _, speaker in diarization.itertracks(yield_label=True):
@@ -199,7 +257,82 @@ class PodcastTranscriber:
                 
             unique_speakers = set([d["speaker"] for d in diarization_list])
             print(f"🟢 [LOG] 声纹角色分割顺利完成！检测到 {len(unique_speakers)} 位发言人: {list(unique_speakers)}")
-            return diarization_list
+            
+            # 立即在内存中进行特征提取
+            speaker_embeddings = {}
+            if unique_speakers:
+                print("📡 [LOG] 正在从内存中直接提取特征向量...")
+                emb_model = model_cache_manager.get_pyannote_embedding(device_to_use)
+                inference = Inference(emb_model, window="whole", device=torch.device(device_to_use))
+                
+                for speaker in unique_speakers:
+                    sp_segs = [s for s in diarization_list if s.get("speaker") == speaker]
+                    if not sp_segs:
+                        continue
+                        
+                    sp_segs = sorted(sp_segs, key=lambda s: s["end"] - s["start"], reverse=True)
+                    candidate_segs = [seg for seg in sp_segs if seg["end"] - seg["start"] >= 1.5][:5]
+                    if not candidate_segs:
+                        candidate_segs = [sp_segs[0]]
+                        
+                    embeddings_list = []
+                    for seg in candidate_segs:
+                        start = seg["start"]
+                        end = min(seg["start"] + 10.0, seg["end"])
+                        try:
+                            emb = inference.crop(audio_in_memory, Segment(start, end))
+                            if isinstance(emb, np.ndarray):
+                                emb = np.nan_to_num(emb)
+                                norm = np.linalg.norm(emb)
+                                if norm > 0:
+                                    embeddings_list.append(emb / norm)
+                        except Exception as seg_ex:
+                            print(f"⚠️ [LOG] 提取 {speaker} 片段声纹失败: {seg_ex}")
+                            continue
+                            
+                    if embeddings_list:
+                        avg_emb = np.mean(embeddings_list, axis=0)
+                        norm = np.linalg.norm(avg_emb)
+                        if norm > 0:
+                            avg_emb = avg_emb / norm
+                        speaker_embeddings[speaker] = avg_emb.tolist()
+                        
+                print(f"🟢 [LOG] 成功完成 {len(speaker_embeddings)} 个发言人的特征提取！")
+                
+                # ====== 单集内声纹聚类修正 ======
+                if len(speaker_embeddings) >= 2:
+                    merge_map = {}
+                    sp_ids = sorted(speaker_embeddings.keys())
+                    for i in range(len(sp_ids)):
+                        if sp_ids[i] in merge_map: continue
+                        for j in range(i + 1, len(sp_ids)):
+                            if sp_ids[j] in merge_map: continue
+                            emb_i = np.array(speaker_embeddings[sp_ids[i]])
+                            emb_j = np.array(speaker_embeddings[sp_ids[j]])
+                            norm_i = np.linalg.norm(emb_i)
+                            norm_j = np.linalg.norm(emb_j)
+                            if norm_i > 0 and norm_j > 0:
+                                sim = np.dot(emb_i, emb_j) / (norm_i * norm_j)
+                                if sim >= 0.92:
+                                    merge_map[sp_ids[j]] = sp_ids[i]
+                                    print(f"🔗 [LOG] 声纹聚类修正: {sp_ids[j]} 与 {sp_ids[i]} 高度相似 (cos={sim:.4f})，合并为 {sp_ids[i]}")
+                                    
+                    if merge_map:
+                        for seg in diarization_list:
+                            if seg.get("speaker") in merge_map:
+                                seg["speaker"] = merge_map[seg["speaker"]]
+                        for merged_sp in merge_map:
+                            if merged_sp in speaker_embeddings:
+                                del speaker_embeddings[merged_sp]
+                        print(f"🎯 [LOG] 聚类修正完成，当前剩余 {len(speaker_embeddings)} 个独立发言人")
+
+            # 清理内存中的音频
+            del audio_in_memory
+            del waveform
+            import gc
+            gc.collect()
+            
+            return diarization_list, speaker_embeddings
             
         except Exception as e:
             import traceback
@@ -439,8 +572,7 @@ class PodcastTranscriber:
             from pyannote.core import Segment
             import numpy as np
 
-            print("📡 [LOG] 正在加载 PyAnnote 声纹特征提取模型...")
-            model = Model.from_pretrained("pyannote/embedding", use_auth_token=HF_TOKEN)
+            model = model_cache_manager.get_pyannote_embedding(device_to_use)
             
             # 动态分配推理计算设备
             device_to_use = self.device

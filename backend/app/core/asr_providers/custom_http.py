@@ -53,103 +53,149 @@ class CustomHTTPProvider(ASRProvider):
         print(f"📦 [LOG] 音频总时长: {audio_duration:.2f} 秒 | 分片: {chunk_duration}s | 格式: {audio_format}")
 
         num_chunks = max(1, int(math.ceil(audio_duration / chunk_duration)))
-        all_segments = []
-
+        
+        # Phase 1: 串行提取所有分片
+        chunk_tasks = []
         for i in range(num_chunks):
             start_offset = i * chunk_duration
             slice_duration = min(chunk_duration, audio_duration - start_offset)
             if slice_duration <= 0.1:
                 continue
-
+                
             chunk_path = None
             try:
-                print(f"✂️ [LOG] 自定义 ASR 分片 {i+1}/{num_chunks}: {start_offset:.1f}s ~ {start_offset + slice_duration:.1f}s")
-
-                # 提取分片
+                print(f"✂️ [LOG] 自定义 ASR 提取分片 {i+1}/{num_chunks}: {start_offset:.1f}s ~ {start_offset + slice_duration:.1f}s")
                 if audio_format == "wav":
                     chunk_path = self.extract_chunk_as_wav(wav_path, start_offset, slice_duration, i)
                 else:
                     chunk_path = self.extract_chunk_as_mp3(wav_path, start_offset, slice_duration, i)
 
                 audio_b64 = self.audio_file_to_base64(chunk_path)
-
-                # 构建请求 body
-                if body_template:
-                    body_str = body_template.replace("{{audio_base64}}", audio_b64)
-                    body_str = body_str.replace("{{audio_format}}", audio_format)
-                    body_str = body_str.replace("{{chunk_index}}", str(i))
-                    body_str = body_str.replace("{{start_offset}}", str(start_offset))
-                    try:
-                        body = json.loads(body_str)
-                    except json.JSONDecodeError:
-                        body = body_str
-                else:
-                    # 默认 body 格式
-                    body = {
-                        "audio": audio_b64,
-                        "format": audio_format,
-                        "language": "zh"
-                    }
-
-                # 发送请求
-                response = self._send_request(endpoint, method, custom_headers, body)
-                result = response.json()
-
-                # 提取文本
-                text = self._extract_by_path(result, text_path)
-                if not text:
-                    print(f"⚠️ [LOG] 分片 {i+1} 响应中未提取到文本 (jsonpath: {text_path})，跳过")
-                    continue
-
-                # 提取时间戳（可选）
-                timestamps = None
-                if ts_path:
-                    timestamps = self._extract_by_path(result, ts_path)
-
-                # 构建段落
-                if timestamps and isinstance(timestamps, list) and len(timestamps) > 0:
-                    # 有时间戳
-                    for ts_item in timestamps:
-                        if isinstance(ts_item, dict):
-                            seg_text = ts_item.get("text", "").strip()
-                            seg_start = ts_item.get("start", 0.0) + start_offset
-                            seg_end = ts_item.get("end", seg_start + 1.0) + start_offset
-                        elif isinstance(ts_item, list) and len(ts_item) >= 2:
-                            seg_text = text  # fallback
-                            seg_start = ts_item[0] / 1000.0 + start_offset
-                            seg_end = ts_item[1] / 1000.0 + start_offset
-                        else:
-                            continue
-                        if seg_text:
-                            all_segments.append({
-                                "start": seg_start,
-                                "end": seg_end,
-                                "text": seg_text
-                            })
-                else:
-                    # 无时间戳 — 使用字符比例估算
-                    sentences = self.split_text_to_sentences(text)
-                    sentences = self.deduplicate_sentences(sentences)
-                    chunk_end = start_offset + slice_duration
-                    mapped = self.map_sentences_to_timestamps(
-                        sentences, diarization_segments, start_offset, chunk_end
-                    )
-                    all_segments.extend(mapped)
-
-                # 进度回调
-                if progress_callback:
-                    progress = 60.0 + ((start_offset + slice_duration) / audio_duration) * 15.0
-                    progress = min(progress, 75.0)
-                    try:
-                        progress_callback(progress)
-                    except Exception:
-                        pass
-
-            except Exception as chunk_ex:
-                raise chunk_ex
-            finally:
+                chunk_tasks.append({
+                    "index": i,
+                    "start_offset": start_offset,
+                    "slice_duration": slice_duration,
+                    "audio_b64": audio_b64,
+                    "chunk_path": chunk_path
+                })
+            except Exception as ex:
+                print(f"⚠️ [LOG] 分片 {i+1} 提取失败: {ex}")
                 if chunk_path:
                     self.cleanup_temp_file(chunk_path)
+
+        # Phase 2: 并发发送 API 请求
+        import threading
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        max_workers = config.get("max_concurrent_tasks", 4)
+        
+        results_lock = threading.Lock()
+        all_results = []
+        progress_lock = threading.Lock()
+        last_progress_end = 0.0
+
+        def process_chunk(task):
+            i = task["index"]
+            start_offset = task["start_offset"]
+            slice_duration = task["slice_duration"]
+            audio_b64 = task["audio_b64"]
+            
+            # 构建请求 body
+            if body_template:
+                body_str = body_template.replace("{{audio_base64}}", audio_b64)
+                body_str = body_str.replace("{{audio_format}}", audio_format)
+                body_str = body_str.replace("{{chunk_index}}", str(i))
+                body_str = body_str.replace("{{start_offset}}", str(start_offset))
+                try:
+                    body = json.loads(body_str)
+                except json.JSONDecodeError:
+                    body = body_str
+            else:
+                body = {
+                    "audio": audio_b64,
+                    "format": audio_format,
+                    "language": "zh"
+                }
+
+            # 发送请求
+            response = self._send_request(endpoint, method, custom_headers, body)
+            result = response.json()
+
+            # 提取文本
+            text = self._extract_by_path(result, text_path)
+            if not text:
+                print(f"⚠️ [LOG] 分片 {i+1} 响应中未提取到文本 (jsonpath: {text_path})，跳过")
+                return None
+
+            # 提取时间戳（可选）
+            timestamps = None
+            if ts_path:
+                timestamps = self._extract_by_path(result, ts_path)
+
+            chunk_segments = []
+            if timestamps and isinstance(timestamps, list) and len(timestamps) > 0:
+                for ts_item in timestamps:
+                    if isinstance(ts_item, dict):
+                        seg_text = ts_item.get("text", "").strip()
+                        seg_start = ts_item.get("start", 0.0) + start_offset
+                        seg_end = ts_item.get("end", seg_start + 1.0) + start_offset
+                    elif isinstance(ts_item, list) and len(ts_item) >= 2:
+                        seg_text = text  # fallback
+                        seg_start = ts_item[0] / 1000.0 + start_offset
+                        seg_end = ts_item[1] / 1000.0 + start_offset
+                    else:
+                        continue
+                    if seg_text:
+                        chunk_segments.append({
+                            "start": seg_start,
+                            "end": seg_end,
+                            "text": seg_text
+                        })
+            else:
+                # 无时间戳 — 使用字符比例估算
+                sentences = self.split_text_to_sentences(text)
+                sentences = self.deduplicate_sentences(sentences)
+                chunk_end = start_offset + slice_duration
+                mapped = self.map_sentences_to_timestamps(
+                    sentences, diarization_segments, start_offset, chunk_end
+                )
+                chunk_segments.extend(mapped)
+
+            # 进度回调
+            if progress_callback and chunk_segments:
+                nonlocal last_progress_end
+                with progress_lock:
+                    if chunk_segments[-1]["end"] > last_progress_end:
+                        last_progress_end = chunk_segments[-1]["end"]
+                        progress = 60.0 + (last_progress_end / max(audio_duration, 1.0)) * 15.0
+                        progress = min(progress, 75.0)
+                        try:
+                            progress_callback(progress)
+                        except Exception:
+                            pass
+                            
+            return (task["index"], chunk_segments)
+            
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(process_chunk, t): t for t in chunk_tasks}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result:
+                        with results_lock:
+                            all_results.append(result)
+                except Exception as e:
+                    task = futures[future]
+                    print(f"❌ [LOG] 分片 {task['index']+1} 请求失败: {e}")
+                    
+        all_results.sort(key=lambda x: x[0])
+        all_segments = []
+        for _, segs in all_results:
+            all_segments.extend(segs)
+
+        # 清理临时文件
+        for task in chunk_tasks:
+            if task["chunk_path"]:
+                self.cleanup_temp_file(task["chunk_path"])
 
         print(f"🟢 [LOG] 自定义 HTTP ASR 识别成功！共 {len(all_segments)} 段。")
         return all_segments

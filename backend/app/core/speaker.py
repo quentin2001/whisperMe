@@ -164,45 +164,23 @@ def split_shownotes(shownotes: str) -> dict:
 
 
 
-def _llm_identify_participants(title: str, episode_content: str, template_names: set, summary_mode: str = None) -> list:
+def batch_infer_speakers(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict, summary_mode: str = None, shownotes_split: dict = None) -> dict:
     """
-    第二阶段：推理这期节目的所有【可能参与者名单】
+    将名单推断与声纹匹配合并为一次 LLM 请求，减少网络延迟
     """
-    prompt = f"""一期播客的标题是：《{title}》
-该节目的 ShowNotes（播客简介）部分摘录如下：
----
-{episode_content}
----
-此外，本节目在固定结尾常驻的主播/幕后团队名单候选有：{list(template_names)}。
-
-任务：
-请根据标题、播客简介，推断出这期单集节目的“真实在场说话的发言人”（包含常驻主播、特邀嘉宾等）。
-注意：
-1. 播客简介里提到的人名（如“本期我们邀请了XXX”）是极高概率的在场发言人。
-2. 固定结尾名单中的主播，可能这期节目录制时缺席了（例如“本期由主播A独立主持，主播B请假”）。请根据简介内容排除缺席的常驻主播。
-3. 请只列出你认为确定在场发言的人名列表。
-
-请以严格的 JSON 数组格式返回（不要有 ```json 或 Markdown 格式包裹，只返回纯文本数组），例如：
-["张三", "李四"]"""
+    if not unmatched_speakers:
+        return {}
+        
+    title = metadata.get("title", "未知标题")
+    shownotes = metadata.get("shownotes", "")
     
-    try:
-        response_str = call_llm(prompt, summary_mode=summary_mode, label="第2阶段-识别在场名单")
-    except LLMError as e:
-        print(f"❌ [LOG ERROR] LLM 请求失败: {e}")
-        response_str = ""
-    try:
-        cleaned = response_str.strip().replace("```json", "").replace("```", "").strip()
-        parsed = json.loads(cleaned)
-        if isinstance(parsed, list):
-            return parsed
-    except Exception:
-        pass
-    return []
-
-def _llm_match_speakers(participants: list, transcript: list, unmatched_speakers: list, known_mappings: dict, title: str, summary_mode: str = None) -> dict:
-    """
-    第三阶段：将临时发言人标签（如 SPEAKER_00）与推导出的真实人名进行配对
-    """
+    if not shownotes_split:
+        shownotes_split = split_shownotes(shownotes)
+        
+    episode_content = shownotes_split["episode_content"]
+    template_names = shownotes_split["template_names"]
+    
+    # 构造 transcript 样本
     sample_size = min(35, len(transcript))
     sample_transcript = []
     
@@ -221,35 +199,43 @@ def _llm_match_speakers(participants: list, transcript: list, unmatched_speakers
             sample_transcript.append(f"{mapped_name}: {txt}")
             
     transcript_snippet = "\n".join(sample_transcript)
-    
+
     prompt = f"""你是一个顶级的音频文本声光定位分析专家。
 当前有一期播客，标题为：《{title}》
-经算法分析，本期单集实际在场的【真实发言人名单】候选有：{participants}。
+该节目的 ShowNotes（播客简介）部分摘录如下：
+---
+{episode_content}
+---
+本节目在固定结尾常驻的主播/幕后团队名单候选有：{list(template_names)}。
 
 现在给你这期节目开头的前 30 句转录文本（其中部分发言人可能已经被声纹库认出并标记了名字，其余则标记为临时符号如 SPEAKER_XX）：
 ---
 {transcript_snippet}
 ---
 
-请根据发言人的说话语气、自报家门（如“大家好，我是某某”）、打招呼以及相互的称呼、甚至对话的逻辑，把这些未识别的临时发言人标识（{unmatched_speakers}）与真实候选名单（{participants}）进行精确的一对一匹配。
+任务：
+1. 请根据标题和简介，推断出这期单集节目的“真实在场说话的发言人”（可能包含常驻主播或特邀嘉宾。注意排除缺席的常驻主播）。
+2. 根据发言人的说话语气、自报家门、相互称呼及对话逻辑，把这些未识别的临时发言人标识（{unmatched_speakers}）与真实人名进行精确匹配。
 
 输出要求：
-1. 必须以严格的 JSON 字典格式输出，Key 为临时标识，Value 为匹配到的真实人名，例如：{{"SPEAKER_00": "张三"}}。
+1. 必须以严格的 JSON 字典格式输出，Key 为临时标识（如 SPEAKER_00），Value 为匹配到的真实人名，例如：{{"SPEAKER_00": "张三"}}。
 2. 不要包含 ```json 或 Markdown 符号包裹，直接输出纯 JSON 字符串。
 3. 如果某个人物实在无法判定，可以不输出在 JSON 中。"""
 
     try:
-        response_str = call_llm(prompt, summary_mode=summary_mode, label="第3阶段-声纹与人名匹配")
+        response_str = call_llm(prompt, summary_mode=summary_mode, label="批量推断与匹配")
     except LLMError as e:
         print(f"❌ [LOG ERROR] LLM 请求失败: {e}")
         response_str = ""
+        
     try:
         cleaned = response_str.strip().replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
-            return parsed
-    except Exception:
-        pass
+            print(f"🔌 [LOG] 批量推理建议映射: {parsed}")
+            return _validate_mappings(parsed, episode_content, shownotes_split["episode_names"], template_names)
+    except Exception as e:
+        print(f"⚠️ [LOG ERROR] 解析批量推断结果失败: {e}")
     return {}
 
 def _validate_mappings(llm_mappings: dict, episode_content: str, episode_names: set, template_names: set) -> dict:
@@ -281,38 +267,6 @@ def _validate_mappings(llm_mappings: dict, episode_content: str, episode_names: 
             if not fuzzy_match:
                 print(f"🛡️ [交叉校验拦截] 大模型输出的 '{matched_name}' 无法在播客 ShowNotes 中找到任何提及，判定为幻觉匹配，已拒绝应用该结果！")
                 
-    return final_mappings
-
-def match_speakers_with_llm(metadata: dict, transcript: list, unmatched_speakers: list, known_mappings: dict, summary_mode: str = None, noise_speakers: dict = None, shownotes_split: dict = None) -> dict:
-    """
-    运行大模型基于上下文推理的声纹匹配管线（第2、3、4阶段）
-    """
-    if not unmatched_speakers:
-        return {}
-        
-    title = metadata.get("title", "未知标题")
-    shownotes = metadata.get("shownotes", "")
-    
-    if not shownotes_split:
-        shownotes_split = split_shownotes(shownotes)
-        
-    episode_content = shownotes_split["episode_content"]
-    template_names = shownotes_split["template_names"]
-    episode_names = shownotes_split["episode_names"]
-    
-    participants = _llm_identify_participants(title, episode_content, template_names, summary_mode=summary_mode)
-    if not participants:
-        print("⚠️ [LOG 警告] 第二阶段未推断出任何在场发言人名单候选。")
-        return {}
-    print(f"👥 [LOG] 第二阶段 - 大模型推断的本期真实在场人员: {participants}")
-    
-    llm_mappings = _llm_match_speakers(participants, transcript, unmatched_speakers, known_mappings, title, summary_mode=summary_mode)
-    if not llm_mappings:
-        print("⚠️ [LOG 警告] 第三阶段未建立起临时标识与真实名字的关联。")
-        return {}
-    print(f"🔌 [LOG] 第三阶段 - 大模型建议的配对映射: {llm_mappings}")
-    
-    final_mappings = _validate_mappings(llm_mappings, episode_content, episode_names, template_names)
     return final_mappings
 
 def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker_embeddings: dict):
@@ -350,7 +304,7 @@ def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker
     if unmatched_speakers:
         try:
             summary_mode = task.get("summary_mode", "local")
-            llm_mappings = match_speakers_with_llm(
+            llm_mappings = batch_infer_speakers(
                 metadata,
                 transcript,
                 unmatched_speakers,

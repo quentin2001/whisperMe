@@ -17,6 +17,10 @@ class OpenAIWhisperProvider(ASRProvider):
     def get_display_name(self) -> str:
         return "OpenAI Whisper API"
 
+    @property
+    def supports_native_timestamps(self) -> bool:
+        return True
+
     def transcribe(self, wav_path: str, diarization_segments: list[dict],
                    progress_callback=None) -> list[dict]:
         online_api_key = config.get("online_api_key", "").strip()
@@ -33,6 +37,8 @@ class OpenAIWhisperProvider(ASRProvider):
         # OpenAI Whisper API 限制 25MB，超过需分片
         file_size = os.path.getsize(wav_path)
         max_size = 24 * 1024 * 1024  # 24MB 安全阈值
+        use_mp3 = config.get("use_mp3_chunks", False)
+        is_already_mp3 = wav_path.lower().endswith('.mp3')
 
         if file_size <= max_size:
             # 整段上传
@@ -54,7 +60,11 @@ class OpenAIWhisperProvider(ASRProvider):
                 chunk_path = None
                 try:
                     print(f"✂️ [LOG] OpenAI Whisper 分片 {i+1}/{num_chunks}: {start_offset:.1f}s ~ {start_offset + slice_dur:.1f}s")
-                    chunk_path = self.extract_chunk_as_wav(wav_path, start_offset, slice_dur, i)
+                    if use_mp3 or is_already_mp3:
+                        chunk_path = self.extract_chunk_as_mp3(wav_path, start_offset, slice_dur, i)
+                        print(f"✂️ [LOG] 使用 MP3 格式提取分片，减小体积...")
+                    else:
+                        chunk_path = self.extract_chunk_as_wav(wav_path, start_offset, slice_dur, i)
                     segs = self._transcribe_single_file(
                         chunk_path, online_api_key, online_base_url, online_model, start_offset
                     )

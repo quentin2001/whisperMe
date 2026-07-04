@@ -91,8 +91,11 @@ class AppConfigModel(BaseModel):
     enable_autostart_windows: bool = False
     enable_auto_cleanup: bool = False
     cleanup_threshold_days: int = 30
-    max_concurrent_tasks: int = 0  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
+    max_concurrent_tasks: int = 4  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
     enable_speaker_inference: bool = True
+    preload_models: bool = True
+    use_mp3_chunks: bool = False
+    use_hf_mirror: bool = True
 
 # 加载全局配置文件
 def load_config() -> dict:
@@ -207,14 +210,29 @@ os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
 os.environ["HF_HUB_CACHE"] = SHORT_HF_CACHE_DIR
 os.environ["HF_ASSETS_CACHE"] = SHORT_HF_CACHE_DIR
 os.environ["XDG_CACHE_HOME"] = SHORT_HF_CACHE_DIR
-# Use hf-mirror.com by default since huggingface.co is blocked in mainland China.
-# Gated models (like pyannote) work perfectly on hf-mirror.com as long as the token is passed.
-if not os.environ.get("HF_ENDPOINT"):
+# Use hf-mirror.com by default if in China region, since huggingface.co is often blocked.
+import locale
+def is_china_region():
+    try:
+        if sys.platform == 'win32':
+            langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            return langid in (0x0804, 0x0404, 0x0c04, 0x1004, 0x1404)
+        else:
+            loc = locale.getdefaultlocale()
+            if loc and loc[0] and 'CN' in loc[0]:
+                return True
+    except Exception:
+        pass
+    return False
+
+use_hf_mirror = config.get("use_hf_mirror", is_china_region())
+if use_hf_mirror and not os.environ.get("HF_ENDPOINT"):
     os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    print("🌍 [CONFIG] 检测到位于中国大陆地区，自动启用 HF 镜像站 (https://hf-mirror.com)")
 
 # huggingface_hub API 动态配置声明
 HF_TOKEN = config.get("hf_token", "").strip()
-endpoint_url = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com")
+endpoint_url = os.environ.get("HF_ENDPOINT", "https://huggingface.co" if not use_hf_mirror else "https://hf-mirror.com")
 os.environ["HF_ENDPOINT"] = endpoint_url
 os.environ["HF_HOME"] = SHORT_HF_CACHE_DIR
 os.environ["HF_HUB_CACHE"] = SHORT_HF_CACHE_DIR

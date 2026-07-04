@@ -130,21 +130,40 @@ def run_podcast_pipeline(task_id: str, url: str):
         audio_filename = os.path.basename(local_mp3)
         db.update_task_field(task_id, audio_url=f"/audio/{audio_filename}", progress=32.0)
 
+        # 检查是否可以跳过 WAV 预处理
+        enable_speaker_inference = config.get("enable_speaker_inference", True)
+        skip_wav = False
+        asr_mode = task.get("asr_mode", "local")
+        if not enable_speaker_inference and asr_mode == "online":
+            from app.core.asr_providers import get_provider
+            provider_name = config.get("online_asr_provider", "mimo")
+            try:
+                provider = get_provider(provider_name)
+                if getattr(provider, "supports_native_timestamps", False):
+                    skip_wav = True
+            except Exception:
+                pass
+
         # Step 2: 音频格式预处理（16kHz Mono WAV）
         check_cancelled(task_id)
         db.update_task_field(task_id, status="transcribing", progress=40.0)
         t_preprocess_start = time.time()
-        standardized_wav = downloader.preprocess_audio(local_mp3)
+        if skip_wav:
+            print(f"⏩ [LOG] 检测到当前 ASR 支持原生时间戳且声纹已关闭，跳过 WAV 预处理")
+            standardized_wav = local_mp3
+        else:
+            standardized_wav = downloader.preprocess_audio(local_mp3)
         timing_stats['音频预处理'] = time.time() - t_preprocess_start
 
-        # Step 3: PyAnnote 声纹分割
+        # Step 3: PyAnnote 声纹分割与特征提取
         check_cancelled(task_id)
         t_diarization_start = time.time()
+        speaker_embeddings = {}
         if config.get("enable_speaker_inference", True):
-            diar_data = transcriber.run_diarization(standardized_wav)
+            diar_data, speaker_embeddings = transcriber.run_diarization_and_embedding(standardized_wav)
         else:
             diar_data = []
-        timing_stats['声纹分割'] = time.time() - t_diarization_start
+        timing_stats['声纹分割与特征'] = time.time() - t_diarization_start
 
         # 如果 HF Token 缺失/无效，标记到 task metadata 供前端展示
         if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30) and config.get("enable_speaker_inference", True):
@@ -195,13 +214,12 @@ def run_podcast_pipeline(task_id: str, url: str):
         except Exception as chunk_ex:
             print(f"⚠️ [LOG 警告] 语义分块聚合失败: {chunk_ex}")
 
-        # Step 4.5 & 4.8: 声纹提取与发言人智能推断 (可选开关)
+        # Step 4.5 & 4.8: 发言人智能推断 (可选开关)
         check_cancelled(task_id)
         if config.get("enable_speaker_inference", True):
             t_rename_start = time.time()  # 在 try 块外初始化，防止 except 中 NameError
             try:
-                print("⏳ [LOG] 正在提取发言人声纹特征向量...")
-                speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
+                # 声纹特征向量已在 Step 3 中与音频加载一并提取
                 db.update_task_field(task_id, speaker_embeddings=speaker_embeddings)
                 
                 # 如果聚类修正合并了 SPEAKER，需要同步更新已有的 transcript 和段落

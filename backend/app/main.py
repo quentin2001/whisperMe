@@ -196,6 +196,10 @@ def startup_event():
     threading.Thread(target=background_auto_cleanup_loop, daemon=True).start()
     print("✅ [STARTUP] 独立后台音频文件自动清理哨兵已上线！")
     
+    # 0.8 预加载 PyAnnote 声纹模型
+    from app.core.transcriber import model_cache_manager
+    threading.Thread(target=model_cache_manager.preload_models, daemon=True).start()
+    
     # 1. 启动队列管理器并绑定管道处理器
     queue_manager.start(run_podcast_pipeline)
     

@@ -21,6 +21,11 @@ class FunASRProvider(ASRProvider):
     def get_display_name(self) -> str:
         return "FunASR (阿里达摩院)"
 
+    @property
+    def supports_native_timestamps(self) -> bool:
+        online_base_url = config.get("online_base_url", "ws://localhost:10095").strip()
+        return online_base_url.startswith("ws://") or online_base_url.startswith("wss://")
+
     def transcribe(self, wav_path: str, diarization_segments: list[dict],
                    progress_callback=None) -> list[dict]:
         online_base_url = config.get("online_base_url", "ws://localhost:10095").strip()
