@@ -191,6 +191,11 @@
     border-color: var(--accent-red) !important;
   }
 
+  input[type="checkbox"], input[type="radio"] {
+    accent-color: var(--accent-red);
+    cursor: pointer;
+  }
+
   /* Heatmap gradient levels — used instead of bg-[var(--x)]/opacity which CDN can't render */
   .heatmap-0 { background-color: color-mix(in srgb, var(--text-muted) 30%, transparent); }
   .heatmap-1 { background-color: color-mix(in srgb, var(--accent-red) 35%, transparent); }

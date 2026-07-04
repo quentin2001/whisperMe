@@ -24,7 +24,8 @@ ALLOWED_IMAGE_DOMAINS = {
     "xmcdn.com",
     "lizhi.fm",
     "music.126.net",
-    "126.net"
+    "126.net",
+    "unsplash.com"
 }
 
 # 全局性能指标缓存
@@ -338,7 +339,7 @@ def proxy_image(url: str):
             raise HTTPException(status_code=403, detail="Domain not allowed")
 
         import httpx
-        with httpx.Client(timeout=10, follow_redirects=True) as client:
+        with httpx.Client(timeout=10, follow_redirects=True, trust_env=False) as client:
             resp = client.get(url, headers={
                 "User-Agent": "Mozilla/5.0",
                 "Referer": ""

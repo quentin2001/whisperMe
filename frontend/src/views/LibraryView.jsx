@@ -807,15 +807,10 @@ export default function LibraryView({
                         <span className="bg-[var(--accent-gold)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
                           {t("已完成", "Completed")}
                         </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex items-center gap-4 mt-3 md:mt-0 self-end md:self-auto">
                   {session.status === 'IN_PROGRESS' ? (
-                    <span className="text-[12px] font-mono text-[var(--text-muted)] italic font-medium">
-                      {session.rawTask.status === 'pending' ? t("排队等待中...", "Waiting in queue...") : t("AI 生成标签中...", "AI generating tags...")}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${session.rawTask.status === 'completed' ? 'bg-[var(--accent-red)] text-white' : 'bg-[var(--border-primary)]/30 text-[var(--text-muted)]'}`}>
+                      {session.rawTask.status === 'completed' ? t("总结已生成", "Summary Ready") : session.rawTask.status === 'pending' ? t("排队等待中...", "Waiting in queue...") : t("AI 处理中...", "AI Processing...")}
                     </span>
                   ) : (
                     <div className="flex items-end gap-0.5 h-6 opacity-80">
