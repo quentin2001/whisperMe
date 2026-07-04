@@ -171,10 +171,20 @@
 
   body {
     background-color: var(--bg-primary);
+    background-image: 
+      radial-gradient(circle at 15% 50%, rgba(246, 36, 64, 0.04), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(246, 36, 64, 0.04), transparent 25%);
+    background-attachment: fixed;
     color: var(--text-primary);
     font-family: "Outfit", "Noto Sans SC", system-ui, sans-serif;
     overflow-x: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  .dark body {
+    background-image: 
+      radial-gradient(circle at 15% 50%, rgba(255, 106, 122, 0.06), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(255, 106, 122, 0.06), transparent 25%);
   }
 
   input:focus, textarea:focus {

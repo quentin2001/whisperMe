@@ -14,7 +14,7 @@ export const I18nProvider = ({ children }) => {
   };
 
   const t = (zhText, enText) => {
-    return lang === 'en' ? (enText || zhText) : zhText;
+    return lang?.startsWith('en') ? (enText || zhText) : zhText;
   };
 
   return (

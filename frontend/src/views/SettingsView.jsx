@@ -254,7 +254,7 @@ export default function SettingsView({
 
               {configData.asr_mode === "local" && (
                 <div className="flex flex-col gap-2 animate-fade-in">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
                   <input
                     type="text"
                     value={configData.local_whisper_model_path || ""}
@@ -269,7 +269,7 @@ export default function SettingsView({
               {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "API Base URL")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "API Base URL")}</label>
                     <input type="text" value={configData.online_base_url || ""} onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_base_url)}`}
                       placeholder="https://api.openai.com/v1" />
@@ -287,7 +287,7 @@ export default function SettingsView({
                     </span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}</label>
                     <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
@@ -329,13 +329,13 @@ export default function SettingsView({
               {configData.summary_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 API 接口地址", "Local API URL")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 API 接口地址", "Local API URL")}</label>
                     <input type="text" value={configData.ollama_url || ""} onChange={(e) => handleConfigChange("ollama_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_url)}`}
                       placeholder="http://localhost:11434" />
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
                     <input type="text" value={configData.ollama_model || ""} onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_model)}`}
                       placeholder="qwen2.5:7b-instruct" />
@@ -346,21 +346,21 @@ export default function SettingsView({
               {configData.summary_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线 API 基础地址", "Online API Base URL")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线 API 基础地址", "Online API Base URL")}</label>
                     <input type="text" value={configData.online_summary_base_url || ""} onChange={(e) => handleConfigChange("online_summary_base_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_base_url)}`}
                       placeholder="https://api.openai.com/v1" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线大模型 ID", "Online Model ID")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线大模型 ID", "Online Model ID")}</label>
                     <input type="text" value={configData.online_summary_model || ""} onChange={(e) => handleConfigChange("online_summary_model", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_model)}`}
                       placeholder="gpt-4o-mini" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("样例：gpt-4o-mini 或 qwen-plus", "Example: gpt-4o-mini or qwen-plus")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Key", "API Key")}</label>
                     <input type="password" value={configData.online_summary_api_key || ""} onChange={(e) => handleConfigChange("online_summary_api_key", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
