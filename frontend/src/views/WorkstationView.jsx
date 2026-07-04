@@ -283,6 +283,14 @@ export default function WorkstationView({
                   alt={session.title}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-500 opacity-90"
+                  onError={(e) => { 
+                    if (!e.target.dataset.retried) {
+                      e.target.dataset.retried = 'true';
+                      e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+                    } else {
+                      e.target.style.display = 'none'; 
+                    }
+                  }}
                 />
                 
                 {/* Duration indicator tag */}
@@ -373,6 +381,14 @@ export default function WorkstationView({
                   alt=""
                   referrerPolicy="no-referrer"
                   className="w-14 h-11 object-cover rounded-md border border-[var(--border-primary)]/20 shrink-0"
+                  onError={(e) => { 
+                    if (!e.target.dataset.retried) {
+                      e.target.dataset.retried = 'true';
+                      e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+                    } else {
+                      e.target.style.display = 'none'; 
+                    }
+                  }}
                 />
                 <div>
                   <h3 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug">

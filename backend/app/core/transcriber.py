@@ -31,6 +31,7 @@ class ModelCacheManager:
         
         self.pyannote_diarization = None
         self.pyannote_embedding = None
+        self.funasr_model = None
         self.lock = threading.Lock()
         self._watcher_thread = None
         self.running = False
@@ -59,6 +60,7 @@ class ModelCacheManager:
                         
                         self.pyannote_diarization = None
                         self.pyannote_embedding = None
+                        self.funasr_model = None
                         
                         import gc
                         import sys
@@ -152,6 +154,25 @@ class ModelCacheManager:
             from pyannote.audio import Model
             model = Model.from_pretrained("pyannote/embedding", use_auth_token=HF_TOKEN)
             self.pyannote_embedding = model
+            self.last_used_time = time.time()
+            return model
+            
+    def get_funasr_model(self, device: str):
+        self.start_watcher()
+        with self.lock:
+            if self.funasr_model is not None:
+                print("🎯 [LOG] 命中 FunASR (Paraformer) 内存缓存！")
+                self.last_used_time = time.time()
+                return self.funasr_model
+            
+            print("📡 [LOG] 正在加载 FunASR Paraformer 模型 (这可能需要几分钟下载)...")
+            from funasr import AutoModel
+            device_str = "cuda:0" if device == "cuda" else "cpu"
+            model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
+                              vad_model="fsmn-vad", vad_model_revision="v2.0.4",
+                              punc_model="ct-punc", punc_model_revision="v2.0.4",
+                              device=device_str, disable_update=True)
+            self.funasr_model = model
             self.last_used_time = time.time()
             return model
             
@@ -449,6 +470,8 @@ class PodcastTranscriber:
             # 本地转录模式
             short_wav_path = get_short_path_name(os.path.abspath(wav_path))
             import torch
+            
+            local_provider = config.get("local_asr_provider", "whisper")
 
             # 动态显存监控与资源控制
             device_to_use = self.device
@@ -466,32 +489,52 @@ class PodcastTranscriber:
                 except Exception as mem_ex:
                     print(f"⚠️ [LOG] 获取 GPU 显存失败: {mem_ex}")
 
-            # 解析选定的本地模型大小规格
-            MODEL_SIZE_MAPPING = {
-                "large-v3": "Systran/faster-whisper-large-v3",
-                "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
-                "medium": "Systran/faster-whisper-medium",
-                "small": "Systran/faster-whisper-small",
-            }
-            model_size = config.get("local_whisper_model_size", "large-v3")
-            model_path_or_size = SHORT_LOCAL_WHISPER_MODEL_PATH
-            if not model_path_or_size or not os.path.exists(model_path_or_size):
-                model_path_or_size = MODEL_SIZE_MAPPING.get(model_size, model_size)
+            if local_provider == "funasr":
+                model = model_cache_manager.get_funasr_model(device_to_use)
+                print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
+                try:
+                    res = model.generate(input=short_wav_path, batch_size_s=300)
+                    whisper_segments_raw = []
+                    if res and len(res) > 0 and "sentence_info" in res[0]:
+                        for sentence in res[0]["sentence_info"]:
+                            # FunASR returns start/end in ms, convert to seconds
+                            whisper_segments_raw.append(WhisperSegmentDummy(
+                                start=sentence.get("start", 0) / 1000.0,
+                                end=sentence.get("end", 0) / 1000.0,
+                                text=sentence.get("text", "")
+                            ))
+                    else:
+                        print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+                except Exception as e:
+                    print(f"❌ [LOG] FunASR 转写发生错误: {e}")
+                    whisper_segments_raw = []
+            else:
+                # 解析选定的本地模型大小规格
+                MODEL_SIZE_MAPPING = {
+                    "large-v3": "Systran/faster-whisper-large-v3",
+                    "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
+                    "medium": "Systran/faster-whisper-medium",
+                    "small": "Systran/faster-whisper-small",
+                }
+                model_size = config.get("local_whisper_model_size", "large-v3")
+                model_path_or_size = SHORT_LOCAL_WHISPER_MODEL_PATH
+                if not model_path_or_size or not os.path.exists(model_path_or_size):
+                    model_path_or_size = MODEL_SIZE_MAPPING.get(model_size, model_size)
 
-            model = model_cache_manager.get_model(
-                model_path_or_size,
-                device=device_to_use,
-                compute_type=compute_type_to_use
-            )
+                model = model_cache_manager.get_model(
+                    model_path_or_size,
+                    device=device_to_use,
+                    compute_type=compute_type_to_use
+                )
 
-            print("✨ [LOG] Whisper 模型已就绪！开始高效转汉字...")
-            whisper_segments_raw, info = model.transcribe(
-                short_wav_path,
-                beam_size=5,
-                language="zh",
-                vad_filter=True,
-                vad_parameters={"min_silence_duration_ms": 500},
-            )
+                print("✨ [LOG] Whisper 模型已就绪！开始高效转汉字...")
+                whisper_segments_raw, info = model.transcribe(
+                    short_wav_path,
+                    beam_size=5,
+                    language="zh",
+                    vad_filter=True,
+                    vad_parameters={"min_silence_duration_ms": 500},
+                )
 
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
             def clean_txt(text):

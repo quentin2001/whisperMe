@@ -253,7 +253,19 @@ export default function SettingsView({
               </div>
 
               {configData.asr_mode === "local" && (
-                <div className="flex flex-col gap-2 animate-fade-in">
+                <>
+                  <div className="flex flex-col gap-2 animate-fade-in">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地引擎", "Local Engine")}</label>
+                    <SettingsDropdown
+                      value={configData.local_asr_provider || "whisper"}
+                      onChange={(val) => handleConfigChange("local_asr_provider", val)}
+                      options={[
+                        { value: "whisper", label: t("Faster Whisper", "Faster Whisper") },
+                        { value: "funasr", label: t("FunASR (Paraformer)", "FunASR (Paraformer)") }
+                      ]}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 animate-fade-in">
                   <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
                   <input
                     type="text"
@@ -263,6 +275,7 @@ export default function SettingsView({
                     placeholder="/path/to/whisper/models/large-v3.bin"
                   />
                 </div>
+                </>
               )}
 
 

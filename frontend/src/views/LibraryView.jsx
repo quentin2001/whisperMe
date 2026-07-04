@@ -751,7 +751,14 @@ export default function LibraryView({
                       alt=""
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover absolute inset-0"
-                      onError={(e) => { e.target.style.display = 'none'; }}
+                      onError={(e) => { 
+                        if (!e.target.dataset.retried) {
+                          e.target.dataset.retried = 'true';
+                          e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+                        } else {
+                          e.target.style.display = 'none'; 
+                        }
+                      }}
                     />
                     {session.status === 'IN_PROGRESS' && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
