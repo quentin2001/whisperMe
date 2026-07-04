@@ -471,70 +471,26 @@ class PodcastTranscriber:
             short_wav_path = get_short_path_name(os.path.abspath(wav_path))
             import torch
             
-            local_provider = config.get("local_asr_provider", "whisper")
-
-            # 动态显存监控与资源控制
             device_to_use = self.device
-            compute_type_to_use = self.compute_type
-            if device_to_use == "cuda":
-                try:
-                    free_mem, total_mem = torch.cuda.mem_get_info()
-                    free_gb = free_mem / (1024 ** 3)
-                    total_gb = total_mem / (1024 ** 3)
-                    print(f"ℹ️ [LOG] GPU 显存监控 - 当前可用: {free_gb:.2f} GB / 总计: {total_gb:.2f} GB")
-                    if free_gb < 1.5:
-                        print(f"⚠️ [LOG] 检测到 GPU 剩余可用显存 ({free_gb:.2f} GB) 小于安全阈值 1.5 GB。为了防止 OOM，Whisper 降级至 CPU 运行。")
-                        device_to_use = "cpu"
-                        compute_type_to_use = "float32"
-                except Exception as mem_ex:
-                    print(f"⚠️ [LOG] 获取 GPU 显存失败: {mem_ex}")
-
-            if local_provider == "funasr":
-                model = model_cache_manager.get_funasr_model(device_to_use)
-                print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
-                try:
-                    res = model.generate(input=short_wav_path, batch_size_s=300)
-                    whisper_segments_raw = []
-                    if res and len(res) > 0 and "sentence_info" in res[0]:
-                        for sentence in res[0]["sentence_info"]:
-                            # FunASR returns start/end in ms, convert to seconds
-                            whisper_segments_raw.append(WhisperSegmentDummy(
-                                start=sentence.get("start", 0) / 1000.0,
-                                end=sentence.get("end", 0) / 1000.0,
-                                text=sentence.get("text", "")
-                            ))
-                    else:
-                        print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
-                except Exception as e:
-                    print(f"❌ [LOG] FunASR 转写发生错误: {e}")
-                    whisper_segments_raw = []
-            else:
-                # 解析选定的本地模型大小规格
-                MODEL_SIZE_MAPPING = {
-                    "large-v3": "Systran/faster-whisper-large-v3",
-                    "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
-                    "medium": "Systran/faster-whisper-medium",
-                    "small": "Systran/faster-whisper-small",
-                }
-                model_size = config.get("local_whisper_model_size", "large-v3")
-                model_path_or_size = SHORT_LOCAL_WHISPER_MODEL_PATH
-                if not model_path_or_size or not os.path.exists(model_path_or_size):
-                    model_path_or_size = MODEL_SIZE_MAPPING.get(model_size, model_size)
-
-                model = model_cache_manager.get_model(
-                    model_path_or_size,
-                    device=device_to_use,
-                    compute_type=compute_type_to_use
-                )
-
-                print("✨ [LOG] Whisper 模型已就绪！开始高效转汉字...")
-                whisper_segments_raw, info = model.transcribe(
-                    short_wav_path,
-                    beam_size=5,
-                    language="zh",
-                    vad_filter=True,
-                    vad_parameters={"min_silence_duration_ms": 500},
-                )
+            # 直接使用 FunASR 进行本地转写
+            model = model_cache_manager.get_funasr_model(device_to_use)
+            print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
+            try:
+                res = model.generate(input=short_wav_path, batch_size_s=300)
+                whisper_segments_raw = []
+                if res and len(res) > 0 and "sentence_info" in res[0]:
+                    for sentence in res[0]["sentence_info"]:
+                        # FunASR returns start/end in ms, convert to seconds
+                        whisper_segments_raw.append(WhisperSegmentDummy(
+                            start=sentence.get("start", 0) / 1000.0,
+                            end=sentence.get("end", 0) / 1000.0,
+                            text=sentence.get("text", "")
+                        ))
+                else:
+                    print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+            except Exception as e:
+                print(f"❌ [LOG] FunASR 转写发生错误: {e}")
+                whisper_segments_raw = []
 
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
             def clean_txt(text):

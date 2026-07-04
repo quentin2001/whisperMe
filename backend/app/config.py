@@ -68,7 +68,6 @@ class AppConfigModel(BaseModel):
     enable_win_notification: bool = True
     enable_email_notification: bool = False
     asr_mode: str = "online"
-    local_asr_provider: str = "whisper"
     online_asr_provider: str = "mimo"
     online_api_key: str = ""
     online_base_url: str = Field(default="")

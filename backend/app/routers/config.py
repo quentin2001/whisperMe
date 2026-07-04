@@ -30,7 +30,6 @@ class UpdateConfigRequest(BaseModel):
     enable_win_notification: bool
     enable_email_notification: bool = False
     asr_mode: str = "local"
-    local_asr_provider: str = "whisper"
     online_asr_provider: str = "mimo"
     online_api_key: str = ""
     online_base_url: str = ""
