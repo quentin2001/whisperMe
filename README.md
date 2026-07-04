@@ -160,6 +160,25 @@ npm run dev
 
 <br />
 
+## ⚡ 性能优化指南
+
+为了应对长达数小时的超大播客音频，whisperMe 内置了深度的架构级性能调优项。您可以在 `config.json` 中配置以下参数以获得极致的加速体验：
+
+| 配置项 | 推荐值 | 说明 |
+|--------|------|------|
+| `max_concurrent_tasks` | `4` | 针对 MiMo 等在线 ASR，将长音频并发分片上传，极大缩短网络传输耗时。 |
+| `use_mp3_chunks` | `true` | 在线 OpenAI Whisper 模式下，强制按时间切分并压缩为 MP3 格式，将传输数据量缩小至原有十分之一。 |
+| `preload_models` | `true` | 在后台启动时预先将 PyAnnote 声纹推理模型加载入显存，消灭每次处理时的模型冷启动时间。 |
+| `use_hf_mirror` | `true` | 处于国内网络环境时，自动强制使用 `hf-mirror.com` 加速大模型组件（如声纹模型）的下载。 |
+
+> 有关跨平台环境（如 Windows 8.3 短路径、TEMP 重定向等）的更多底层细节，请参阅 [跨平台路径与环境配置指南](docs/OS_PATHS.md)。
+
+<br />
+
+---
+
+<br />
+
 ## 🤖 与你的 AI Agent (Hermes/OpenClaw) 联动
 
 如果你在本地运行了 AI Agent，你可以让它成为 whisperMe 的全职管家。
