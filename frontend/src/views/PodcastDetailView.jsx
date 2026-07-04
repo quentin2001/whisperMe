@@ -477,6 +477,20 @@ export default function PodcastDetailView({
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
+  // Scroll debounce state
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const scrollTimeoutRef = useRef(null);
+
+  const handleUserScroll = () => {
+    setIsUserScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsUserScrolling(false);
+    }, 4000); // 4 seconds debounce
+  };
+
   const containerRef = useRef(null);
   const activeBubbleRef = useRef(null);
 
@@ -697,13 +711,15 @@ export default function PodcastDetailView({
 
   // Trigger manual AI summary analysis regeneration
   const triggerAIAnalysis = async () => {
+    if (!activeTask) return;
     setAnalyzing(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/summarize`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/summary/start`, {
         method: "POST"
       });
       if (res.ok) {
-        await alert(t("AI总结与深度分析已重新排队生成，请稍候！", "AI summary and deep analysis have been queued for regeneration, please wait!"), { variant: 'info', confirmText: t('好的', 'OK') });
+        await alert(t("AI总结与深度分析已排队生成，请稍候！", "AI summary and deep analysis have been queued for generation, please wait!"), { variant: 'info', confirmText: t('好的', 'OK') });
+        if (onRefreshTask) onRefreshTask();
       } else {
         await alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
       }
@@ -748,13 +764,13 @@ export default function PodcastDetailView({
 
   // Auto scroll transcript to active dialogue bubble
   useEffect(() => {
-    if (activeBubbleRef.current) {
+    if (activeBubbleRef.current && !isUserScrolling) {
       activeBubbleRef.current.scrollIntoView({
         behavior: "smooth",
         block: "center"
       });
     }
-  }, [currentTime]);
+  }, [currentTime, isUserScrolling]);
 
   // Map backend paragraphs
   const paragraphs = (activeTask.paragraphs || []).map((p, idx) => {
@@ -772,7 +788,7 @@ export default function PodcastDetailView({
   });
 
   const displayTitle = activeTask.title || "Untitled Session";
-  const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing", summarizing: "Summarizing" };
+  const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing", summarizing: "Summarizing", transcribed: "Transcribed" };
   const displayStatus = statusMap[activeTask.status] || "In Progress";
   const commentsList = activeTask.metadata?.comments || [];
 
@@ -857,18 +873,20 @@ export default function PodcastDetailView({
             />
           </div>
 
-          <button
-            onClick={triggerAIAnalysis}
-            disabled={analyzing}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:bg-neutral-300 text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
-          >
-            {analyzing ? (
-              <RefreshCw size={13} className="animate-spin" />
-            ) : (
-              <Sparkles size={13} fill="white" />
-            )}
-            <span>{analyzing ? t("重新生成中...", "Regenerating...") : t("AI 深度总结", "AI Analysis")}</span>
-          </button>
+          {(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") && (
+            <button
+              onClick={triggerAIAnalysis}
+              disabled={analyzing || activeTask.status === "summarizing"}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:bg-neutral-300 text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
+            >
+              {analyzing || activeTask.status === "summarizing" ? (
+                <RefreshCw size={13} className="animate-spin" />
+              ) : (
+                <Sparkles size={13} fill="white" />
+              )}
+              <span>{analyzing || activeTask.status === "summarizing" ? t("生成中...", "Generating...") : (activeTask.status === "completed" ? t("重新生成总结", "Regenerate Summary") : t("✨ 运行 AI 深度总结", "Run AI Summary"))}</span>
+            </button>
+          )}
 
           <button
             onClick={() => setShowSpeakerModal(true)}
@@ -885,8 +903,10 @@ export default function PodcastDetailView({
         
         {/* Left pane: Scrollable Full Transcript */}
         <div 
-          className="overflow-y-auto px-10 py-8 border-r border-[var(--border-primary)]/30 h-full shrink-0"
+          className="overflow-y-auto px-10 py-8 border-r border-[var(--border-primary)]/30 h-full shrink-0 custom-scrollbar"
           style={{ width: `${leftWidth}%` }}
+          onWheel={handleUserScroll}
+          onTouchMove={handleUserScroll}
         >
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-3xl font-extrabold tracking-tight text-[var(--text-primary)] font-display">{t("完整转录文本", "Full Transcript")}</h2>

@@ -139,8 +139,8 @@ class MiMoASRProvider(ASRProvider):
 
             return (task["index"], mapped)
 
-        # 并发执行（max_workers=4 防止 API 限流）
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # 并发执行（max_workers=2 避免 API 限流）
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {executor.submit(process_chunk, t): t for t in chunk_tasks}
             for future in as_completed(futures):
                 try:
@@ -167,29 +167,57 @@ class MiMoASRProvider(ASRProvider):
         return all_segments
 
     def _send_request(self, url: str, headers: dict, payload: dict) -> httpx.Response:
-        """4 级自适应网络请求（与原逻辑完全一致）"""
+        """4 级自适应网络请求 + 429 退避重试"""
         response = None
+        import time as _time
 
-        # 1. 系统代理
-        try:
-            with httpx.Client(timeout=400.0, trust_env=True) as client:
-                response = client.post(url, headers=headers, json=payload)
-                if response.status_code == 200:
-                    print(f"🟢 [LOG] 通过代理请求成功！")
-                    return response
-        except Exception as e_proxy:
-            print(f"⚠️ [LOG] MiMo ASR 代理请求失败: {e_proxy}。正在尝试直连模式...")
-
-        # 2. DoH DNS 绕过直连
-        try:
-            with doh_dns_bypass(url):
-                with httpx.Client(timeout=400.0, trust_env=False) as client:
+        # 0. 429 退避重试（最多 5 次，退避间隔 2^attempt 秒）
+        max_retries = 5
+        for retry in range(max_retries):
+            # 1. 系统代理
+            try:
+                with httpx.Client(timeout=400.0, trust_env=True) as client:
                     response = client.post(url, headers=headers, json=payload)
                     if response.status_code == 200:
-                        print(f"🟢 [LOG] 通过直连(DoH DNS 绕过)请求成功！")
+                        print(f"🟢 [LOG] 通过代理请求成功！")
                         return response
-        except Exception as e_doh:
-            print(f"❌ [LOG] MiMo ASR 直连(DoH DNS 绕过)请求失败: {e_doh}")
+                    if response.status_code == 429:
+                        wait = 2 ** (retry + 1)
+                        print(f"⏳ [LOG] MiMo API 限流 (429)，{wait}s 后重试 ({retry+1}/{max_retries})...")
+                        _time.sleep(wait)
+                        continue
+            except Exception as e_proxy:
+                if retry < max_retries - 1:
+                    wait = 2 ** (retry + 1)
+                    print(f"⏳ [LOG] MiMo ASR 代理请求失败，{wait}s 后重试: {e_proxy}")
+                    _time.sleep(wait)
+                    continue
+                print(f"⚠️ [LOG] MiMo ASR 代理请求最终失败: {e_proxy}。正在尝试直连模式...")
+
+            # 2. DoH DNS 绕过直连
+            try:
+                with doh_dns_bypass(url):
+                    with httpx.Client(timeout=400.0, trust_env=False) as client:
+                        response = client.post(url, headers=headers, json=payload)
+                        if response.status_code == 200:
+                            print(f"🟢 [LOG] 通过直连(DoH DNS 绕过)请求成功！")
+                            return response
+                        if response.status_code == 429:
+                            wait = 2 ** (retry + 1)
+                            print(f"⏳ [LOG] MiMo API 限流 (429) 直连，{wait}s 后重试 ({retry+1}/{max_retries})...")
+                            _time.sleep(wait)
+                            continue
+            except Exception as e_doh:
+                if retry < max_retries - 1:
+                    wait = 2 ** (retry + 1)
+                    print(f"⏳ [LOG] MiMo ASR 直连失败，{wait}s 后重试: {e_doh}")
+                    _time.sleep(wait)
+                    continue
+                print(f"❌ [LOG] MiMo ASR 直连(DoH DNS 绕过)请求失败: {e_doh}")
+
+            # 非 429/200 且非异常的状态码，不重试
+            if response is not None and response.status_code not in (200, 429):
+                break
 
         if response is None:
             raise Exception("MiMo ASR API 调用失败：无响应")

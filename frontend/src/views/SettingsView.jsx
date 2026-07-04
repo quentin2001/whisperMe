@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power, Activity, Sparkles } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -73,6 +73,42 @@ export default function SettingsView({
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
   const [hfTokenStatus, setHfTokenStatus] = useState(null);
   const [hfChecking, setHfChecking] = useState(false);
+  const [testingAsr, setTestingAsr] = useState(false);
+  const [testingLlm, setTestingLlm] = useState(false);
+
+  const testConnection = async (type) => {
+    const isAsr = type === "asr";
+    const apiKey = isAsr ? configData.online_api_key : configData.online_summary_api_key;
+    const baseUrl = isAsr ? configData.online_base_url : configData.online_summary_base_url;
+    const model = isAsr ? configData.online_model : configData.online_summary_model;
+
+    if (!baseUrl) {
+      alert("请输入 API Base URL");
+      return;
+    }
+
+    if (isAsr) setTestingAsr(true);
+    else setTestingLlm(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/config/test/${type}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKey || "", base_url: baseUrl, model: model || "" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await import("../components/Dialog.jsx").then(m => m.alert(`✅ 测试成功：${data.message}`, { variant: 'info' }));
+      } else {
+        await import("../components/Dialog.jsx").then(m => m.alert(`❌ 测试失败：${data.message}`, { variant: 'danger' }));
+      }
+    } catch (e) {
+      await import("../components/Dialog.jsx").then(m => m.alert(`❌ 网络请求异常：${e.message}`, { variant: 'danger' }));
+    } finally {
+      if (isAsr) setTestingAsr(false);
+      else setTestingLlm(false);
+    }
+  };
 
   const handleVerifyHF = async () => {
     setHfChecking(true);
@@ -191,9 +227,17 @@ export default function SettingsView({
 
             {/* Card 1: ASR Settings */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <Sliders size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("ASR 引擎设置", "ASR Engine Settings")}</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/20">
+                <div className="flex items-center gap-2">
+                  <Sliders size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("ASR 引擎设置", "ASR Engine Settings")}</h3>
+                </div>
+                {configData.asr_mode === "online" && (
+                  <button onClick={() => testConnection("asr")} disabled={testingAsr} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-primary)]/40 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0">
+                    {testingAsr ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} className="text-[var(--accent-red)]" />}
+                    <span>{testingAsr ? t("测试中...", "Testing...") : t("连通性测试", "Test Connection")}</span>
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -249,55 +293,25 @@ export default function SettingsView({
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key from your ASR service provider")}</span>
                   </div>
+
                 </>
               )}
             </div>
 
 
-            {/* Hugging Face Authorization Card */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-red)]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <ShieldAlert size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("Hugging Face 授权", "Hugging Face Authorization")}</h3>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("HF Token (人声分割必需)", "HF Token (Speaker Diarization)")}<span className="text-[var(--accent-red)] ml-1">*</span></label>
-                <input
-                  type="password"
-                  value={configData.hf_token || ""}
-                  onChange={(e) => handleConfigChange("hf_token", e.target.value)}
-                  className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`}
-                  placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                />
-                <p className="text-xs text-[var(--text-muted)]">{t("必须配置此 Token 才能下载核心的声纹识别模型。只需要 Read (只读) 权限的免费 Token。", "Required to download the speaker diarization model. A free Read-only token is sufficient.")}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={handleVerifyHF}
-                    disabled={hfChecking}
-                    className="px-3 py-1.5 text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {hfChecking ? <Loader2 size={12} className="animate-spin inline mr-1" /> : <ShieldAlert size={12} className="inline mr-1" />}
-                    {t("验证 Token", "Verify Token")}
-                  </button>
-                  {hfTokenStatus && (
-                    hfTokenStatus.status === "valid"
-                      ? <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Check size={12} />{t("有效", "Valid")}</span>
-                      : hfTokenStatus.status === "invalid"
-                      ? <span className="text-xs font-bold text-[var(--accent-red)] flex items-center gap-1"><AlertCircle size={12} />{t("无效", "Invalid")}</span>
-                      : <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><AlertCircle size={12} />{t("未配置", "Not Set")}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-
             {/* Card 2: LLM Summary Settings */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <Cpu size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/20">
+                <div className="flex items-center gap-2">
+                  <Cpu size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
+                </div>
+                {configData.summary_mode === "online" && (
+                  <button onClick={() => testConnection("llm")} disabled={testingLlm} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-primary)]/40 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0">
+                    {testingLlm ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} className="text-[var(--accent-red)]" />}
+                    <span>{testingLlm ? t("测试中...", "Testing...") : t("连通性测试", "Test Connection")}</span>
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -352,6 +366,7 @@ export default function SettingsView({
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
                   </div>
+
                 </>
               )}
             </div>
@@ -506,6 +521,48 @@ export default function SettingsView({
                     {t("随系统开机自动后台运行", "Start automatically in background on system boot")}
                   </span>
                 </label>
+              </div>
+            </div>
+
+            {/* AI Lab Beta Features Card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
+              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
+                <Sparkles size={18} className="text-[var(--accent-red)]" />
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("实验室选项 (Beta)", "Lab Options (Beta)")}</h3>
+              </div>
+              <div className="flex flex-col p-4 bg-[var(--bg-secondary)]/30 rounded-lg border border-[var(--border-primary)]/30 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("智能声纹推理与说话人分离", "Speaker Diarization & Smart Inference")}</h4>
+                    <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("关闭后转录速度极快，但无法区分不同说话人（适合单人播客）。", "Turn off for blazing fast transcription without speaker separation (ideal for solo podcasts).")}</p>
+                  </div>
+                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                </div>
+                {configData.enable_speaker_inference !== false && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border-primary)]/20 flex flex-col gap-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 flex-1">
+                        <ShieldAlert size={14} className="text-[var(--accent-red)] shrink-0" />
+                        {t("Hugging Face Token", "Hugging Face Token")}
+                        <span className="text-[var(--accent-red)]">*</span>
+                      </label>
+                      <button type="button" onClick={handleVerifyHF} disabled={hfChecking} className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] text-[11px] font-bold rounded-md transition-all disabled:opacity-50 cursor-pointer border border-[var(--border-primary)]/40 outline-none whitespace-nowrap shrink-0">
+                        {hfChecking ? <Loader2 size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
+                        <span>{t("验证 Token", "Verify Token")}</span>
+                      </button>
+                    </div>
+                    <input type="password" value={configData.hf_token || ""} onChange={(e) => handleConfigChange("hf_token", e.target.value)} className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`} placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                    <div className="flex items-center gap-2">
+                      {hfTokenStatus && (
+                        hfTokenStatus.status === "valid" ? (
+                          <span className="text-[var(--success-color,green)] text-xs font-bold flex items-center gap-1.5"><Check size={14} /> {t("Token 验证通过", "Token is valid")}</span>
+                        ) : (
+                          <span className="text-[var(--accent-red)] text-xs font-bold flex items-center gap-1.5"><AlertCircle size={14} /> {hfTokenStatus.message}</span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

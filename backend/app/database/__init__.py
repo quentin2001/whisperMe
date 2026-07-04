@@ -26,6 +26,9 @@ class DatabaseFacade:
     def get_task(self, task_id: str):
         return self.task_repo.get_task(task_id)
 
+    def get_task_by_url(self, url: str):
+        return self.task_repo.get_task_by_url(url)
+
     def get_next_pending_task(self):
         return self.task_repo.get_next_pending_task()
 
@@ -119,6 +122,15 @@ class DatabaseFacade:
 
     def get_all_speakers_with_embeddings(self):
         return self.speaker_repo.get_all_speakers_with_embeddings()
+
+    def upsert_speaker(self, name: str, embedding: list[float], sample_count: int = 1):
+        return self.speaker_repo.upsert_speaker(name, embedding, sample_count)
+
+    def merge_speakers(self, source_name: str, target_name: str) -> bool:
+        return self.speaker_repo.merge_speakers(source_name, target_name)
+
+    def delete_speaker(self, name: str) -> bool:
+        return self.speaker_repo.delete_speaker(name)
 
 # Expose a global db instance
 db = DatabaseFacade()

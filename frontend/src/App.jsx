@@ -40,6 +40,8 @@ export default function App() {
   const setIsAudioMissing = useUIStore(state => state.setIsAudioMissing);
 
   // Audio Playback states
+  const isPlaying = usePlayerStore(state => state.isPlaying);
+  const duration = usePlayerStore(state => state.duration);
   const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
   const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
   const setDuration = usePlayerStore(state => state.setDuration);
@@ -336,8 +338,10 @@ export default function App() {
     }
   };
 
+  const updateConfigData = useConfigStore(state => state.updateConfigData);
+
   const handleConfigChange = (key, value) => {
-    setConfigData(prev => ({ ...prev, [key]: value }));
+    updateConfigData({ [key]: value });
   };
 
   const togglePlay = () => {

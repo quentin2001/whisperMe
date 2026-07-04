@@ -206,8 +206,8 @@
 
 /* Custom scrollbars that look premium and warm, expanding when hovered or active */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
@@ -216,8 +216,8 @@
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 4px;
-  border: 2px solid transparent;
+  border-radius: 6px;
+  border: 3px solid transparent;
   background-clip: padding-box;
   transition: background 0.2s ease, border-width 0.2s ease;
 }
@@ -225,7 +225,7 @@
 ::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:active {
   background: var(--scrollbar-hover);
-  border-width: 0px;
+  border-width: 2px;
 }
 
 /* Fix textarea scrollbar clipping rounded corners */

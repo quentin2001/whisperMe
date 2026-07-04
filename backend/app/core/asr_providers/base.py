@@ -39,14 +39,36 @@ class ASRProvider(ABC):
     # ==================== 共享工具方法 ====================
 
     @staticmethod
-    def get_audio_duration(wav_path: str) -> float:
-        """读取 WAV 文件总时长（秒）"""
+    def get_audio_duration(audio_path: str) -> float:
+        """读取音频文件总时长（秒），支持 WAV/MP3/AAC 等所有 ffmpeg 兼容格式"""
+        # 用 ffmpeg -i 获取时长（输出到 stderr，解析 Duration 行）
+        import re as _re
+        from app.config import FFMPEG_PATH as _FFMPEG_PATH
+        for ffmpeg_cmd in [_FFMPEG_PATH, "ffmpeg", "ffmpeg.exe"]:
+            if not ffmpeg_cmd:
+                continue
+            try:
+                cmd = [ffmpeg_cmd, "-i", audio_path]
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     creationflags=subprocess.CREATE_NO_WINDOW,
+                                     timeout=15)
+                stderr = res.stderr.decode("utf-8", errors="ignore")
+                match = _re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", stderr)
+                if match:
+                    h, m, s = float(match.group(1)), float(match.group(2)), float(match.group(3))
+                    duration = h * 3600 + m * 60 + s
+                    if duration > 0:
+                        return duration
+            except Exception:
+                continue
+
+        # 回退到 Python wave 模块（仅 WAV）
         import wave
         try:
-            with wave.open(wav_path, "rb") as w:
+            with wave.open(audio_path, "rb") as w:
                 return w.getnframes() / float(w.getframerate())
         except Exception as e:
-            print(f"⚠️ [LOG] 读取 WAV 时长失败: {e}")
+            print(f"⚠️ [LOG] 读取音频时长失败: {e}")
             return 1.0
 
     @staticmethod
@@ -54,7 +76,8 @@ class ASRProvider(ABC):
                              chunk_index: int) -> str:
         """从 WAV 中提取指定区间的 MP3 分片，返回分片文件路径"""
         short_wav_path = get_short_path_name(os.path.abspath(wav_path))
-        chunk_mp3_path = wav_path.replace(".wav", f"_chunk_{chunk_index}.mp3")
+        base_name = os.path.splitext(wav_path)[0]
+        chunk_mp3_path = f"{base_name}_chunk_{chunk_index}.mp3"
         short_chunk_path = get_short_path_name(chunk_mp3_path)
 
         for ffmpeg_cmd in [FFMPEG_PATH, "ffmpeg"]:
@@ -79,7 +102,8 @@ class ASRProvider(ABC):
                              chunk_index: int) -> str:
         """从 WAV 中提取指定区间的 WAV 分片，返回分片文件路径"""
         short_wav_path = get_short_path_name(os.path.abspath(wav_path))
-        chunk_wav_path = wav_path.replace(".wav", f"_chunk_{chunk_index}.wav")
+        base_name = os.path.splitext(wav_path)[0]
+        chunk_wav_path = f"{base_name}_chunk_{chunk_index}.wav"
         short_chunk_path = get_short_path_name(chunk_wav_path)
 
         for ffmpeg_cmd in [FFMPEG_PATH, "ffmpeg"]:

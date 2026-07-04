@@ -163,6 +163,7 @@ def run_migrations(core, facade):
         add_column_if_missing("cards", "pos_y", "REAL")
         add_column_if_missing("tasks", "speaker_confidence", "TEXT")
         add_column_if_missing("tasks", "qa_history", "TEXT")
+        add_column_if_missing("tasks", "hf_token_missing", "BOOLEAN")
 
         # Board initialization
         c.execute("SELECT COUNT(*) as count FROM boards")

@@ -51,6 +51,43 @@ class UpdateConfigRequest(BaseModel):
     custom_storage_dir: str = ""
     language: str = "en"
     enable_autostart_windows: bool = False
+    enable_speaker_inference: bool = True
+
+class TestConfigRequest(BaseModel):
+    api_key: str = ""
+    base_url: str = ""
+    model: str = ""
+
+@router.post("/config/test/asr")
+def test_asr_connection(req: TestConfigRequest):
+    try:
+        # 简单探测基础域名连通性
+        test_url = req.base_url.rstrip("/") + "/models"
+        headers = {"Authorization": f"Bearer {req.api_key}"}
+        # 如果是 mimo，可能没有 /models 接口，我们只做基本的网络联通探测
+        if "mimo" in req.base_url.lower():
+            test_url = req.base_url.rstrip("/")
+        resp = httpx.get(test_url, headers=headers, timeout=5.0)
+        if resp.status_code in [200, 401, 403, 404]: # 至少证明网络通了
+            return {"success": True, "message": f"连接成功 (HTTP {resp.status_code})"}
+        return {"success": False, "message": f"服务器返回异常状态码: {resp.status_code}"}
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)}"}
+
+@router.post("/config/test/llm")
+def test_llm_connection(req: TestConfigRequest):
+    try:
+        # LLM 探测可以调用 /chat/completions 或 /models
+        test_url = req.base_url.rstrip("/") + "/models"
+        headers = {"Authorization": f"Bearer {req.api_key}"}
+        resp = httpx.get(test_url, headers=headers, timeout=5.0)
+        if resp.status_code == 200:
+            return {"success": True, "message": "连接与鉴权成功"}
+        elif resp.status_code in [401, 403]:
+            return {"success": False, "message": "连接成功但鉴权失败 (API Key 可能不正确)"}
+        return {"success": False, "message": f"服务器返回: {resp.status_code}"}
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)}"}
 
 @router.get("/config")
 def get_global_config():

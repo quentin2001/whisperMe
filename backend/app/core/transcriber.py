@@ -240,10 +240,10 @@ class PodcastTranscriber:
         last_progress_int = 60
 
         if asr_mode == "online":
-            from app.config import config
+            from app.config import config as _online_config
             from app.core.asr_providers import get_provider
 
-            provider_name = config.get("online_asr_provider", "mimo")
+            provider_name = _online_config.get("online_asr_provider", "mimo")
             provider = get_provider(provider_name)
 
             print(f"[LOG] Using online ASR provider: {provider.get_display_name()} ({provider_name})")

@@ -92,6 +92,7 @@ class AppConfigModel(BaseModel):
     enable_auto_cleanup: bool = False
     cleanup_threshold_days: int = 30
     max_concurrent_tasks: int = 0  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
+    enable_speaker_inference: bool = True
 
 # 加载全局配置文件
 def load_config() -> dict:

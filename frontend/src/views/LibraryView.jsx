@@ -261,7 +261,8 @@ export default function LibraryView({
   onJumpToSettings,
   onAnalyzeLogs,
   onNewSessionTrigger,
-  onDeleteTask
+  onDeleteTask,
+  onAddNewSession
 }) {
   const { t } = useTranslation();
   const sortedTasks = [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -788,7 +789,11 @@ export default function LibraryView({
                       <span className="text-[var(--border-primary)]/40">•</span>
                       {session.status === 'IN_PROGRESS' ? (
                         <span className="bg-[var(--accent-red-light)] text-[var(--accent-red)] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
-                          {session.rawTask.status === 'pending' ? t("排队中", "Queued") : `${t("处理中", "In Progress")} (${Math.round(session.progress)}%)`}
+                          {session.rawTask.status === 'pending' ? t("排队中", "Queued") : 
+                           session.rawTask.status === 'downloading' ? `${t("下载中", "Downloading")} (${Math.round(session.progress)}%)` :
+                           session.rawTask.status === 'transcribing' ? `${t("转录中", "Transcribing")} (${Math.round(session.progress)}%)` :
+                           session.rawTask.status === 'summarizing' ? `${t("总结中", "Summarizing")} (${Math.round(session.progress)}%)` :
+                           `${t("处理中", "In Progress")} (${Math.round(session.progress)}%)`}
                         </span>
                       ) : session.status === 'FAILED' ? (
                         <span className="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">

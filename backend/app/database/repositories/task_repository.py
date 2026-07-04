@@ -65,6 +65,22 @@ class TaskRepository:
             return row
         return None
 
+    def get_task_by_url(self, url: str) -> dict:
+        c = self.core.conn.cursor()
+        # Look for the most recently created task with this exact URL
+        c.execute("SELECT * FROM tasks WHERE url=? ORDER BY created_at DESC LIMIT 1", (url,))
+        row = c.fetchone()
+        if row:
+            row["obsidian_synced"] = bool(row["obsidian_synced"])
+            row["restoring"] = bool(row["restoring"])
+            meta = row.get("metadata") or {}
+            if isinstance(meta, str):
+                try: meta = json.loads(meta)
+                except: meta = {}
+            row["duration"] = meta.get("duration", "00:00")
+            return row
+        return None
+
     def get_next_pending_task(self) -> dict:
         c = self.core.conn.cursor()
         c.execute("SELECT * FROM tasks WHERE status='pending' ORDER BY created_at ASC LIMIT 1")

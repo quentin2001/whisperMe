@@ -114,6 +114,9 @@ export default function AudioPlayerControl({
                 value={currentTime || 0}
                 onChange={handleProgressChange}
                 className="w-full accent-[#f62440] h-1.5 bg-[var(--bg-hover)] rounded-lg cursor-pointer appearance-none"
+                style={{
+                  background: `linear-gradient(to right, var(--accent-red) ${(currentTime / Math.max(1, duration || 1)) * 100}%, var(--bg-hover) ${(currentTime / Math.max(1, duration || 1)) * 100}%)`
+                }}
               />
             </div>
             <span className="text-xs font-mono font-bold text-[var(--text-muted)]">

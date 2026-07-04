@@ -140,11 +140,14 @@ def run_podcast_pipeline(task_id: str, url: str):
         # Step 3: PyAnnote 声纹分割
         check_cancelled(task_id)
         t_diarization_start = time.time()
-        diar_data = transcriber.run_diarization(standardized_wav)
+        if config.get("enable_speaker_inference", True):
+            diar_data = transcriber.run_diarization(standardized_wav)
+        else:
+            diar_data = []
         timing_stats['声纹分割'] = time.time() - t_diarization_start
 
         # 如果 HF Token 缺失/无效，标记到 task metadata 供前端展示
-        if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30):
+        if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30) and config.get("enable_speaker_inference", True):
             db.update_task_field(task_id, hf_token_missing=True)
 
         db.update_task_field(task_id, progress=60.0)
@@ -192,66 +195,71 @@ def run_podcast_pipeline(task_id: str, url: str):
         except Exception as chunk_ex:
             print(f"⚠️ [LOG 警告] 语义分块聚合失败: {chunk_ex}")
 
-        # Step 4.5: 提取声纹特征，并进行智能特征及上下文改名
+        # Step 4.5 & 4.8: 声纹提取与发言人智能推断 (可选开关)
         check_cancelled(task_id)
-        t_rename_start = time.time()  # 在 try 块外初始化，防止 except 中 NameError
-        try:
-            print("⏳ [LOG] 正在提取发言人声纹特征向量...")
-            speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
-            db.update_task_field(task_id, speaker_embeddings=speaker_embeddings)
-            
-            # 如果聚类修正合并了 SPEAKER，需要同步更新已有的 transcript 和段落
-            diar_speakers = set(seg["speaker"] for seg in diar_data)
-            transcript_speakers = set(seg.get("speaker") for seg in merged_transcript)
-            merged_away = transcript_speakers - diar_speakers
-            if merged_away:
-                reverse_map = {}
-                for old_sp in merged_away:
-                    for seg in merged_transcript:
-                        if seg.get("speaker") == old_sp:
-                            seg_center = (seg.get("start", 0) + seg.get("end", 0)) / 2
-                            for d in diar_data:
-                                if d["start"] <= seg_center <= d["end"]:
-                                    reverse_map[old_sp] = d["speaker"]
-                                    break
-                            break
+        if config.get("enable_speaker_inference", True):
+            t_rename_start = time.time()  # 在 try 块外初始化，防止 except 中 NameError
+            try:
+                print("⏳ [LOG] 正在提取发言人声纹特征向量...")
+                speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
+                db.update_task_field(task_id, speaker_embeddings=speaker_embeddings)
                 
-                if reverse_map:
-                    print(f"🔄 [LOG] 正在同步聚类修正到转录文本: {reverse_map}")
-                    for seg in merged_transcript:
-                        if seg.get("speaker") in reverse_map:
-                            seg["speaker"] = reverse_map[seg["speaker"]]
-                    db.update_task_field(task_id, transcript=merged_transcript)
+                # 如果聚类修正合并了 SPEAKER，需要同步更新已有的 transcript 和段落
+                diar_speakers = set(seg["speaker"] for seg in diar_data)
+                transcript_speakers = set(seg.get("speaker") for seg in merged_transcript)
+                merged_away = transcript_speakers - diar_speakers
+                if merged_away:
+                    reverse_map = {}
+                    for old_sp in merged_away:
+                        for seg in merged_transcript:
+                            if seg.get("speaker") == old_sp:
+                                seg_center = (seg.get("start", 0) + seg.get("end", 0)) / 2
+                                for d in diar_data:
+                                    if d["start"] <= seg_center <= d["end"]:
+                                        reverse_map[old_sp] = d["speaker"]
+                                        break
+                                break
                     
-                    try:
-                        paragraphs = db.get_paragraphs_by_podcast(task_id)
-                        if paragraphs:
-                            updated = False
-                            for p in paragraphs:
-                                if p.get("speaker") in reverse_map:
-                                    p["speaker"] = reverse_map[p["speaker"]]
-                                    updated = True
-                            if updated:
-                                db.delete_paragraphs_by_podcast(task_id)
-                                db.add_paragraphs(paragraphs)
-                                print(f"✅ [LOG] 段落 speaker 标签已同步更新")
-                    except Exception as para_ex:
-                        print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
-            
-            auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
-        except Exception as emb_ex:
-            timing_stats['发言人智能推断'] = time.time() - t_rename_start
-            if str(emb_ex) == "TASK_CANCELLED":
-                raise emb_ex
-            print(f"⚠️ [LOG 警告] 提取声纹特征或智能改名失败: {emb_ex}")
+                    if reverse_map:
+                        print(f"🔄 [LOG] 正在同步聚类修正到转录文本: {reverse_map}")
+                        for seg in merged_transcript:
+                            if seg.get("speaker") in reverse_map:
+                                seg["speaker"] = reverse_map[seg["speaker"]]
+                        db.update_task_field(task_id, transcript=merged_transcript)
+                        
+                        try:
+                            paragraphs = db.get_paragraphs_by_podcast(task_id)
+                            if paragraphs:
+                                updated = False
+                                for p in paragraphs:
+                                    if p.get("speaker") in reverse_map:
+                                        p["speaker"] = reverse_map[p["speaker"]]
+                                        updated = True
+                                if updated:
+                                    db.delete_paragraphs_by_podcast(task_id)
+                                    db.add_paragraphs(paragraphs)
+                                    print(f"✅ [LOG] 段落 speaker 标签已同步更新")
+                        except Exception as para_ex:
+                            print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
+                
+                auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
+            except Exception as emb_ex:
+                timing_stats['发言人智能推断'] = time.time() - t_rename_start
+                if str(emb_ex) == "TASK_CANCELLED":
+                    raise emb_ex
+                print(f"⚠️ [LOG 警告] 提取声纹特征或智能改名失败: {emb_ex}")
 
-        # Step 4.8: 对仅说语气词/短词的发言人自动打上“未识别语气词”标签
+            # Step 4.8: 对仅说语气词/短词的发言人自动打上“未识别语气词”标签
+            check_cancelled(task_id)
+            try:
+                apply_interjection_labels(task_id, merged_transcript)
+            except Exception as label_ex:
+                print(f"⚠️ [LOG 警告] 自动标记语气词发言人失败: {label_ex}")
+        else:
+            print("⏭️ [LOG] 用户已关闭声纹推断，跳过特征提取与大模型人名推断。")
+
+        # Step 5: 转录完成，等待手动触发总结
         check_cancelled(task_id)
-        try:
-            apply_interjection_labels(task_id, merged_transcript)
-        except Exception as label_ex:
-            print(f"⚠️ [LOG 警告] 自动标记语气词发言人失败: {label_ex}")
-
         # 物理销毁临时超大标准化 WAV 音频
         if standardized_wav and os.path.exists(standardized_wav):
             try:
@@ -260,40 +268,15 @@ def run_podcast_pipeline(task_id: str, url: str):
             except Exception as fe:
                 print(f"⚠️ [LOG 警告] 无法物理清理临时 WAV 文件: {fe}")
 
-        # Step 5: 调用 AI 总结
-        check_cancelled(task_id)
-        db.update_task_field(task_id, status="summarizing", progress=80.0)
-        task_summary_mode = task.get("summary_mode", "local")
-        t_summary_start = time.time()
-        summary_report = summarizer.summarize(metadata, merged_transcript, summary_mode=task_summary_mode)
-        timing_stats['AI 深度总结'] = time.time() - t_summary_start
-        
-        total_time = time.time() - pipeline_start_time
-        time_report = "\n\n---\n\n### ⏱️ 分析用时统计\n"
-        for step, t in timing_stats.items():
-            if t > 60:
-                time_report += f"- **{step}**: {t/60:.1f} 分钟\n"
-            else:
-                time_report += f"- **{step}**: {t:.1f} 秒\n"
-        if total_time > 60:
-            time_report += f"\n**总计耗时**: {total_time/60:.1f} 分钟"
-        else:
-            time_report += f"\n**总计耗时**: {total_time:.1f} 秒"
-            
-        summary_report += time_report
-        db.update_task_field(task_id, summary=summary_report, progress=95.0)
-
-        # 标志任务已彻底成功（校验关键产出）
-        check_cancelled(task_id)
+        # 标志任务已成功完成转录环节（等待手动总结）
         if not merged_transcript or len(merged_transcript) == 0:
-            db.update_task_field(task_id, status="failed", error_message="转录结果为空，无法生成总结。", progress=100.0)
+            db.update_task_field(task_id, status="failed", error_message="转录结果为空。", progress=100.0)
             notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》转录结果为空")
             return
-        if not summary_report or len(summary_report.strip()) < 20:
-            db.update_task_field(task_id, status="failed", error_message="AI 总结生成失败或内容过短。", progress=100.0)
-            notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》AI 总结失败")
-            return
-        db.update_task_field(task_id, status="completed", progress=100.0)
+
+        total_time = time.time() - pipeline_start_time
+        timing_stats['转录总计耗时'] = total_time
+        db.update_task_field(task_id, status="transcribed", progress=100.0)
 
         # Step 6: 消息提醒
         duration_str = metadata.get("duration", "")

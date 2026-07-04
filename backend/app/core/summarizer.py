@@ -166,7 +166,7 @@ class PodcastSummarizer:
 
         except httpx.ConnectError:
             err_msg = f"""⚠️ **本地大模型生成总结失败**
-- **原因**：无法连接到大模型推理服务（当前配置接口地址为 `{api_url}`）。
+- **原因**：无法连接到大模型推理服务。
 - **解决方案**：
   1. 如果使用 **本地大模型 (Ollama/LM Studio)**：请确保您已启动对应的 Local Server（如 LM Studio 的 1234 端口），且配置的地址无误。
   2. 如果使用 **在线 API 总结**：请确保您的网络通畅，且 API 代理地址不需要翻墙或代理配置正确。

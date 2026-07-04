@@ -16,7 +16,8 @@ export const useConfigStore = create((set) => ({
     summary_mode: "local",
     theme: "dark",
     model_dir: "",
-    hf_token: ""
+    hf_token: "",
+    enable_speaker_inference: true
   },
   promptData: {
     prompt: ""

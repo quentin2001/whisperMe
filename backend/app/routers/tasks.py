@@ -1,7 +1,10 @@
 import os
+import re
 import uuid
 import shutil
+import socket
 import math
+from urllib.parse import urlparse
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from app.config import (
@@ -30,6 +33,53 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 downloader = PodcastDownloader()
 transcriber = PodcastTranscriber()
 summarizer = PodcastSummarizer()
+
+# --- SSRF 防护：URL 白名单校验 ---
+PRIVATE_IP_PATTERNS = [
+    re.compile(r"^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$"),
+    re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$"),
+    re.compile(r"^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$"),
+    re.compile(r"^192\.168\.\d{1,3}\.\d{1,3}$"),
+    re.compile(r"^0\.0\.0\.0$"),
+]
+
+def validate_url_safety(url: str):
+    """拒绝指向内网地址的 URL（SSRF 防护）"""
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+    except Exception:
+        raise HTTPException(status_code=400, detail="无效的 URL 格式")
+
+    if not hostname:
+        raise HTTPException(status_code=400, detail="URL 中未包含有效的主机名")
+
+    # 检查 localhost 类主机名
+    if hostname in ("localhost", "localhost.localdomain", "127.0.0.1", "0.0.0.0",
+                    "::1", "[::1]"):
+        raise HTTPException(status_code=400, detail="不允许访问本地回环地址")
+
+    # 检查是否裸 IP 且为私有地址
+    for pattern in PRIVATE_IP_PATTERNS:
+        if pattern.match(hostname):
+            raise HTTPException(status_code=400, detail=f"不允许访问内网地址: {hostname}")
+
+    # 尝试 DNS 解析，如果解析到私有 IP 也拒绝
+    try:
+        ips = socket.getaddrinfo(hostname, None)
+        for info in ips:
+            ip = info[4][0]
+            for pattern in PRIVATE_IP_PATTERNS:
+                if pattern.match(ip):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"域名 {hostname} 解析到内网地址 {ip}，不允许访问"
+                    )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # DNS 解析失败不阻塞，后續下载阶段会报错
+
 
 # --- Pydantic Schemas ---
 class CreateTaskRequest(BaseModel):
@@ -346,6 +396,13 @@ def clear_qa_history(task_id: str):
 
 @router.post("")
 def create_task(req: CreateTaskRequest):
+    validate_url_safety(req.url)
+    
+    # Duplicate prevention
+    existing_task = db.get_task_by_url(req.url)
+    if existing_task and existing_task["status"] in ["pending", "downloading", "transcribing", "summarizing", "completed", "transcribed"]:
+        return {"task_id": existing_task["id"], "status": existing_task["status"], "is_duplicate": True}
+
     task_id = str(uuid.uuid4())
     curr_summary_mode = config.get("summary_mode", "local")
     db.add_task(task_id, req.url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
@@ -353,7 +410,7 @@ def create_task(req: CreateTaskRequest):
     # 放入全局单例队列管理器进行排队串行处理，不再直接塞给 background_tasks 并行跑
     queue_manager.add_task(task_id, req.url)
     
-    res = {"task_id": task_id, "status": "pending"}
+    res = {"task_id": task_id, "status": "pending", "is_duplicate": False}
     warning = check_low_disk_space()
     if warning:
         res["warning"] = warning
@@ -373,12 +430,20 @@ def create_batch_tasks(req: BatchCreateRequest):
         url = url.strip()
         if not url:
             continue
+        validate_url_safety(url)
+        
+        # Duplicate prevention
+        existing_task = db.get_task_by_url(url)
+        if existing_task and existing_task["status"] in ["pending", "downloading", "transcribing", "summarizing", "completed", "transcribed"]:
+            created.append({"task_id": existing_task["id"], "url": url, "status": existing_task["status"], "is_duplicate": True})
+            continue
+
         task_id = str(uuid.uuid4())
         db.add_task(task_id, url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
         queue_manager.add_task(task_id, url)
-        created.append({"task_id": task_id, "url": url, "status": "pending"})
+        created.append({"task_id": task_id, "url": url, "status": "pending", "is_duplicate": False})
 
-    res = {"created": len(created), "tasks": created}
+    res = {"created": len([c for c in created if not c.get("is_duplicate")]), "tasks": created}
     warning = check_low_disk_space()
     if warning:
         res["warning"] = warning
@@ -521,17 +586,17 @@ def rename_speaker(task_id: str, req: RenameSpeakerRequest):
         
     return {"success": True, "speaker_mappings": mappings}
 
-@router.post("/{task_id}/summary/regenerate")
-def regenerate_summary(task_id: str, background_tasks: BackgroundTasks):
+@router.post("/{task_id}/summary/start")
+def start_summary(task_id: str, background_tasks: BackgroundTasks):
     """
-    当修改了发言人昵称或需要重新总结时，可手动发起 Ollama 重建总结任务
+    手动发起大模型深度总结，支持转录完成初次启动或后续重新生成
     """
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="未找到任务")
     
-    if task["status"] != "completed" and task["status"] != "failed":
-        raise HTTPException(status_code=400, detail="任务处于非就绪状态，无法重新生成总结")
+    if task["status"] not in ["completed", "failed", "transcribed"]:
+        raise HTTPException(status_code=400, detail="任务处于非就绪状态，无法启动总结")
 
     def run_re_summarize():
         try:
