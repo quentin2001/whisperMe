@@ -71,6 +71,7 @@ export default function SettingsView({
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isFlashing, setIsFlashing] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
+  const [dependencies, setDependencies] = useState(null);
   const [hfTokenStatus, setHfTokenStatus] = useState(null);
   const [hfChecking, setHfChecking] = useState(false);
   const [testingAsr, setTestingAsr] = useState(false);
@@ -179,7 +180,13 @@ export default function SettingsView({
   useEffect(() => {
     const p = configData.ffmpeg_path || "";
     const url = p ? `${API_BASE}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API_BASE}/api/dependencies`;
-    fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
+    fetch(url)
+      .then(r => r.json())
+      .then(d => {
+        setDependencies(d);
+        setFfmpegStatus(d.ffmpeg || { available: false });
+      })
+      .catch(() => setFfmpegStatus({ available: false }));
   }, [configData?.ffmpeg_path]);
 
   const getHighlightClass = (val) => {
@@ -260,10 +267,24 @@ export default function SettingsView({
                       value={configData.local_asr_provider || "whisper"}
                       onChange={(val) => handleConfigChange("local_asr_provider", val)}
                       options={[
-                        { value: "whisper", label: t("Faster Whisper", "Faster Whisper") },
-                        { value: "funasr", label: t("FunASR (Paraformer)", "FunASR (Paraformer)") }
+                        { 
+                          value: "whisper", 
+                          label: `${t("Faster Whisper", "Faster Whisper")}${dependencies?.asr_providers ? (dependencies.asr_providers.whisper ? ` (${t("已检测到", "Detected")})` : ` (${t("未检测到", "Not Detected")})`) : ""}` 
+                        },
+                        { 
+                          value: "funasr", 
+                          label: `${t("FunASR (Paraformer)", "FunASR (Paraformer)")}${dependencies?.asr_providers ? (dependencies.asr_providers.funasr ? ` (${t("已检测到", "Detected")})` : ` (${t("未检测到", "Not Detected")})`) : ""}` 
+                        }
                       ]}
                     />
+                    {dependencies?.asr_providers && !dependencies.asr_providers[configData.local_asr_provider || "whisper"] && (
+                      <div className="text-xs text-[var(--accent-red)] font-semibold mt-1 bg-[var(--accent-red-light)]/20 border border-[var(--accent-red-light)]/30 rounded-lg p-2.5">
+                        ⚠️ {t("当前 Python 环境未安装该引擎的依赖包。如需使用，请在后端环境执行：", "The dependencies for this engine are not installed. Run this to install:")}
+                        <code className="block bg-black/35 font-mono p-1.5 rounded-md mt-1.5 select-all text-[var(--text-primary)]">
+                          {configData.local_asr_provider === "funasr" ? "pip install funasr modelscope" : "pip install faster-whisper"}
+                        </code>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
                   <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
