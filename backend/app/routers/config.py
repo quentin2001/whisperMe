@@ -68,12 +68,12 @@ def test_asr_connection(req: TestConfigRequest):
         if "mimo" in req.base_url.lower():
             test_url = req.base_url.rstrip("/")
         resp = httpx.get(test_url, headers=headers, timeout=5.0)
-        if resp.status_code in [200, 401, 403, 404]: # 至少证明网络通了
-            return {"success": True, "message": f"连接成功 (HTTP {resp.status_code})"}
+        if resp.status_code in [200, 401, 403, 404]: # 404 is allowed because root endpoints of APIs often have no GET route
+            return {"success": True, "message": "连接成功"}
         return {"success": False, "message": f"服务器返回异常状态码: {resp.status_code}"}
     except Exception as e:
         return {"success": False, "message": f"连接失败: {str(e)}"}
-
+ 
 @router.post("/config/test/llm")
 def test_llm_connection(req: TestConfigRequest):
     try:
@@ -81,11 +81,9 @@ def test_llm_connection(req: TestConfigRequest):
         test_url = req.base_url.rstrip("/") + "/models"
         headers = {"Authorization": f"Bearer {req.api_key}"}
         resp = httpx.get(test_url, headers=headers, timeout=5.0)
-        if resp.status_code == 200:
-            return {"success": True, "message": "连接与鉴权成功"}
-        elif resp.status_code in [401, 403]:
-            return {"success": False, "message": "连接成功但鉴权失败 (API Key 可能不正确)"}
-        return {"success": False, "message": f"服务器返回错误状态码: {resp.status_code} (API基础路径可能不正确)"}
+        if resp.status_code in [200, 401, 403, 404]: # 404 is allowed because root endpoints of APIs often have no GET route
+            return {"success": True, "message": "连接成功"}
+        return {"success": False, "message": f"服务器返回异常状态码: {resp.status_code}"}
     except Exception as e:
         return {"success": False, "message": f"连接失败: {str(e)}"}
 

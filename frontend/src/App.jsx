@@ -583,10 +583,10 @@ export default function App() {
               <div className="flex gap-4 items-center">
                 <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{t("音频来源：", "AUDIO SOURCE:")}</span>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={audioSource === "link"} onChange={() => setAudioSource("link")} className="w-3.5 h-3.5 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("在线链接", "LINK")}
+                  <input type="radio" checked={audioSource === "link"} onChange={() => setAudioSource("link")} className="w-3.5 h-3.5 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("在线链接", "LINK")}
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={audioSource === "file"} onChange={() => setAudioSource("file")} className="w-3.5 h-3.5 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("本地文件", "LOCAL FILE")}
+                  <input type="radio" checked={audioSource === "file"} onChange={() => setAudioSource("file")} className="w-3.5 h-3.5 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("本地文件", "LOCAL FILE")}
                 </label>
               </div>
 

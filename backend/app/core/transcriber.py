@@ -165,10 +165,21 @@ class ModelCacheManager:
                 self.last_used_time = time.time()
                 return self.funasr_model
             
-            print("📡 [LOG] 正在加载 FunASR Paraformer 模型 (这可能需要几分钟下载)...")
             from funasr import AutoModel
+            model_path = "paraformer-zh"
+            custom_path = config.get("local_whisper_model_path", "")
+            if custom_path and os.path.isdir(custom_path) and (
+                os.path.exists(os.path.join(custom_path, "configuration.json")) or 
+                os.path.exists(os.path.join(custom_path, "model.onnx")) or 
+                "funasr" in custom_path.lower() or "paraformer" in custom_path.lower()
+            ):
+                model_path = custom_path
+                print(f"📂 [LOG] 检测到本地自定义路径，将从该路径加载 FunASR 模型: {custom_path}")
+            else:
+                print("📡 [LOG] 正在加载 FunASR Paraformer 模型 (如本地无缓存则会自动下载)...")
+
             device_str = "cuda:0" if device == "cuda" else "cpu"
-            model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
+            model = AutoModel(model=model_path, model_revision="v2.0.4",
                               vad_model="fsmn-vad", vad_model_revision="v2.0.4",
                               punc_model="ct-punc", punc_model_revision="v2.0.4",
                               device=device_str, disable_update=True)

@@ -543,7 +543,7 @@ export default function SettingsView({
                     <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("智能声纹推理与说话人分离", "Speaker Diarization & Smart Inference")}</h4>
                     <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("关闭后转录速度极快，但无法区分不同说话人（适合单人播客）。", "Turn off for blazing fast transcription without speaker separation (ideal for solo podcasts).")}</p>
                   </div>
-                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
                 </div>
                 {configData.enable_speaker_inference !== false && (
                   <div className="mt-4 pt-4 border-t border-[var(--border-primary)]/20 flex flex-col gap-3 animate-fade-in">
@@ -584,14 +584,14 @@ export default function SettingsView({
                   <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("桌面通知", "Desktop Notifications")}</h4>
                   <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               <div className="flex items-center justify-between p-4 bg-[var(--bg-secondary)]/30 rounded-lg border border-[var(--border-primary)]/30">
                 <div>
                   <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("邮件提醒", "Email Alerts")}</h4>
                   <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("任务结束时发送邮件通知（需要配置 SMTP）。", "Send mail alerts (SMTP) when task completes.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_email_notification === true} onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_email_notification === true} onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               {configData.enable_email_notification === true && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[var(--border-primary)]/20 pt-4 animate-fade-in">
@@ -638,7 +638,7 @@ export default function SettingsView({
                   <h4 className="font-bold text-xs text-[var(--text-primary)]">{t("启用自动清理", "Enable Auto-Cleanup")}</h4>
                   <p className="text-[var(--text-muted)] text-[10px] mt-0.5">{t("开启后将定时清除过期音频。", "Regularly clean up expired audio files.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_auto_cleanup || false} onChange={(e) => handleConfigChange("enable_auto_cleanup", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_auto_cleanup || false} onChange={(e) => handleConfigChange("enable_auto_cleanup", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               {configData.enable_auto_cleanup && (
                 <div className="flex flex-col gap-2 animate-fade-in">

@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["system"])
 
 ALLOWED_IMAGE_DOMAINS = {
     "xiaoyuzhoufm.com",
+    "xyzcdn.net",
     "bilibili.com",
     "hdslb.com",
     "xmcdn.com",
