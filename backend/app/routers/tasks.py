@@ -198,83 +198,30 @@ def get_task_transcript(task_id: str, format: str = "text"):
         return speaker_mappings.get(speaker_id, speaker_id)
 
     if format == "srt":
-        lines = []
-        for i, p in enumerate(items):
-            start = p.get("start_time", 0)
-            end = p.get("end_time", 0)
-            speaker = resolve_speaker(p.get("speaker", ""))
-            text = p.get("content", "") or p.get("text", "")
-            sh, sm, ss = int(start//3600), int((start%3600)//60), start%60
-            eh, em, es = int(end//3600), int((end%3600)//60), end%60
-            lines.append(f"{i+1}\n{sh:02d}:{sm:02d}:{ss:06.3f}".replace(".",",") + f" --> {eh:02d}:{em:02d}:{es:06.3f}".replace(".",",") + f"\n{speaker}: {text}")
         from fastapi.responses import PlainTextResponse
-        return PlainTextResponse("\n\n".join(lines), media_type="text/plain", headers={"Content-Disposition": f"attachment; filename=transcript.srt"})
+        from app.utils.formatters import format_srt
+        return PlainTextResponse(format_srt(items, resolve_speaker), media_type="text/plain", headers={"Content-Disposition": f"attachment; filename=transcript.srt"})
 
     if format == "vtt":
-        lines = ["WEBVTT", ""]
-        for i, p in enumerate(items):
-            start = p.get("start_time", 0)
-            end = p.get("end_time", 0)
-            speaker = resolve_speaker(p.get("speaker", ""))
-            text = p.get("content", "") or p.get("text", "")
-            sh, sm, ss = int(start//3600), int((start%3600)//60), start%60
-            eh, em, es = int(end//3600), int((end%3600)//60), end%60
-            lines.append(f"{i+1}\n{sh:02d}:{sm:02d}:{ss:06.3f} --> {eh:02d}:{em:02d}:{es:06.3f}\n{speaker}: {text}")
         from fastapi.responses import PlainTextResponse
-        return PlainTextResponse("\n\n".join(lines), media_type="text/vtt", headers={"Content-Disposition": f"attachment; filename=transcript.vtt"})
+        from app.utils.formatters import format_vtt
+        return PlainTextResponse(format_vtt(items, resolve_speaker), media_type="text/vtt", headers={"Content-Disposition": f"attachment; filename=transcript.vtt"})
 
     if format == "markdown":
         from fastapi.responses import PlainTextResponse
-        import yaml
-
+        from app.utils.formatters import format_markdown
         title = task.get("title", "未知标题")
-        podcast = task.get("podcast_name", "未知播客")
-        meta = task.get("metadata", {}) or {}
-        pub_date = meta.get("pub_date", "")
-        duration = meta.get("duration", "")
-        url = task.get("url", "")
-        summary = task.get("summary", "")
-
-        frontmatter = {
-            "title": title,
-            "podcast": podcast,
-            "date": pub_date,
-            "duration": duration,
-            "url": url,
-        }
-        fm_str = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
-
-        doc = f"---\n{fm_str}---\n\n"
-        doc += f"# {title}\n\n"
-        doc += f"> {podcast}"
-        if pub_date:
-            doc += f" · {pub_date}"
-        if duration:
-            doc += f" · {duration}"
-        doc += "\n\n"
-
-        if summary:
-            doc += f"## AI Summary\n\n{summary}\n"
-        else:
-            doc += "*暂无 AI 总结*\n"
-
         safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60]
         return PlainTextResponse(
-            doc,
+            format_markdown(task),
             media_type="text/markdown",
             headers={"Content-Disposition": f'attachment; filename="{safe_name}.md"'}
         )
 
     # 默认 text 格式
-    lines = []
-    for p in items:
-        start = p.get("start_time", 0)
-        speaker = resolve_speaker(p.get("speaker", ""))
-        text = p.get("content", "") or p.get("text", "")
-        mm, ss = int(start//60), int(start%60)
-        lines.append(f"[{mm:02d}:{ss:02d}] {speaker}: {text}")
     from fastapi.responses import PlainTextResponse
-    return PlainTextResponse("\n".join(lines), media_type="text/plain")
+    from app.utils.formatters import format_text
+    return PlainTextResponse(format_text(items, resolve_speaker), media_type="text/plain")
 
 @router.post("/{task_id}/qa")
 def ask_podcast(task_id: str, req: QARequest):
@@ -376,7 +323,7 @@ def ask_podcast(task_id: str, req: QARequest):
     # Save Q&A to history
     qa_history.append({"role": "user", "content": req.question})
     qa_history.append({"role": "assistant", "content": answer})
-    db.update_task(task_id, qa_history=qa_history)
+    db.update_task_field(task_id, qa_history=qa_history)
 
     return {"answer": answer, "history": qa_history}
 
@@ -394,7 +341,7 @@ def clear_qa_history(task_id: str):
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="未找到该任务")
-    db.update_task(task_id, qa_history=[])
+    db.update_task_field(task_id, qa_history=[])
     return {"success": True, "message": "问答历史已清空"}
 
 @router.post("")
@@ -445,7 +392,7 @@ def delete_task(task_id: str):
         
     # 如果任务处于排队或运行状态，先将其置为取消状态，触发后台工作线程中断
     if task.get("status") in ["pending", "downloading", "transcribing", "summarizing"]:
-        db.update_task(task_id, status="cancelled", progress=100.0, error_message="任务在删除前已被取消。")
+        db.update_task_field(task_id, status="cancelled", progress=100.0, error_message="任务在删除前已被取消。")
         print(f"🚫 [LOG] 正在运行的任务 {task_id} 在被删除前已被取消。")
         
     # 物理清除下载的 MP3 文件以释放硬盘，前提是该音频没有被其他任务共享
@@ -483,7 +430,7 @@ def cancel_task(task_id: str):
         raise HTTPException(status_code=404, detail="任务不存在")
         
     if task.get("status") in ["pending", "downloading", "transcribing", "summarizing"]:
-        db.update_task(task_id, status="cancelled", progress=100.0, error_message="任务已被手动取消。")
+        db.update_task_field(task_id, status="cancelled", progress=100.0, error_message="任务已被手动取消。")
         print(f"🚫 [LOG] 任务 {task_id} 已被手动取消。")
         return {"success": True, "message": "任务已被手动取消。"}
     
@@ -502,7 +449,7 @@ def retry_task(task_id: str):
         raise HTTPException(status_code=400, detail=f"当前任务状态为 {status}，仅支持重试失败或已取消的任务")
 
     # 重置任务状态为 pending，清除错误信息和进度
-    db.update_task(task_id, status="pending", progress=0.0, error_message="")
+    db.update_task_field(task_id, status="pending", progress=0.0, error_message="")
     # 重新加入队列
     queue_manager.add_task(task_id, task.get("url", ""))
     print(f"🔄 [LOG] 任务 {task_id} 已重新加入队列。")
@@ -523,7 +470,7 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
         return {"success": True, "message": "音频文件已存在，无需重新下载"}
         
     # 在数据库中初始化修复状态和进度
-    db.update_task(task_id, restoring=True, restore_progress=0.0)
+    db.update_task_field(task_id, restoring=True, restore_progress=0.0)
         
     # 启动后台任务进行下载修复
     def do_redownload():
@@ -531,7 +478,7 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
             print(f"📥 [LOG] 启动后台音频修复重新下载, 原始链接: {task['url']}")
             
             def restore_progress_callback(percent):
-                db.update_task(task_id, restore_progress=round(percent, 1))
+                db.update_task_field(task_id, restore_progress=round(percent, 1))
                 
             local_path, metadata = downloader.download_url_audio(task['url'], progress_callback=restore_progress_callback)
             
@@ -548,10 +495,10 @@ def redownload_task_audio(task_id: str, background_tasks: BackgroundTasks):
                 
             new_audio_url = f"/audio/{final_filename}"
             print(f"✅ [LOG] 音频文件修复重新下载成功: {final_filename}")
-            db.update_task(task_id, audio_url=new_audio_url, restoring=False, restore_progress=100.0)
+            db.update_task_field(task_id, audio_url=new_audio_url, restoring=False, restore_progress=100.0)
         except Exception as e:
             print(f"❌ [LOG] 音频文件修复重新下载失败: {e}")
-            db.update_task(task_id, restoring=False, restore_progress=0.0)
+            db.update_task_field(task_id, restoring=False, restore_progress=0.0)
             
     background_tasks.add_task(do_redownload)
     return {"success": True, "message": "已在后台启动音频文件下载修复"}
@@ -564,7 +511,7 @@ def rename_speaker(task_id: str, req: RenameSpeakerRequest):
         
     mappings = task.get("speaker_mappings", {})
     mappings[req.speaker_id] = req.new_name
-    db.update_task(task_id, speaker_mappings=mappings)
+    db.update_task_field(task_id, speaker_mappings=mappings)
     
     # 将手动命名的发言人声纹特征写入本地声纹库
     speaker_embs = task.get("speaker_embeddings", {})
@@ -588,16 +535,16 @@ def regenerate_summary(task_id: str, background_tasks: BackgroundTasks):
 
     def run_re_summarize():
         try:
-            db.update_task(task_id, status="summarizing", progress=80.0)
+            db.update_task_field(task_id, status="summarizing", progress=80.0)
             summary_report = summarizer.summarize(
                 task["metadata"], 
                 task["transcript"], 
                 speaker_mappings=task.get("speaker_mappings"),
                 summary_mode=task.get("summary_mode", "local")
             )
-            db.update_task(task_id, status="completed", summary=summary_report, progress=100.0)
+            db.update_task_field(task_id, status="completed", summary=summary_report, progress=100.0)
         except Exception as ex:
-            db.update_task(task_id, status="failed", error_message=str(ex), progress=100.0)
+            db.update_task_field(task_id, status="failed", error_message=str(ex), progress=100.0)
 
     background_tasks.add_task(run_re_summarize)
     return {"status": "summarizing"}
@@ -625,7 +572,7 @@ def refresh_metadata(task_id: str):
                 old_meta[k] = v
                 
         # 更新数据库
-        updated_t = db.update_task(
+        updated_t = db.update_task_field(
             task_id,
             metadata=old_meta,
             title=new_metadata.get("title", task.get("title")),
@@ -680,7 +627,7 @@ def upload_audio(file: UploadFile = File(...), asr_mode: str = Form("local")):
     db.add_task(task_id, local_path, asr_mode=asr_mode, summary_mode=curr_summary_mode)
     
     name_without_ext = os.path.splitext(file.filename)[0]
-    db.update_task(
+    db.update_task_field(
         task_id,
         title=name_without_ext,
         podcast_name="本地导入",

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power } from "lucide-react";
 import { API_BASE } from "../constants.js";
+import { useConfigStore } from "../store/configStore.js";
+import { useTranslation } from "../contexts/I18nContext";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,20 +54,20 @@ function SettingsDropdown({ value, options, onChange }) {
 }
 
 export default function SettingsView({
-  versionInfo,
-  configData,
   handleConfigChange,
   handleSaveConfig,
   onResetData,
-  promptData,
-  setPromptData,
-  promptSaveStatus,
   handleSavePrompt,
   handleResetPrompt,
-  onCheckVersion,
-  checkingVersion
-}) {
-  const t = (zh, en) => (configData.language === "en" ? en : zh);
+  onCheckVersion}) {
+  const { t } = useTranslation();
+  const versionInfo = useConfigStore(state => state.versionInfo);
+  const configData = useConfigStore(state => state.configData);
+  const promptData = useConfigStore(state => state.promptData);
+  const setPromptData = useConfigStore(state => state.setPromptData);
+  const promptSaveStatus = useConfigStore(state => state.promptSaveStatus);
+  const checkingVersion = useConfigStore(state => state.checkingVersion);
+
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [isFlashing, setIsFlashing] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
@@ -76,7 +78,7 @@ export default function SettingsView({
     setHfChecking(true);
     setHfTokenStatus(null);
     try {
-      const res = await fetch(`${API}/api/settings/hf-token-status`);
+      const res = await fetch(`${API_BASE}/api/settings/hf-token-status`);
       const data = await res.json();
       setHfTokenStatus(data);
     } catch (e) {
@@ -90,10 +92,10 @@ export default function SettingsView({
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const API = API_BASE;
+
 
   useEffect(() => {
-    fetch(`${API}/api/prompt/templates`)
+    fetch(`${API_BASE}/api/prompt/templates`)
       .then(r => r.json())
       .then(data => {
         if (data && typeof data === "object") {
@@ -108,7 +110,7 @@ export default function SettingsView({
     if (!templateId) return;
     setSelectedTemplate(templateId);
     setLoadingTemplate(true);
-    fetch(`${API}/api/prompt/template/${templateId}`)
+    fetch(`${API_BASE}/api/prompt/template/${templateId}`)
       .then(r => r.json())
       .then(data => {
         if (data.prompt) {
@@ -119,11 +121,16 @@ export default function SettingsView({
       .finally(() => setLoadingTemplate(false));
   };
 
-  const recheckFfmpeg = () => {
-    setFfmpegStatus(null);
-    const p = configData?.ffmpeg_path?.trim();
-    const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
-    fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
+  const handleVerifyFfmpeg = async (p = "") => {
+    setFfmpegStatus({ status: "checking" });
+    const url = p ? `${API_BASE}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API_BASE}/api/dependencies`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      setFfmpegStatus(data);
+    } catch (e) {
+      setFfmpegStatus({ status: "unknown", message: "网络错误" });
+    }
   };
 
   useEffect(() => {
@@ -134,8 +141,8 @@ export default function SettingsView({
   }, []);
 
   useEffect(() => {
-    const p = configData?.ffmpeg_path?.trim();
-    const url = p ? `${API}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API}/api/dependencies`;
+    const p = configData.ffmpeg_path || "";
+    const url = p ? `${API_BASE}/api/dependencies?ffmpeg_path=${encodeURIComponent(p)}` : `${API_BASE}/api/dependencies`;
     fetch(url).then(r => r.json()).then(d => setFfmpegStatus(d.ffmpeg || { available: false })).catch(() => setFfmpegStatus({ available: false }));
   }, [configData?.ffmpeg_path]);
 
@@ -599,7 +606,7 @@ export default function SettingsView({
                   {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">{ffmpegStatus.path.split(/[\\/]/).slice(-2).join("/")}</div>}
                   {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-[var(--accent-red)] mt-1">Install: winget install Gyan.FFmpeg</div>}
                 </div>
-                <button onClick={recheckFfmpeg} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-check</button>
+                <button onClick={() => handleVerifyFfmpeg(configData.ffmpeg_path)} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-check</button>
               </div>
               {/* FFmpeg 路径已内置，无需手动配置 */}
             </div>

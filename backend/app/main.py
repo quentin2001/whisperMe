@@ -152,7 +152,7 @@ def run_auto_cleanup():
                             except Exception as e:
                                 print(f"⚠️ [Auto Cleanup] Failed to delete file: {e}")
                                 
-                    db.update_task(task["id"], audio_url="")
+                    db.update_task_field(task["id"], audio_url="")
                     cleaned_count += 1
             except Exception as parse_err:
                 print(f"⚠️ [Auto Cleanup] Error processing task {task.get('id')} date: {parse_err}")
@@ -206,7 +206,7 @@ def startup_event():
         for t in tasks:
             status = t.get("status")
             if status not in ["completed", "failed"]:
-                db.update_task(
+                db.update_task_field(
                     t["id"],
                     status="pending",
                     progress=0.0,
@@ -252,7 +252,7 @@ def startup_event():
                     task_modified = True
                     
             if task_modified:
-                db.update_task(t["id"], speaker_mappings=mappings)
+                db.update_task_field(t["id"], speaker_mappings=mappings)
                 print(f"🏷️ [STARTUP MIGRATION] 自动为任务 {t.get('title') or t.get('id')} 中的发言人标记 '语气词发言人'")
     except Exception as migration_ex:
         print(f"❌ [STARTUP MIGRATION] 语气词发言人迁移失败: {migration_ex}")

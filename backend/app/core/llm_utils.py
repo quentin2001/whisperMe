@@ -2,28 +2,24 @@
 import httpx
 from app.config import config
 from app.core import logger
+from app.core.network import doh_dns_bypass
+
 print = logger.info
+
+
+class LLMError(Exception):
+    """Base exception for all LLM network call failures."""
+    pass
 
 
 def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
              temperature: float = 0.1, timeout: float = 120.0) -> str:
     """Call the configured LLM (local Ollama or online OpenAI-compatible API).
 
-    Args:
-        prompt: The full prompt to send.
-        summary_mode: "local" or "online". Defaults to config value.
-        label: Label for log messages.
-        temperature: LLM temperature parameter.
-        timeout: HTTP request timeout in seconds.
-
-    Returns:
-        The LLM's response text.
-
-    Raises:
-        HTTPException: If the LLM API returns a non-200 status.
+    Implements a two-tier network fallback strategy:
+    1. Try with system proxy (trust_env=True)
+    2. Fallback to direct connection using DoH DNS bypass (trust_env=False)
     """
-    from fastapi import HTTPException
-
     if not summary_mode:
         summary_mode = config.get("summary_mode", "local")
 
@@ -40,7 +36,9 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
         ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
         target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
         base_url = ollama_url.rstrip('/')
-        api_url = f"{base_url}/v1/chat/completions" if '/v1' not in base_url else f"{base_url}/chat/completions"
+        if '/v1' not in base_url and '11434' not in base_url: api_url = f"{base_url}/v1/chat/completions"
+        elif '11434' in base_url and '/v1' not in base_url: api_url = f"{base_url}/v1/chat/completions"
+        else: api_url = f"{base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         print(f"🤖 [LOG] {label}【本地模式】 - 接口: {api_url} | 模型: {target_model}")
 
@@ -51,13 +49,28 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
         "temperature": temperature
     }
 
-    with httpx.Client(timeout=timeout, trust_env=False) as client:
-        try:
+    response = None
+    
+    # Tier 1: Try system proxy
+    try:
+        with httpx.Client(timeout=timeout, trust_env=True) as client:
             response = client.post(api_url, json=payload, headers=headers)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"LLM 网络连接错误: {str(e)}")
-            
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"LLM API error (code {response.status_code}): {response.text}")
-        result = response.json()
-        return result["choices"][0]["message"]["content"].strip()
+            response.raise_for_status()
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
+    except Exception as e_proxy:
+        print(f"⚠️ [LOG] {label} 代理请求失败: {e_proxy}。尝试直连...")
+
+    # Tier 2: Direct connection with DoH bypass
+    try:
+        with doh_dns_bypass(api_url):
+            with httpx.Client(timeout=timeout, trust_env=False) as client:
+                response = client.post(api_url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result["choices"][0]["message"]["content"].strip()
+    except Exception as e_doh:
+        print(f"❌ [LOG] {label} 直连(DoH DNS 绕过)请求失败: {e_doh}")
+        status_code = response.status_code if response is not None else "Unknown"
+        detail_msg = response.text if response is not None else str(e_doh)
+        raise LLMError(f"LLM API error (code {status_code}): {detail_msg}")

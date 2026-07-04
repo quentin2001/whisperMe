@@ -23,13 +23,14 @@ def _isolate_test_env(monkeypatch):
     tmp_dir = tempfile.mkdtemp(prefix="whisperme_test_")
     test_db_path = os.path.join(tmp_dir, "test_whisperMe.db")
 
+    import app.database.core as db_core
+    monkeypatch.setattr(db_core, "DB_FILE_PATH", test_db_path)
     import app.database as db_module
-    monkeypatch.setattr(db_module, "DB_FILE_PATH", test_db_path)
-    test_db = db_module.LocalDatabase()
+    test_db = db_module.DatabaseFacade()
     monkeypatch.setattr(db_module, "db", test_db)
 
     # 替换所有直接 import db 的模块
-    for mod_name in ["app.main", "app.routers.tasks", "app.routers.boards"]:
+    for mod_name in ["app.main", "app.routers.tasks", "app.routers.boards", "app.services.board_service", "app.services.task_service"]:
         mod = sys.modules.get(mod_name)
         if mod and hasattr(mod, "db"):
             monkeypatch.setattr(mod, "db", test_db)
@@ -78,7 +79,7 @@ def sample_task(_isolate_test_env):
     task_id = str(uuid.uuid4())
 
     test_db.add_task(task_id, "https://example.com/podcast/ep1", asr_mode="local", summary_mode="local")
-    test_db.update_task(
+    test_db.update_task_field(
         task_id,
         title="测试播客 - 第一期",
         podcast_name="测试播客",

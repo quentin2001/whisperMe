@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import json
 import threading
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, HTTPException
 from app.config import config, STORAGE_BASE, CURRENT_VERSION
 from app.core.queue_manager import queue_manager
 
@@ -16,6 +16,16 @@ from app.core import logger
 print = logger.info
 
 router = APIRouter(prefix="/api", tags=["system"])
+
+ALLOWED_IMAGE_DOMAINS = {
+    "xiaoyuzhoufm.com",
+    "bilibili.com",
+    "hdslb.com",
+    "xmcdn.com",
+    "lizhi.fm",
+    "music.126.net",
+    "126.net"
+}
 
 # 全局性能指标缓存
 SYSTEM_PERF_CACHE = {
@@ -252,7 +262,7 @@ def check_dependencies(ffmpeg_path: str = None):
         result = _sp.run(
             ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
-            creationflags=0x08000000 if sys.platform == "win32" else 0
+            creationflags=_sp.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         )
         if result.returncode == 0 and result.stdout.strip():
             parts = result.stdout.strip().split(",")
@@ -306,9 +316,27 @@ def check_software_version(force: bool = False):
 def proxy_image(url: str):
     """代理图片请求，解决浏览器无法直接访问某些 CDN 的问题"""
     if not url:
-        return Response(status_code=400, content="Missing url parameter")
+        raise HTTPException(status_code=400, detail="Missing url parameter")
 
     try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(status_code=403, detail="Invalid protocol")
+        
+        hostname = parsed.hostname
+        if not hostname:
+            raise HTTPException(status_code=403, detail="Invalid url format")
+
+        # 校验白名单
+        is_allowed = False
+        for domain in ALLOWED_IMAGE_DOMAINS:
+            if hostname == domain or hostname.endswith("." + domain):
+                is_allowed = True
+                break
+                
+        if not is_allowed:
+            raise HTTPException(status_code=403, detail="Domain not allowed")
+
         import httpx
         with httpx.Client(timeout=10, follow_redirects=True) as client:
             resp = client.get(url, headers={
@@ -322,10 +350,12 @@ def proxy_image(url: str):
                     media_type=content_type,
                     headers={"Cache-Control": "public, max-age=86400"}
                 )
-            return Response(status_code=resp.status_code)
+            raise HTTPException(status_code=resp.status_code, detail="Upstream error")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"⚠️ [PROXY] 图片代理失败: {url} - {e}")
-        return Response(status_code=502)
+        raise HTTPException(status_code=502, detail="Bad Gateway")
 
 
 # --- 启动函数 ---

@@ -7,104 +7,73 @@ import SettingsView from "./views/SettingsView";
 import DialogRenderer, { alert, confirm } from "./components/Dialog.jsx";
 import { initialLogs } from "./data.js";
 import { API_BASE } from "./constants.js";
+import { usePlayerStore } from "./store/playerStore.js";
+import { useConfigStore } from "./store/configStore.js";
+import { useTaskStore } from "./store/taskStore.js";
+import { useUIStore } from "./store/uiStore.js";
+import { useTranslation } from "./contexts/I18nContext.jsx";
+
 
 const BACKEND_URL = API_BASE;
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard"); // 'dashboard', 'workstation', 'detail', 'config'
-  const [activeTaskId, setActiveTaskId] = useState(null);
-  const [detailSourceTab, setDetailSourceTab] = useState("dashboard"); // 'dashboard' or 'workstation'
-  const [activeTask, setActiveTask] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [newUrl, setNewUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const activeTab = useUIStore(state => state.activeTab);
+  const setActiveTab = useUIStore(state => state.setActiveTab); // 'dashboard', 'workstation', 'detail', 'config'
+  const activeTaskId = useTaskStore(state => state.activeTaskId);
+  const setActiveTaskId = useTaskStore(state => state.setActiveTaskId);
+  const detailSourceTab = useUIStore(state => state.detailSourceTab);
+  const setDetailSourceTab = useUIStore(state => state.setDetailSourceTab); // 'dashboard' or 'workstation'
+  const activeTask = useTaskStore(state => state.activeTask);
+  const setActiveTask = useTaskStore(state => state.setActiveTask);
+  const tasks = useTaskStore(state => state.tasks);
+  const setTasks = useTaskStore(state => state.setTasks);
+  const newUrl = useTaskStore(state => state.newUrl);
+  const setNewUrl = useTaskStore(state => state.setNewUrl);
+  const loading = useUIStore(state => state.loading);
+  const setLoading = useUIStore(state => state.setLoading);
+  const setDetailLoading = useUIStore(state => state.setDetailLoading);
+  const uploading = useUIStore(state => state.uploading);
+  const setUploading = useUIStore(state => state.setUploading);
 
-  const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
-  const [isAudioMissing, setIsAudioMissing] = useState(false);
+  const isIngestModalOpen = useUIStore(state => state.isIngestModalOpen);
+  const setIsIngestModalOpen = useUIStore(state => state.setIsIngestModalOpen);
+  const setIsAudioMissing = useUIStore(state => state.setIsAudioMissing);
 
   // Audio Playback states
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1.0);
-  const [volume, setVolume] = useState(0.8);
+  const setCurrentTime = usePlayerStore(state => state.setCurrentTime);
+  const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
+  const setDuration = usePlayerStore(state => state.setDuration);
+  const playbackRate = usePlayerStore(state => state.playbackRate);
+  
 
-  const [perfData, setPerfData] = useState(null);
-  const [versionInfo, setVersionInfo] = useState({
-    current_version: "1.0.0",
-    latest_version: "1.0.0",
-    has_update: false,
-    release_url: "https://github.com/quentin2001/whisperMe/releases",
-    release_notes: ""
-  });
+  const perfData = useConfigStore(state => state.perfData);
+  const setPerfData = useConfigStore(state => state.setPerfData);
+  const versionInfo = useConfigStore(state => state.versionInfo);
+  const setVersionInfo = useConfigStore(state => state.setVersionInfo);
 
-  const [configData, setConfigData] = useState({
-    ffmpeg_path: "",
-    ffmpeg_bin_dir: "",
-    local_whisper_model_path: "",
-    hf_token: "",
-    ollama_url: "",
-    ollama_model: "",
-    smtp_server: "",
-    smtp_port: 465,
-    smtp_username: "",
-    smtp_password: "",
-    smtp_sender: "",
-    notification_email: "",
-    enable_win_notification: true,
-    enable_email_notification: false,
-    asr_mode: "online",
-    online_asr_provider: "mimo",
-    online_api_key: "",
-    online_base_url: "",
-    online_model: "",
-    custom_asr_endpoint: "",
-    custom_asr_method: "POST",
-    custom_asr_headers: "{}",
-    custom_asr_body_template: "",
-    custom_asr_response_jsonpath: "$.data.text",
-    custom_asr_timestamp_jsonpath: "",
-    custom_asr_audio_format: "mp3",
-    custom_asr_chunk_duration: 60,
-    summary_mode: "online",
-    online_summary_api_key: "",
-    online_summary_base_url: "",
-    online_summary_model: "",
-    enable_llm_semantic_sewing: false,
-    webhook_url: "",
-    custom_storage_dir: "",
-    language: "en"
-  });
-  const t = (zh, en) => (configData.language === "en" ? en : zh);
-  const [audioSource, setAudioSource] = useState("link");
+  const configData = useConfigStore(state => state.configData);
+  const setConfigData = useConfigStore(state => state.setConfigData);
+  const { t } = useTranslation();
+  const audioSource = useTaskStore(state => state.audioSource);
+  const setAudioSource = useTaskStore(state => state.setAudioSource);
 
   // Prompt 编辑状态
-  const [promptData, setPromptData] = useState({
-    prompt: ""
-  });
-  const [promptSaveStatus, setPromptSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
+  const promptData = useConfigStore(state => state.promptData);
+  const setPromptData = useConfigStore(state => state.setPromptData);
+  const promptSaveStatus = useConfigStore(state => state.promptSaveStatus);
+  const setPromptSaveStatus = useConfigStore(state => state.setPromptSaveStatus);
 
   // Local storage audit logs
-  const [logs, setLogs] = useState(() => {
-    const saved = localStorage.getItem("whisperme_logs");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return initialLogs;
-      }
-    }
-    return initialLogs;
-  });
+  const logs = useConfigStore(state => state.logs);
+  const setLogs = useConfigStore(state => state.setLogs);
 
   const fileInputRef = useRef(null);
   const audioPlayerRef = useRef(null);
   const activeTaskRef = useRef(null);
   const playbackPositions = useRef({});
 
-  const [checkingVersion, setCheckingVersion] = useState(false);
+  const checkingVersion = useConfigStore(state => state.checkingVersion);
+  const setCheckingVersion = useConfigStore(state => state.setCheckingVersion);
   const fetchVersion = async (force = false) => {
     setCheckingVersion(true);
     try {
@@ -238,6 +207,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    const saved = localStorage.getItem("whisperme_logs");
+    if (saved) {
+        try { setLogs(JSON.parse(saved)); } catch(e) {}
+    }
     fetchTasks();
     fetchConfig();
     fetchVersion();
@@ -464,8 +437,7 @@ export default function App() {
             }
           }, 200);
         }}
-        perfData={perfData}
-        t={t}
+        
       />
 
       {/* Main split screens panel area */}
@@ -473,24 +445,23 @@ export default function App() {
         {activeTab === "detail" && activeTask ? (
           /* Active full screen transcript parser */
           <PodcastDetailView
-            activeTask={activeTask}
+            
             audioPlayerRef={audioPlayerRef}
-            isPlaying={isPlaying}
+            
             togglePlay={togglePlay}
-            progress={duration > 0 ? (currentTime / duration) * 100 : 0}
+            
             handleProgressChange={handleProgressChange}
-            currentTime={currentTime}
-            duration={duration}
-            playbackRate={playbackRate}
-            setPlaybackRate={setPlaybackRate}
-            volume={volume}
-            setVolume={setVolume}
+            
+            
+            
+            
+            
+            
             onRefreshTask={() => fetchTaskDetail(activeTask.id, true)}
             onBack={() => {
               setActiveTaskId(null);
               setActiveTab(detailSourceTab === "workstation" ? "workstation" : "dashboard");
             }}
-            t={t}
           />
         ) : (
           /* Tab contents switch */
@@ -499,8 +470,8 @@ export default function App() {
               <LibraryView
                 tasks={tasks}
                 logs={logs}
-                perfData={perfData}
                 configData={configData}
+                perfData={perfData}
                 onJumpToWorkstation={() => setActiveTab("workstation")}
                 onJumpToSettings={() => setActiveTab("config")}
                 onNewSessionTrigger={() => setIsIngestModalOpen(true)}
@@ -524,13 +495,12 @@ export default function App() {
                 }}
                 onAnalyzeLogs={handleAnalyzeAllLogs}
                 onDeleteTask={handleDeleteTask}
-                t={t}
               />
             )}
 
             {activeTab === "workstation" && (
               <WorkstationView
-                tasks={tasks}
+                
                 onOpenSession={(task) => {
                   setDetailSourceTab("workstation");
                   setActiveTaskId(task.id);
@@ -538,24 +508,23 @@ export default function App() {
                 }}
                 onNewSessionTrigger={() => setIsIngestModalOpen(true)}
                 onDeleteTask={handleDeleteTask}
-                t={t}
               />
             )}
 
             {activeTab === "config" && (
               <SettingsView
-                versionInfo={versionInfo}
-                configData={configData}
+                
+                
                 handleConfigChange={handleConfigChange}
                 handleSaveConfig={handleSaveConfig}
                 onResetData={handleResetData}
-                promptData={promptData}
-                setPromptData={setPromptData}
-                promptSaveStatus={promptSaveStatus}
+                
+                
+                
                 handleSavePrompt={handleSavePrompt}
                 handleResetPrompt={handleResetPrompt}
                 onCheckVersion={fetchVersion}
-                checkingVersion={checkingVersion}
+                
               />
             )}
           </>

@@ -69,7 +69,7 @@ def find_ffmpeg() -> str | None:
                     [user_path, "-version"],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     timeout=5,
-                    creationflags=0x08000000 if sys.platform == "win32" else 0
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
                 )
                 if result.returncode == 0:
                     return user_path
@@ -137,7 +137,7 @@ def get_ffmpeg_info(ffmpeg_path: str = None) -> dict:
             [path, "-version"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=5,
-            creationflags=0x08000000 if sys.platform == "win32" else 0
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         )
         output = result.stdout.decode("utf-8", errors="ignore")
         # 只提取版本号数字: "ffmpeg version 8.1.1-full_build" -> "8.1.1"

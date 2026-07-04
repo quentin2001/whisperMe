@@ -7,6 +7,12 @@ import {
 } from "lucide-react";
 import { API_BASE, proxyImage } from "../constants.js";
 import { alert, confirm } from "../components/Dialog.jsx";
+import AudioPlayerControl from '../components/podcast/AudioPlayerControl.jsx';
+import TranscriptList from '../components/podcast/TranscriptList.jsx';
+import SpeakerManagerModal from '../components/podcast/SpeakerManagerModal.jsx';
+import QAChatPanel from '../components/podcast/QAChatPanel.jsx';
+import { usePlayerStore } from "../store/playerStore.js";
+import { useTaskStore } from "../store/taskStore.js";
 
 // ==================== 📝 Inline Markdown Parser ====================
 function parseInlineMarkdown(text) {
@@ -34,7 +40,8 @@ function parseInlineMarkdown(text) {
 }
 
 // ==================== 📝 High-Performance Markdown Parser with Alerts ====================
-function MarkdownRenderer({ text, t }) {
+function MarkdownRenderer({ text }) {
+  const { t } = useTranslation();
   if (!text) return <p className="text-[var(--text-muted)] text-xs">{t("暂无总结内容", "No summary content available")}</p>;
   
   const lines = text.replace(/\\n/g, "\n").split("\n");
@@ -329,8 +336,9 @@ function parseShownotesToBlocks(text) {
   return blocks;
 }
 
-function ShownotesRenderer({ text, onTimeJump, t }) {
-  if (!text) return <p className="text-xs text-[var(--text-muted)]">{t ? t("本单集暂无节目简介所示时间轴。", "No shownotes available for this episode.") : "No shownotes available."}</p>;
+function ShownotesRenderer({ text, onTimeJump }) {
+  const { t } = useTranslation();
+  if (!text) return <p className="text-xs text-[var(--text-muted)]">{t("本单集暂无节目简介所示时间轴。", "No shownotes available for this episode.")}</p>;
 
   const blocks = parseShownotesToBlocks(text);
   const headerRegex = /^(?:#+\s+|[一二三四五六七八九十]+[、.]|[0-9]+\.|part\s*\d|【|🎙️|⏳|📅|💡|📌|「|『)/i;
@@ -409,7 +417,8 @@ function renderCommentText(text, onTimeJump) {
   });
 }
 
-function CommentItemRenderer({ comment, onTimeJump, t }) {
+function CommentItemRenderer({ comment, onTimeJump }) {
+  const { t } = useTranslation();
   const text = comment.content || comment.text || "";
   
   return (
@@ -436,23 +445,25 @@ function CommentItemRenderer({ comment, onTimeJump, t }) {
 }
 
 // ==================== 🎙️ Main View Component ====================
-export default function PodcastDetailView({ 
-  activeTask, 
-  audioPlayerRef, 
-  isPlaying, 
-  togglePlay, 
-  progress, 
-  handleProgressChange,
-  currentTime,
-  duration,
-  playbackRate,
-  setPlaybackRate,
-  volume,
-  setVolume,
-  onRefreshTask,
+import { useTranslation } from "../contexts/I18nContext";
+
+export default function PodcastDetailView({
   onBack,
-  t
+  onRefreshTask,
+  audioPlayerRef,
+  togglePlay,
+  handleProgressChange
 }) {
+  const { t } = useTranslation();
+  const activeTask = useTaskStore(state => state.activeTask);
+  const isPlaying = usePlayerStore(state => state.isPlaying);
+  const currentTime = usePlayerStore(state => state.currentTime);
+  const duration = usePlayerStore(state => state.duration);
+  const playbackRate = usePlayerStore(state => state.playbackRate);
+  const setPlaybackRate = usePlayerStore(state => state.setPlaybackRate);
+  const volume = usePlayerStore(state => state.volume);
+  const setVolume = usePlayerStore(state => state.setVolume);
+
   const [searchWord, setSearchWord] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -461,134 +472,13 @@ export default function PodcastDetailView({
   const [leftWidth, setLeftWidth] = useState(60);
   const [isDragging, setIsDragging] = useState(false);
   const [detailSubTab, setDetailSubTab] = useState("shownotes"); // "shownotes" | "comments" | "summary" | "qa"
-  const [qaMessages, setQaMessages] = useState([]);
-  const [qaInput, setQaInput] = useState("");
-  const [qaLoading, setQaLoading] = useState(false);
-
-  useEffect(() => {
-    setQaInput("");
-    setQaLoading(false);
-    // Load saved Q&A history from backend
-    if (activeTask?.id && activeTask?.status === "completed") {
-        fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`)
-            .then(res => res.ok ? res.json() : { history: [] })
-            .then(data => {
-                const history = (data.history || []).map(m => ({
-                    role: m.role,
-                    content: m.content,
-                }));
-                setQaMessages(history);
-            })
-            .catch(() => setQaMessages([]));
-    } else {
-        setQaMessages([]);
-    }
-  }, [activeTask?.id]);
-
   // Speaker Management State
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
-  const [editingSpeakerId, setEditingSpeakerId] = useState(null);
-  const [editingSpeakerName, setEditingSpeakerName] = useState("");
-  const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [mergingSpeakerId, setMergingSpeakerId] = useState(null);
-  const [mergeTargetId, setMergeTargetId] = useState(null);
 
   const containerRef = useRef(null);
   const activeBubbleRef = useRef(null);
-
-  const getUniqueSpeakers = () => {
-    if (!activeTask || !activeTask.paragraphs) return [];
-    const speakers = new Set();
-    activeTask.paragraphs.forEach((p) => {
-      if (p.speaker) {
-        speakers.add(p.speaker);
-      }
-    });
-    return Array.from(speakers).sort();
-  };
-
-  const handleRenameSpeaker = async (speakerId, newName) => {
-    if (!newName.trim()) return;
-    setIsSavingSpeaker(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/speaker/rename`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          speaker_id: speakerId,
-          new_name: newName.trim(),
-        }),
-      });
-      if (res.ok) {
-        setEditingSpeakerId(null);
-        if (onRefreshTask) {
-          onRefreshTask();
-        }
-      } else {
-        await alert(t("重命名发言人失败，请重试。", "Failed to rename speaker. Please try again."));
-      }
-    } catch (err) {
-      console.error(err);
-      await alert(t("通信出错：", "Communication error: ") + err.message);
-    } finally {
-      setIsSavingSpeaker(false);
-    }
-  };
-
-  const handleMergeSpeaker = async (sourceId, targetId) => {
-    const sourceName = activeTask.speaker_mappings?.[sourceId] || sourceId;
-    const targetName = activeTask.speaker_mappings?.[targetId] || targetId;
-    if (!await confirm(t(`确认将 "${sourceName}" 合并到 "${targetName}"？合并后源说话人将被删除。`, `Merge "${sourceName}" into "${targetName}"? The source speaker will be removed.`))) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/speakers/merge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_name: sourceName, target_name: targetName }),
-      });
-      if (res.ok) {
-        // Also rename in this task's mappings
-        const mappings = { ...activeTask.speaker_mappings };
-        mappings[sourceId] = targetName;
-        const renameRes = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/speaker/rename`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ speaker_id: sourceId, new_name: targetName }),
-        });
-        if (renameRes.ok && onRefreshTask) onRefreshTask();
-        setMergingSpeakerId(null);
-        setMergeTargetId(null);
-      } else {
-        const err = await res.json();
-        await alert(err.detail || t("合并失败", "Merge failed"));
-      }
-    } catch (err) {
-      await alert(t("通信出错：", "Communication error: ") + err.message);
-    }
-  };
-
-  const handleForgetSpeaker = async (speakerId) => {
-    const speakerName = activeTask.speaker_mappings?.[speakerId] || speakerId;
-    if (!await confirm(t(`确认从全局声纹库中移除 "${speakerName}"？后续将不再自动识别此人。`, `Remove "${speakerName}" from the global voiceprint library? They won't be auto-recognized in the future.`))) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/speakers/forget`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: speakerName }),
-      });
-      if (res.ok) {
-        if (onRefreshTask) onRefreshTask();
-      } else {
-        const err = await res.json();
-        await alert(err.detail || t("操作失败", "Operation failed"));
-      }
-    } catch (err) {
-      await alert(t("通信出错：", "Communication error: ") + err.message);
-    }
-  };
 
   const handleRedownloadAudio = async () => {
     setIsTriggeringRestore(true);
@@ -754,51 +644,6 @@ export default function PodcastDetailView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  const handleQAClear = async () => {
-    if (qaMessages.length === 0) return;
-    if (!await confirm(t("确定要清空所有问答记录吗？", "Clear all Q&A history?"))) return;
-    try {
-      await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, { method: "DELETE" });
-      setQaMessages([]);
-    } catch (err) {
-      console.error("清空问答历史失败:", err);
-    }
-  };
-
-  const handleQASubmit = async () => {
-    if (!qaInput.trim() || qaLoading) return;
-    const question = qaInput.trim();
-    setQaInput("");
-    // Show user message immediately
-    setQaMessages(prev => [...prev, { role: "user", content: question }]);
-    setQaLoading(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Reload full history from backend to stay in sync
-        setQaMessages(data.history || []);
-      } else {
-        // Remove the optimistic user message on error
-        setQaMessages(prev => prev.slice(0, -1));
-        setQaMessages(prev => [...prev, { role: "user", content: question }, { role: "assistant", content: `错误: ${data.detail || "请求失败"}` }]);
-      }
-    } catch (err) {
-      // On network error, keep the user message but show error
-      setQaMessages(prev => {
-        const withoutLast = prev.slice(0, -1);
-        return [...withoutLast, { role: "user", content: question }, { role: "assistant", content: `网络错误: ${err.message}` }];
-      });
-    } finally {
-      setQaLoading(false);
-    }
   };
 
   // Seeking handlers
@@ -1064,58 +909,15 @@ export default function PodcastDetailView({
           </div>
           
           {/* Transcription progress indicator */}
-          {(activeTask.status === "downloading" || activeTask.status === "transcribing") && (
-            <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg">
-              <div className="w-3 h-3 border-2 border-[var(--accent-red)] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-[var(--accent-red)] font-semibold">
-                {activeTask.status === "downloading"
-                  ? t("正在下载音频...", "Downloading audio...")
-                  : t("转录进行中...", "Transcribing...") + (paragraphs.length > 0 ? ` (${paragraphs.length} ${t("段", "paragraphs")})` : "")
-                }
-              </span>
-            </div>
-          )}
-
-          {/* HF Token 缺失降级提示 */}
-          {activeTask.hf_token_missing && (
-            <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs font-semibold text-yellow-600">
-              <AlertCircle size={14} />
-              <span>{t("本次转录未启用说话人识别（HuggingFace Token 未配置）。", "Speaker identification was skipped — HuggingFace Token not configured.")}</span>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-6">
-            {paragraphs
-              .filter(p => p.text.toLowerCase().includes(searchWord.toLowerCase()))
-              .map((p) => {
-                const isCurrentlyPlayingThis = currentTime >= p.start_time && currentTime <= p.end_time;
-
-                return (
-                  <div 
-                    key={p.id}
-                    onClick={() => jumpToTimeSeconds(p.start_time)}
-                    ref={isCurrentlyPlayingThis ? activeBubbleRef : null}
-                    className={`p-4 rounded-lg cursor-pointer transition-all border ${
-                      isCurrentlyPlayingThis 
-                        ? "bg-[var(--bg-card)] border-[#f62440] ring-1 ring-[#f62440]/10 shadow-xs" 
-                        : "border-transparent hover:bg-[var(--bg-card)]/40 hover:border-[var(--border-primary)]/20"
-                    }`}
-                  >
-                    <p className="font-mono text-xs text-[var(--accent-red)] font-bold mb-1.5 hover:underline">
-                      {p.timeStart} — {p.timeEnd}
-                    </p>
-                    <div className="mb-2.5">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--accent-red)]/8 text-[var(--accent-red)] font-bold text-[10px] tracking-wider uppercase select-none">
-                        👤 {p.speaker}
-                      </span>
-                    </div>
-                    <p className="text-[var(--text-primary)] text-[15px] leading-relaxed select-text font-medium">
-                      {p.text}
-                    </p>
-                  </div>
-                );
-            })}
-          </div>
+          <TranscriptList 
+            activeTask={activeTask}
+            paragraphs={paragraphs}
+            searchWord={searchWord}
+            currentTime={currentTime}
+            activeBubbleRef={activeBubbleRef}
+            jumpToTimeSeconds={jumpToTimeSeconds}
+            
+          />
         </div>
 
         {/* Resizable Divider bar */}
@@ -1181,7 +983,7 @@ export default function PodcastDetailView({
                   <FileText size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("节目大纲时间线", "Shownotes Timeline")}</h3>
                 </div>
-                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} t={t} />
+                <ShownotesRenderer text={activeTask.metadata?.shownotes} onTimeJump={jumpToTimeSeconds} />
               </div>
             )}
 
@@ -1195,7 +997,7 @@ export default function PodcastDetailView({
                 <div className="flex flex-col gap-4">
                   {commentsList.length > 0 ? (
                     commentsList.map((comment, cIdx) => (
-                      <CommentItemRenderer key={cIdx} comment={comment} onTimeJump={jumpToTimeSeconds} t={t} />
+                      <CommentItemRenderer key={cIdx} comment={comment} onTimeJump={jumpToTimeSeconds} />
                     ))
                   ) : (
                     <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
@@ -1232,7 +1034,7 @@ export default function PodcastDetailView({
                     </p>
                   </div>
                 ) : activeTask.summary ? (
-                  <MarkdownRenderer text={activeTask.summary} t={t} />
+                  <MarkdownRenderer text={activeTask.summary} />
                 ) : (
                   <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
                     <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无总结内容", "No summary available")}</span>
@@ -1242,76 +1044,11 @@ export default function PodcastDetailView({
             )}
 
             {detailSubTab === "qa" && (
-              <div className="flex flex-col h-full animate-fade-in">
-                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={18} className="text-[var(--accent-red)]" />
-                    <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("与播客对话", "Ask the Podcast")}</h3>
-                  </div>
-                  {qaMessages.length > 0 && (
-                    <button
-                      onClick={handleQAClear}
-                      className="flex items-center gap-1.5 px-2 py-1.5 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-red)] rounded-lg transition-all cursor-pointer border-0 outline-none bg-transparent"
-                      title={t("清空对话", "Clear conversation")}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto flex flex-col gap-4 mb-4">
-                  {qaMessages.length === 0 && !qaLoading && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                      <MessageSquare size={32} className="text-[var(--text-muted)] opacity-40" />
-                      <p className="text-sm text-[var(--text-muted)]">{t("输入问题，基于转录文本为你解答", "Ask a question about this podcast")}</p>
-                    </div>
-                  )}
-                  {qaMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
-                        msg.role === "user"
-                          ? "bg-[var(--accent-red)] text-white"
-                          : "bg-[var(--bg-card)] border border-[var(--border-primary)]/40 text-[var(--text-primary)]"
-                      }`}>
-                        {msg.role === "assistant" ? (
-                          <MarkdownRenderer text={msg.content} t={t} />
-                        ) : (
-                          msg.content
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {qaLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl px-4 py-3 flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-[var(--accent-red)] border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs text-[var(--text-muted)]">{t("正在思考...", "Thinking...")}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Input */}
-                <div className="flex gap-2 shrink-0 pt-2 border-t border-[var(--border-primary)]/30">
-                  <input
-                    type="text"
-                    value={qaInput}
-                    onChange={(e) => setQaInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleQASubmit()}
-                    placeholder={t("输入问题...", "Ask a question...")}
-                    className="flex-1 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-red)]/50 transition-colors"
-                    disabled={qaLoading}
-                  />
-                  <button
-                    onClick={handleQASubmit}
-                    disabled={!qaInput.trim() || qaLoading}
-                    className="px-4 py-2.5 bg-[var(--accent-red)] text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all cursor-pointer"
-                  >
-                    {t("发送", "Send")}
-                  </button>
-                </div>
-              </div>
+              <QAChatPanel 
+                activeTask={activeTask} 
+                MarkdownRenderer={MarkdownRenderer} 
+                 
+              />
             )}
           </div>
         </div>
@@ -1319,339 +1056,35 @@ export default function PodcastDetailView({
       </div>
 
       {/* Pinned Playback bottom bar panel */}
-      <footer className="h-24 border-t border-[var(--border-primary)]/40 bg-[var(--bg-card)] px-8 flex items-center justify-between shrink-0 select-none">
+      <AudioPlayerControl 
+        activeTask={activeTask}
+        isPlaying={isPlaying}
+        togglePlay={togglePlay}
+        currentTime={currentTime}
+        duration={duration}
+        playbackRate={playbackRate}
+        handleProgressChange={handleProgressChange}
+        handleStepBack={handleStepBack}
+        handleStepForward={handleStepForward}
+        handleSpeedToggle={handleSpeedToggle}
+        isMuted={isMuted}
+        volume={volume}
+        handleVolumeInput={handleVolumeInput}
+        toggleMute={toggleMute}
+        formatTime={formatTime}
+        isTriggeringRestore={isTriggeringRestore}
+        handleRedownloadAudio={handleRedownloadAudio}
         
-        {/* Left: session audio details */}
-        <div className="w-1/4 flex items-center gap-3">
-          <div className="w-11 h-11 bg-[var(--accent-red)] rounded-lg overflow-hidden shadow-sm shrink-0 relative">
-            {activeTask.image_url ? (
-              <>
-                <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight absolute inset-0">
-                  <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
-                    {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
-                  </span>
-                </div>
-                <img
-                  src={proxyImage(activeTask.image_url)}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover absolute inset-0"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              </>
-            ) : (
-              <div className="w-full h-full flex flex-col justify-center items-center text-white font-bold tracking-tight">
-                <span className="text-[10px] uppercase font-mono tracking-wide leading-none">
-                  {(activeTask.podcast_name || activeTask.title || "WM").charAt(0)}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="hidden sm:block overflow-hidden">
-            <h4 className="font-bold text-xs text-[var(--text-primary)] font-display max-w-[200px] truncate">{displayTitle}</h4>
-            <p className="text-[10px] font-semibold text-[var(--accent-red)] uppercase tracking-wider mt-0.5 animate-pulse">
-              {!activeTask.audio_url
-                ? (activeTask.restoring ? t("音频重新下载中...", "Re-downloading Audio") : t("音频已被清理", "Audio Cleaned Up"))
-                : (isPlaying ? t("解码播放中", "Active Playback Decoding") : t("播放空闲", "Playback Idle"))}
-            </p>
-          </div>
-        </div>
-
-        {/* Center: Play controllers or Re-download panel */}
-        {!activeTask.audio_url ? (
-          <div className="flex-1 max-w-2xl flex items-center justify-between bg-[var(--bg-primary)]/60 border border-[var(--border-primary)]/40 rounded-xl px-6 py-2.5 shadow-xs">
-            <div className="flex items-center gap-3 flex-1 mr-4">
-              <span className="text-lg">🗑️</span>
-              <div className="text-left flex-1">
-                <p className="text-xs font-bold text-[var(--text-primary)]">
-                  {activeTask.restoring 
-                    ? t("正在从原始地址重新下载音频文件...", "Re-downloading audio file from source...") 
-                    : t("音频文件已被自动清理以节省硬盘空间", "Audio file has been auto-cleaned to save disk space")}
-                </p>
-                {activeTask.restoring && (
-                  <div className="w-full max-w-md bg-[var(--bg-hover)] h-1.5 rounded-full overflow-hidden mt-1.5 relative">
-                    <div 
-                      className="bg-[var(--accent-red)] h-full transition-all duration-300" 
-                      style={{ width: `${activeTask.restore_progress || 0}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              {activeTask.restoring ? (
-                <span className="text-xs font-mono font-bold text-[var(--accent-red)] animate-pulse whitespace-nowrap">
-                  {typeof activeTask.restore_progress === 'number' ? Math.round(activeTask.restore_progress) : 0}%
-                </span>
-              ) : (
-                <button
-                  onClick={handleRedownloadAudio}
-                  disabled={isTriggeringRestore}
-                  className="px-4 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:opacity-50 text-white font-bold rounded-lg text-xs shadow-xs hover:shadow-md cursor-pointer border-0 outline-none transition-all whitespace-nowrap"
-                >
-                  {isTriggeringRestore ? t("启动中...", "Starting...") : t("重新下载音频", "Re-download Audio")}
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 max-w-2xl flex flex-col items-center gap-2">
-            {/* Timeline and timeline indicators */}
-            <div className="w-full flex items-center gap-3">
-              <span className="text-xs font-mono font-bold text-[var(--accent-red)]">
-                {formatTime(currentTime)}
-              </span>
-              
-              {/* Range seeker bar */}
-              <div className="flex-1 relative flex items-center">
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(1, duration || 0)}
-                  value={currentTime || 0}
-                  onChange={handleProgressChange}
-                  className="w-full accent-[#f62440] h-1.5 bg-[var(--bg-hover)] rounded-lg cursor-pointer appearance-none"
-                />
-              </div>
-
-              <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
-                {formatTime(duration)}
-              </span>
-            </div>
-
-            {/* Playback action buttons */}
-            <div className="flex items-center gap-5">
-              <button
-                onClick={handleStepBack}
-                className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
-              >
-                <SkipBack size={15} />
-              </button>
-
-              <button
-                onClick={togglePlay}
-                className="w-10 h-10 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none"
-              >
-                {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
-              </button>
-
-              <button
-                onClick={handleStepForward}
-                className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
-              >
-                <SkipForward size={15} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Right side controllers */}
-        <div className="w-1/4 flex items-center justify-end gap-3 font-semibold text-xs animate-fade-in">
-          {activeTask.audio_url && (
-            <>
-              {/* Play speed selector rate */}
-              <button
-                onClick={handleSpeedToggle}
-                className="px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-md border border-[var(--border-primary)]/30 active:scale-98 transition-all cursor-pointer border-0 outline-none"
-              >
-                {t("语速", "Speed")} {playbackRate.toFixed(1)}x
-              </button>
-
-              {/* Volume bars and state */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={toggleMute}
-                  className="p-1 text-[#926e6d] hover:text-[var(--text-primary)] cursor-pointer border-0 outline-none bg-transparent"
-                >
-                  {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeInput}
-                  className="w-20 accent-[#f62440] h-1 bg-[var(--bg-hover)] rounded-lg cursor-pointer"
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </footer>
+      />
 
       {/* Speaker Management Modal */}
-      {showSpeakerModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] p-6 animate-fade-in select-none">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/50 rounded-xl max-w-lg w-full relative flex flex-col shadow-2xl">
-            <div className="p-6 border-b border-[var(--border-primary)]/30 flex justify-between items-center bg-[var(--bg-secondary)]/50 rounded-t-xl">
-              <h3 className="text-xl font-bold font-display text-[var(--text-primary)] flex items-center gap-2">
-                <Users size={20} className="text-[var(--accent-red)]" />
-                {t("发言人管理", "Speaker Management")}
-              </h3>
-              <button 
-                onClick={() => {
-                  setShowSpeakerModal(false);
-                  setEditingSpeakerId(null);
-                }} 
-                className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors cursor-pointer border-0 bg-transparent text-lg"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <p className="text-sm text-[var(--text-muted)]">
-                {t("在此处修改发言人名称。修改后将自动更新整个文本的发言人标签。", "Update speaker names here. The speaker tags across the entire transcript will be updated automatically.")}
-              </p>
-
-              <div className="flex flex-col gap-3">
-                {getUniqueSpeakers().length === 0 ? (
-                  <div className="border border-[var(--border-primary)]/40 border-dashed p-8 text-center rounded-lg text-sm text-[var(--text-muted)] font-semibold">
-                    {t("未检测到发言人", "No speakers detected")}
-                  </div>
-                ) : (
-                  getUniqueSpeakers().map((spId) => {
-                    const currentName = activeTask.speaker_mappings?.[spId] || spId;
-                    const isEditing = editingSpeakerId === spId;
-                    const confidenceData = activeTask.speaker_confidence?.[spId];
-                    const confidenceScore = confidenceData?.score;
-                    const confidenceSource = confidenceData?.source;
-                    const isMerging = mergingSpeakerId === spId;
-
-                    const getConfidenceLabel = (score, source) => {
-                      if (source === "noise") return { text: t("语气词", "Interjection"), color: "bg-gray-100 text-gray-500" };
-                      if (source === "manual") return { text: t("手动", "Manual"), color: "bg-blue-50 text-blue-600" };
-                      if (source === "llm") return { text: t("AI推理", "AI Inferred"), color: "bg-purple-50 text-purple-600" };
-                      if (!score && score !== 0) return null;
-                      if (score >= 0.85) return { text: `${t("高置信", "High")} ${(score*100).toFixed(0)}%`, color: "bg-green-50 text-green-700" };
-                      if (score >= 0.78) return { text: `${t("中置信", "Medium")} ${(score*100).toFixed(0)}%`, color: "bg-yellow-50 text-yellow-700" };
-                      return { text: `${t("低置信", "Low")} ${(score*100).toFixed(0)}%`, color: "bg-orange-50 text-orange-600" };
-                    };
-                    const confLabel = getConfidenceLabel(confidenceScore, confidenceSource);
-
-                    return (
-                      <div key={spId} className="flex items-center justify-between p-3 border border-[var(--border-primary)]/30 rounded-lg bg-[var(--bg-primary)]/30">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2 w-full">
-                            <input
-                              type="text"
-                              value={editingSpeakerName}
-                              onChange={(e) => setEditingSpeakerName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleRenameSpeaker(spId, editingSpeakerName);
-                                if (e.key === "Escape") setEditingSpeakerId(null);
-                              }}
-                              className="flex-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 focus:border-[#f62440] focus:ring-1 focus:ring-[#f62440] rounded px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none"
-                              autoFocus
-                              disabled={isSavingSpeaker}
-                            />
-                            <button
-                              onClick={() => handleRenameSpeaker(spId, editingSpeakerName)}
-                              disabled={isSavingSpeaker || !editingSpeakerName.trim()}
-                              className="px-3 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer border-0 outline-none"
-                            >
-                              {t("保存", "Save")}
-                            </button>
-                            <button
-                              onClick={() => setEditingSpeakerId(null)}
-                              disabled={isSavingSpeaker}
-                              className="px-3 py-1.5 bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded cursor-pointer border-0 outline-none"
-                            >
-                              {t("取消", "Cancel")}
-                            </button>
-                          </div>
-                        ) : isMerging ? (
-                          <div className="flex items-center gap-2 w-full">
-                            <span className="text-xs text-[var(--text-secondary)] font-semibold whitespace-nowrap">{t("合并到:", "Merge to:")}</span>
-                            <select
-                              value={mergeTargetId || ""}
-                              onChange={(e) => setMergeTargetId(e.target.value)}
-                              className="flex-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none"
-                            >
-                              <option value="">{t("选择目标...", "Select target...")}</option>
-                              {getUniqueSpeakers().filter(id => id !== spId).map(id => (
-                                <option key={id} value={id}>{activeTask.speaker_mappings?.[id] || id}</option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => handleMergeSpeaker(spId, mergeTargetId)}
-                              disabled={!mergeTargetId}
-                              className="px-3 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer border-0 outline-none"
-                            >
-                              {t("合并", "Merge")}
-                            </button>
-                            <button
-                              onClick={() => { setMergingSpeakerId(null); setMergeTargetId(null); }}
-                              className="px-3 py-1.5 bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded cursor-pointer border-0 outline-none"
-                            >
-                              {t("取消", "Cancel")}
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-[var(--text-primary)] truncate">{currentName}</span>
-                                {confLabel && (
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide shrink-0 ${confLabel.color}`}>
-                                    {confLabel.text}
-                                  </span>
-                                )}
-                              </div>
-                              {activeTask.speaker_mappings?.[spId] && (
-                                <span className="text-[10px] text-[var(--text-muted)] font-semibold mt-0.5">{t("原始 ID: ", "Original ID: ")}{spId}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                onClick={() => {
-                                  setEditingSpeakerId(spId);
-                                  setEditingSpeakerName(currentName);
-                                }}
-                                className="text-xs text-[var(--accent-red)] hover:underline font-bold bg-transparent border-0 outline-none cursor-pointer px-1"
-                              >
-                                {t("编辑", "Edit")}
-                              </button>
-                              <button
-                                onClick={() => { setMergingSpeakerId(spId); setMergeTargetId(null); }}
-                                className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
-                                title={t("合并到其他说话人", "Merge into another speaker")}
-                              >
-                                <GitMerge size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleForgetSpeaker(spId)}
-                                className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors bg-transparent border-0 outline-none cursor-pointer"
-                                title={t("从声纹库中移除", "Remove from voiceprint library")}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            
-            <div className="p-6 border-t border-[var(--border-primary)]/30 flex justify-end bg-[var(--bg-secondary)]/20 rounded-b-xl">
-              <button
-                onClick={() => {
-                  setShowSpeakerModal(false);
-                  setEditingSpeakerId(null);
-                }}
-                className="px-4 py-2 bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[#e7bcbb]/30 text-xs font-bold rounded-lg cursor-pointer border-0 outline-none"
-              >
-                {t("关闭", "Close")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SpeakerManagerModal 
+        activeTask={activeTask}
+        showSpeakerModal={showSpeakerModal}
+        setShowSpeakerModal={setShowSpeakerModal}
+        onRefreshTask={onRefreshTask}
+        
+      />
     </div>
   );
 }

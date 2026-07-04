@@ -1,47 +1,48 @@
 # whisperMe — 系统架构设计文档
 
-> 最后更新：2026-06-25 · Session `2026-06-25`
+> 最后更新：2026-07-03 · 深度代码审计后更新
 
 ---
 
 ## 1. 总体架构
 
-whisperMe 采用经典的前后端分离 **SPA + REST API** 架构，部署于本地桌面环境（Windows）。
+whisperMe 采用经典的前后端分离 **SPA + REST API** 架构，部署于本地桌面环境（Windows）。系统集成了复杂的本地计算（ASR、LLM）与在线 API 回退机制。
 
 ```mermaid
 graph TB
     subgraph Frontend ["🖥️ Frontend (Vite + React)"]
-        A[App.jsx — SPA 路由与全局状态]
+        A[App.jsx — 巨型 SPA 路由与全局状态枢纽]
         A2[contexts/ThemeContext — 暗色模式管理]
-        B[views/ — 页面级业务视图]
-        C[components/ — 侧边栏与表单件]
+        B[views/ — 页面级业务视图 (Library, Workstation, Detail, Settings)]
+        C[components/ — 独立组件 (Sidebar, Dialog)]
         D[index.css — CSS 变量 / 暗色主题 / 滚动条]
     end
 
     subgraph Backend ["⚙️ Backend (FastAPI + Uvicorn)"]
-        E[main.py — App 挂载与分发外壳]
-        F[config.py — 全局配置与 BaseModel 校验]
-        G[database.py — SQLite 并发 WAL 数据库]
+        E[main.py — App 挂载、Lifespan与后台任务分发]
+        F[config.py — 全局配置与 BaseModel 校验 (热重载)]
+        G[database.py — SQLite 并发 WAL 数据库 (God Class)]
         H[routers/ — 路由层 tasks/config/system/boards]
         I[core/pipeline.py — 流水线调度核心]
         J[core/speaker.py — 声纹匹配与智能推理]
-        K[core/transcriber.py — ASR 识别引擎 (常驻 VRAM 缓存)]
-        L[core/downloader.py — 音频下载器]
+        K[core/transcriber.py — ASR 识别引擎 (包含 VRAM 管理)]
+        L[core/downloader.py — 音频下载器 (多平台解析)]
         M[core/summarizer.py — LLM 总结器]
         N[core/queue_manager.py — SQLite 任务队列管理器]
+        O[mcp_server.py — AI Agent MCP 接口]
     end
 
     subgraph Storage ["💾 本地存储"]
-        O[config.json — 全局配置文件]
-        P[whisperMe.db — SQLite 数据库（含 speakers 声纹表）]
+        P[config.json — 全局配置文件]
+        Q[whisperMe.db — SQLite 数据库（含 speakers 声纹表）]
         R[prompt.json — AI 总结 Prompt 模板]
-        S[downloads/ — 原始音频文件]
+        S[downloads/ & transcripts/ — 持久化文件]
     end
 
-    A -->|HTTP REST| H
+    A -->|HTTP REST / WS| H
+    O -->|直接调用| G
     H --> G
     H --> N
-    N --> G
     N --> I
     I --> G
     I --> L
@@ -52,213 +53,105 @@ graph TB
 
 ---
 
-## 2. 目录结构
+## 2. 项目目录树
 
-```
+```text
 whisperMe/
-├── README.md                  # 项目首页说明
-├── config.json                # 运行时全局配置（由 config.example.json 复制）
-├── config.example.json        # 配置模板
-├── prompt.json                # AI 总结 Prompt 模板
-├── logo.svg                   # 品牌 Logo
-├── speaker_fingerprints.json  # 声纹指纹存储
-├── whisperMe.db               # SQLite 关系数据库（主数据源，默认位于 STORAGE_BASE）
-├── tasks_db.json.bak          # 自动迁移后的 JSON 备份文件
-├── start_project.py           # 一键启动并记录日志的后台管理脚本
-├── 一键启动.bat                # Windows 环境双击一键启动入口
-├── logs/                      # 前后端标准流重定向持久化日志
+├── CLAUDE.md                    # Claude Code 项目指令
+├── README.md                    # 使用文档
+├── VERSION                      # 版本号
+├── config.example.json          # 配置模板
+├── prompt.json                  # AI 总结 Prompt 模板
+├── start.bat / stop.bat         # 生产模式启停（Windows）
+│
+├── scripts/                     # 运维与打包脚本
+│   ├── build.py / build_exe.py  # 发布与构建脚本
+│   ├── launcher.py              # 生产模式后台启动器
+│   ├── start_project.py         # 开发模式双开启动器
+│   └── whisperme-cli.py         # CLI 工具 (6 个命令域，Agent 友好)
 │
 ├── backend/
-│   ├── run.py                 # 后端入口（uvicorn 启动器）
-│   ├── requirements.txt       # Python 依赖清单
+│   ├── run.py / run_server.py   # FastAPI 启动入口 (Dev/Prod)
 │   └── app/
-│       ├── __init__.py
-│       ├── config.py          # 全局配置 BaseModel 校验
-│       ├── database.py        # SQLite 数据库控制层 (WAL 并发模式)
-│       ├── main.py            # FastAPI App 挂载与分发外壳
-│       ├── prompt.json        # 内部 Prompt 备份
-│       ├── routers/           # 模块化路由层
-│       │   ├── __init__.py
-│       │   ├── tasks.py       # 任务管理 API（含重试、问答、导出）
-│       │   ├── config.py      # 系统设置 API
-│       │   ├── system.py      # 系统状态 & 性能 API & 图片代理
-│       │   └── boards.py      # 知识卡片 & 看板 API
-│       ├── core/
-│       │   ├── downloader.py      # 小宇宙 / Bilibili / 网易云下载器
-│       │   ├── transcriber.py     # Whisper / MiMo ASR 转录引擎 (VRAM 缓存)
-│       │   ├── summarizer.py      # Ollama / 在线 LLM 总结器
-│       │   ├── notifier.py        # 邮件 & 桌面通知
-│       │   ├── queue_manager.py   # SQLite 驱动后台持久队列
-│       │   ├── prompt_manager.py  # Prompt 模板 IO
-│       │   ├── speaker.py         # 声纹识别与智能推理核心
-│       │   ├── llm_utils.py       # 共享 LLM 调用工具
-│       │   ├── ffmpeg.py          # FFmpeg 自动发现
-│       │   └── pipeline.py        # 流水线作业调度（含 fail 校验）
-│       └── mcp_server.py          # MCP Server（8 工具 + 资源 + 提示词）
+│       ├── config.py            # 全局配置校验与环境 Patch
+│       ├── database.py          # SQLite 数据层控制 ( WAL )
+│       ├── main.py              # FastAPI 主程序
+│       ├── mcp_server.py        # MCP 协议服务端
+│       ├── routers/             # API 路由层
+│       │   ├── boards.py        # 知识卡片与对撞机
+│       │   ├── config.py        # 系统设置与热更
+│       │   ├── system.py        # 性能监控、版本、图片代理
+│       │   └── tasks.py         # 核心任务管理、问答、导出
+│       └── core/                # 核心业务
+│           ├── downloader.py    # 播客/视频下载器 (多级回退)
+│           ├── pipeline.py      # 流水线编排作业
+│           ├── speaker.py       # 声纹与大模型推断
+│           ├── transcriber.py   # 模型缓存与转录 (Whisper/在线)
+│           ├── summarizer.py    # LLM 分析与内容生成
+│           ├── network.py       # DoH 直连与代理穿透
+│           ├── notifier.py      # 桌面/邮件/Webhook 推送
+│           ├── queue_manager.py # DB驱动的任务队列
+│           ├── llm_utils.py     # LLM 调用基建
+│           └── asr_providers/   # 多种在线 ASR 厂商实现
 │
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.js         # Vite + React + Tailwind CSS v4 插件
-│   └── src/
-│       ├── main.jsx           # React 挂载入口
-│       ├── App.jsx            # SPA 容器组件
-│       ├── index.css          # 核心 CSS / 设计令牌 / @font-face / @theme
-│       ├── constants.js       # API_BASE + proxyImage 工具函数
-│       ├── components/        # 功能型局部件
-│       │   ├── Sidebar.jsx    # 品牌侧边栏导航
-│       │   ├── Topbar.jsx     # 系统标题顶栏
-│       │   └── Dialog.jsx     # 对话框组件
-│       └── views/             # 视图级业务模块
-│           ├── LibraryView.jsx       # 播客库主视图
-│           ├── WorkstationView.jsx   # 播客工作台视图
-│           ├── PodcastDetailView.jsx # 详情页（含 Q&A 标签 + 重试按钮）
-│           └── SettingsView.jsx      # 系统配置视图
-│   └── public/
-│       └── fonts/                 # 本地字体（smiley-sans.woff2）
-│
-├── downloads/                 # 下载的原始音频
-├── temp_sandbox/              # 临时沙盒目录
-├── ffmpeg/                    # 内置 FFmpeg 二进制
-├── launcher.py                # 跨平台后台启动器（端口检测 + PID 管理）
-├── build.py                   # 发布构建脚本
-└── docs/                      # 项目文档
+└── frontend/
+    ├── vite.config.js / tailwind.config.js
+    └── src/
+        ├── App.jsx              # SPA 核心与全局状态总线
+        ├── data.js              # i18n 字典与 Theme 预设
+        ├── index.css            # 设计令牌与全局样式
+        ├── components/          # Sidebar, Dialog 等
+        └── views/
+            ├── LibraryView.jsx       # 播客库主视图 (含 Web Audio 玩具)
+            ├── WorkstationView.jsx   # 沙盒知识视图
+            ├── PodcastDetailView.jsx # 超大详情页 (音频、字幕、评论联动)
+            └── SettingsView.jsx      # 系统级配置中心
 ```
 
 ---
 
-## 3. 后端核心模块
+## 3. 数据流与核心模块
 
-### 3.1 config.py — 全局配置与 BaseModel 校验
-*   **配置校验与补齐**：升级使用 Pydantic v2 `BaseModel` 对全局配置文件 `config.json` 进行严苛的类型与默认值补齐校验，消除外部 `pydantic-settings` 依赖，杜绝缺失或非法配置导致启动崩溃。
-*   **环境防御机制**：包含四层"钢铁防御"机制，专门解决 Windows 本地部署下的路径和兼容性问题：
-    1.  NumPy 2.0 向后兼容性补焊（修复 `np.NaN`、`np.float`）。
-    2.  重写控制台标准流 `stdout` / `stderr` 编码为标准 UTF-8，规避中文报错。
-    3.  自动提取 venv 中 NVIDIA DLL (cuBLAS/cuDNN) 并动态注入 Path。
-    4.  转换 TEMP/TMP/HOME 等环境变量至英文短路径沙盒（8.3 短路径转换），规避中文字符集报错。
-*   **HuggingFace 动态 Patch**：根据 `hf_token` 配置自动切换官方源或 hf-mirror.com 镜像源。
+### 3.1 核心数据流转 (Pipeline)
+一条播客 URL 进入系统后的完整生命周期由 `core/pipeline.py` 的 `run_podcast_pipeline` 编排：
+1. **下载阶段** (`downloader.py`)：通过 httpx / curl / yt-dlp 策略尝试下载，解析音频及 Shownotes。
+2. **预处理**：FFmpeg 转换为 Mono 16kHz WAV。
+3. **声纹分离** (`transcriber.py / speaker.py`)：使用 PyAnnote 生成声纹分段，提取声纹特征 (Embedding)。
+4. **语音转录** (`transcriber.py`)：使用 Faster-Whisper 或在线 ASR 转录为文本。
+5. **智能切分与匹配**：按段落聚合并通过 Cosine 相似度 + LLM 推理识别真实说话人身份。
+6. **AI 分析总结** (`summarizer.py`)：构建庞大 Prompt 交由 Ollama / 在线大模型生成 Markdown 报告。
+7. **触达通知** (`notifier.py`)：Windows 弹窗、邮件或 Webhook 推送。
 
-### 3.2 routers/ — 模块化 API 控制器层
-路由结构解耦，子接口在主模块中通过挂载 `APIRouter` 注册：
-*   **tasks.py (任务管理 API)**：负责播客任务的增删改查、失败重试（`POST /{id}/retry`）、播客问答（`POST /{id}/qa`，支持长转录分段）、取消、重新下载、物理文件清理、导出（SRT/VTT/Text/JSON/Markdown）等核心生命周期逻辑。
-*   **config.py (配置设置 API)**：负责读取、修改并回写全局 `config.json`，以及 Prompt 推送词模板的读取和热修改。
-*   **system.py (系统状态 API)**：负责本地硬件信息（CPU、RAM、GPU、VRAM）实时拉取，版本检测，性能哨兵后台调度，以及 **图片代理**（`GET /api/proxy/image`）解决 CDN 不可达问题。
-*   **boards.py (看板卡片 API)**：负责知识段落、脑洞对撞机、连线链接、复习卡片、看板布局的全套 CRUD 及艾宾浩斯复习曲线算法。
-
-### 3.3 core/ — 核心业务处理管道
-后端服务分离出两大核心作业模块：
-*   **pipeline.py (流水线调度核心)**：负责将播客的下载 -> 音频 Mono/16kHz 预处理 -> 声纹分割 (PyAnnote) -> 语音转录 (Whisper) -> 语义段落聚合 (Semantic Chunking) -> 声纹命名识别 -> LLM 深度总结 (Ollama/在线) -> 桌面/邮件推送这一整套作业过程组装成原子流水线，并包含实时的 `check_cancelled` 取消检查。
-*   **speaker.py (声纹与大模型推理核心)**：
-  - **自适应噪音过滤**：预清洗无意义的短语气助词，直接跳过大模型，降低运行成本。
-  - **历史声纹 Cosine 相似度匹配**：自动比对 `speaker_fingerprints.json` 余弦相似度，秒级识别老熟人姓名。
-  - **大模型简介与指征匹配**：对剩余未知 SPEAKER，通过大模型读取简介和对话上下文，做黄金交叉 Shownotes 拼写交叉验证，智能推断出本集在场发言人真实姓名。
-*   **transcriber.py (ASR 转录引擎)**：
-  - **在线模式零 AI 库导入**：在线 ASR 模式下，系统启动彻底延迟并规避 `torch`、`faster_whisper` 和 `pyannote` 导入，极大提升启动耗时。
-  - **ModelCacheManager 单例缓存**：本地模式下，常驻缓存已加载 of `WhisperModel` 实例，大幅消除转录冷启动重新读盘时间。
-  - **显存/内存自动释放 (TTL/LRU)**：支持 `local_model_idle_timeout`，模型闲置超时后自动清空 PyTorch CUDA 缓存并进行 GC。
-*   **downloader.py**：多网页自适应抓取引擎，包含 httpx (有/无代理) -> curl.exe (有/无代理) 4 级自适应，保障网络穿透。
-*   **summarizer.py**：双模式总结 (本地 Ollama/在线 OpenAI)，内置 Doh DNS Bypass 功能直连抗劫持。
-*   **notifier.py**：邮件与 Windows 桌面通知。
-*   **queue_manager.py**：SQLite 驱动的持久化 FIFO 后台任务队列，能在服务崩溃/重启后断点自动续传。
-
-### 3.4 database.py — SQLite WAL 数据持久化 (高并发读写)
-*   **线程隔离连接池**：使用 `threading.local` 为每一个后台工作线程 and Web 请求线程建立专属的 `sqlite3.Connection` 实例，从根本上隔离了连接争抢。
-*   **并发 WAL (Write-Ahead Logging) 模式**：通过 PRAGMA 开启 WAL，全面支持读写并行。面板加载与卡片拉取请求时完全零锁阻塞，响应敏捷。
-*   **Busy Timeout 与外键级联**：开启 `PRAGMA foreign_keys = ON;` 级联删除，设置 `PRAGMA busy_timeout = 30000;` 智能等待繁忙写入锁，并在 Python 端使用 `write_lock` 序列化写操作，规避死锁。
-
-## 4. 前端架构
-
-### 4.1 技术栈
-
-- **Vite 8** — 构建工具
-- **React 19** — UI 框架
-- **Tailwind CSS v4** — 编译打包（`@tailwindcss/vite` 插件），CSS 变量 + `@theme` 块
-- **smiley-sans** — 本地 WOFF2 字体，`@font-face` 加载
-- **无第三方 UI 库** — 所有组件均为自研，图标使用 lucide-react
-
-### 4.2 页面结构
-
-| 页面/Tab | 功能 |
-|----------|------|
-| 播客库 (Dashboard) | 任务列表、状态监控、新增任务 |
-| 任务详情 (Detail) | 剧本对话流、AI 总结报告、Shownotes、说话人管理 |
-| 认知沙盒 (Sandbox) | 段落沉淀、Anki 闪光卡片、AI 碰撞器 |
-| 系统设置 (Settings) | 外观主题、ASR/LLM 引擎配置、SMTP 通知配置 |
-
-### 4.3 国际化 (i18n)
-
-内置四语言支持，通过 `TRANSLATIONS` 常量对象实现前端 i18n：
-- 🇨🇳 简体中文 (`zh-CN`) — 默认
-- 🇹🇼 繁體中文 (`zh-TW`)
-- 🇺🇸 English (`en-US`)
-- 🇯🇵 日本語 (`ja-JP`)
-
-### 4.4 主题系统
-
-支持 **浅色 / 深色 / 跟随系统** 三种显示模式，每种模式内置多套预设配色方案（如 Antigravity Slate、Midnight Obsidian 等），并支持自定义背景色/前景色/强调色。
-
-### 4.5 设计令牌 (Design Tokens)
-
-所有样式通过 CSS Custom Properties 统一管理（见 `index.css :root`），包括：
-- 字体：Outfit + Noto Sans SC
-- 色彩：HSL 调和配色系统
-- 圆角：`--radius-sm` (8px) / `--radius-md` (14px) / `--radius-lg` (24px)
-- 过渡：`--transition-smooth` (cubic-bezier)
-
-### 4.6 播放跳转与评论互动
-
-前端实现了深度的播放跳转与多文本来源的联动机制：
-- **气泡定位跳转**：点击段落对话气泡时，播放器会自动定位到该段落的起始时间（`para.start_time`），而非单个词语的随机时间。悬停气泡时，前端会呈现动态播放图标，提示可交互性。
-- **评论与简介时间戳解析 (CommentRenderer)**：系统通过正则表达式（如 `((\d{1,2}):)?(\d{2}):(\d{2})`）匹配解析网友热评、节目简介中的时间格式，将其动态转换成内嵌按钮。
-- **平滑滚动与金色发光反馈**：用户点击解析出的时间戳或气泡后，左侧的剧本对话流会自动使用平滑滚动（`scrollIntoView({ behavior: 'smooth' })`）将对应时段的段落移动到视口中央，并在该段落上渲染一个持续 2 秒的金色发光（`glow-highlight`）动效，引导视觉聚焦。
+### 3.2 任务队列调度 (Queue Manager)
+- 基于 SQLite 持久化的 FIFO 队列。
+- 后台守护线程轮询 `tasks` 表，支持断点恢复与并发数量限制 (`max_concurrent_tasks`)。
 
 ---
 
-## 5. 数据流
+## 4. 核心 API/组件接口契约
 
-### 5.1 新建任务流程
+系统在前端 SPA 和后端 FastAPI 之间采用 RESTful JSON 通信（WebSocket 仅用于实时性能数据）。
 
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant F as Frontend
-    participant B as Backend API
-    participant Q as Queue Manager
-    participant P as Pipeline
+### 4.1 关键后端 API 契约
+- `POST /api/tasks`：提交 URL 任务。参数 `{ "url": str, "asr_mode": str }`
+- `GET /api/tasks/{task_id}`：获取完整转录、总结、分轨与元数据。
+- `POST /api/tasks/{task_id}/qa`：基于当前播客超长文本的问答请求。
+- `POST /api/upload`：本地音频直接上传建任务。
+- `GET /api/proxy/image?url=xxx`：解决部分平台防盗链的代理中转。
+- `POST /api/cards/create`：从字幕段落中沉淀知识卡片。
 
-    U->>F: 粘贴链接 / 上传文件
-    F->>B: POST /api/tasks 或 /api/upload
-    B->>Q: 入队
-    B-->>F: 返回 task_id + pending
-    Q->>P: 出队执行
-    P->>P: 下载 → 转录 → 总结
-    P->>B: 更新 tasks_db.json
-    P->>B: 发送通知 (Windows / Email)
-    F->>B: 轮询 GET /api/tasks
-    B-->>F: 返回最新状态
-```
-
-### 5.2 认知沙盒流程
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant F as Frontend
-    participant B as Backend API
-
-    U->>F: 选中段落 → 沉淀
-    F->>B: POST /api/cards/create
-    B-->>F: 返回新卡片
-    U->>F: 进入对撞机
-    F->>B: GET /api/cards/collider
-    B-->>F: 返回随机卡片组
-    U->>F: 复习卡片
-    F->>B: POST /api/cards/{id}/review
-    B-->>F: 更新艾宾浩斯间隔
-```
+### 4.2 关键前端状态契约 (App.jsx)
+由于未使用 Redux/Zustand，前端重度依赖 `App.jsx` 进行状态下发。核心 Props 契约包括：
+- `activeTask` / `tasks`：当前选中的任务与全量列表。
+- `configData`：系统的完整运行时配置。
+- `t(zh, en)`：自研的轻量级 i18n 翻译函数。
+- `audioPlayerRef`：全局共享的音频播放器控制柄，用于时间戳的跨组件跳转。
 
 ---
 
-## 6. 关键设计决策
+## 5. 关键设计决策 (原作者架构初衷)
+
+> 💡 **架构师注：此部分完整保留了作者在项目设计之初的核心业务思想。**
 
 | 决策 | 理由 |
 |------|------|
@@ -275,10 +168,16 @@ sequenceDiagram
 
 ---
 
-## 7. 运行时端口
+## 6. 历史偏离说明 (代码审计补充)
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| Frontend (Vite) | 9173 | 开发服务器 |
-| Backend (FastAPI) | 9101 | API 服务 + 静态音频挂载 |
-| Ollama / LM Studio | 11434 | 本地 LLM 推理（可选） |
+经过 2026 年 7 月的全方位代码审计，发现当前代码实现与历史设计的偏离及隐患：
+
+1. **SPA 复杂度的严重失控**：原设计“单文件 SPA (App.jsx) 减少组件间通信复杂度”，但在当前实现中，`App.jsx` 已膨胀为拥挤的“God Component”（近 700 行），且衍生出了极其庞大的子视图（如 `PodcastDetailView.jsx` 达 1650+ 行）。这种模式已严重影响性能（引发无节制的渲染瀑布）。
+2. **前后端路由污染**：后端原本设计的模块化 `routers` 层，目前已被大量的业务逻辑（File I/O、LLM调用、数据库硬编码 SQL、甚至 Ebbinghaus 算法）严重污染，变成了典型的 Fat Controller，缺乏 Service 中间层。
+3. **并发隐患与安全漏洞**：
+   - 现有的图片代理 `/api/proxy/image` 缺乏域名白名单，存在严重的 SSRF 安全漏洞。
+   - 网络穿透模块 `network.py` 中存在非线程安全的猴子补丁（全局覆盖 `socket.getaddrinfo`）。
+   - `database.py` 已膨胀至千行级别的 God Class，缺乏 ORM 或 Repository 模式拆分。
+4. **LLM 调用泛滥与重复**：至少有 4 处模块自行封装并硬编码了与大模型交互的网络层逻辑。
+
+针对上述偏离与技术债，后续重构策略详见 `docs/refactor_plan.md`。

@@ -8,13 +8,13 @@ _original_check_output = subprocess.check_output
 
 def _patched_run(*args, **kwargs):
     if sys.platform == 'win32' and 'creationflags' not in kwargs:
-        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW  # CREATE_NO_WINDOW
     return _original_run(*args, **kwargs)
 
 
 def _patched_check_output(*args, **kwargs):
     if sys.platform == 'win32' and 'creationflags' not in kwargs:
-        kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW  # CREATE_NO_WINDOW
     return _original_check_output(*args, **kwargs)
 
 

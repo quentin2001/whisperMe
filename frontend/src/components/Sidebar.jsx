@@ -1,16 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { Library, Sliders, Settings, Cpu, Bell } from "lucide-react";
+import { usePlayerStore } from "../store/playerStore.js";
+import { useConfigStore } from "../store/configStore.js";
+import { useTranslation } from "../contexts/I18nContext";
 
 export default function Sidebar({
   currentTab,
   onTabChange,
   onNewSessionTrigger,
   onShowLogsTrigger,
-  perfData,
   versionInfo,
-  isConfigInvalid,
-  t
+  isConfigInvalid
 }) {
+  const { t } = useTranslation();
+  const currentTime = usePlayerStore(state => state.currentTime);
+  const duration = usePlayerStore(state => state.duration);
+  const playbackRate = usePlayerStore(state => state.playbackRate);
+  const setPlaybackRate = usePlayerStore(state => state.setPlaybackRate);
+  const volume = usePlayerStore(state => state.volume);
+  const setVolume = usePlayerStore(state => state.setVolume);
+  const logs = useConfigStore(state => state.logs);
+  const perfData = useConfigStore(state => state.perfData);
+  const configData = useConfigStore(state => state.configData);
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   // Live simulated system stats that fluctuate slightly to feel alive and realistic!
   const [systStats, setSystStats] = useState({ cpu: 12, ram: 2.4 });
 

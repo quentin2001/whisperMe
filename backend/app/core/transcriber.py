@@ -5,12 +5,18 @@ import socket
 import threading
 import time
 import httpx
+import subprocess
+import shutil
+from typing import Dict, List, Optional
+import traceback
+from app.core import logger
 from app.config import (
     config,
     SHORT_LOCAL_WHISPER_MODEL_PATH,
     HF_TOKEN,
     get_short_path_name,
-    FFMPEG_PATH
+    FFMPEG_PATH,
+    PROJECT_DIR
 )
 from app.core.network import doh_dns_bypass
 
@@ -663,7 +669,7 @@ class PodcastTranscriber:
 
 请直接输出 JSON 数组内容，不要包含 ```json 或 ``` 格式块，不要包含任何 markdown 语法或前言后语。"""
 
-                    sewn_json_str = self._call_llm(prompt)
+                    sewn_json_str = call_llm(prompt, label="LLM语义缝合")
                     
                     # Try to parse the output
                     # Strip code blocks if LLM still included them
@@ -695,59 +701,6 @@ class PodcastTranscriber:
                 
         return paragraphs
 
-    def _call_llm(self, prompt: str) -> str:
-        from app.config import config
-        import httpx
-        
-        summary_mode = config.get("summary_mode", "local")
-        if summary_mode == "online":
-            api_key = config.get("online_summary_api_key", "").strip()
-            base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
-            target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
-            api_url = f"{base_url.rstrip('/')}/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-        else:
-            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-            target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
-            base_url = ollama_url.rstrip('/')
-            api_url = f"{base_url}/v1/chat/completions" if '/v1' not in base_url else f"{base_url}/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            
-        payload = {
-            "model": target_model,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-            "temperature": 0.1
-        }
-        
-        response = None
-        # 1. 优先使用系统代理
-        try:
-            with httpx.Client(timeout=120.0, trust_env=True) as client:
-                response = client.post(api_url, json=payload, headers=headers)
-                if response.status_code == 200:
-                    return response.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e_proxy:
-            print(f"⚠️ [LOG] LLM 语义缝合接口代理请求失败: {e_proxy}。尝试直连...")
-            
-        # 2. 直连兜底 (结合 DoH 绕过)
-        try:
-            with doh_dns_bypass(api_url):
-                with httpx.Client(timeout=120.0, trust_env=False) as client:
-                    response = client.post(api_url, json=payload, headers=headers)
-                    if response.status_code == 200:
-                        result = response.json()
-                        return result["choices"][0]["message"]["content"].strip()
-        except Exception as e_doh:
-            print(f"❌ [LOG] LLM 语义缝合直连(DoH DNS 绕过)请求失败: {e_doh}")
-            
-        if response is None or response.status_code != 200:
-            detail_msg = response.text if response is not None else "无响应"
-            status_code = response.status_code if response is not None else "未知"
-            raise Exception(f"LLM API error (code {status_code}): {detail_msg}")
-        result = response.json()
-        return result["choices"][0]["message"]["content"].strip()
+
 
 

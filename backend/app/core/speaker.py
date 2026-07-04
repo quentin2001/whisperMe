@@ -5,6 +5,7 @@ import httpx
 from app.config import config, PROJECT_DIR
 from app.database import db
 from app.core import logger
+from app.core.llm_utils import call_llm, LLMError
 
 print = logger.info
 
@@ -161,39 +162,7 @@ def split_shownotes(shownotes: str) -> dict:
     print(f"📄 [LOG] 固定模板区人名: {template_names}")
     return {"episode_content": episode_content, "template_section": template_section, "episode_names": episode_names, "template_names": template_names}
 
-def _call_llm_api(prompt: str, summary_mode: str = None, label: str = "LLM调用") -> str:
-    if not summary_mode:
-        summary_mode = config.get("summary_mode", "local")
-    headers = {"Content-Type": "application/json"}
-    if summary_mode == "online":
-        api_key = config.get("online_summary_api_key", "").strip()
-        base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
-        target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
-        api_url = f"{base_url.rstrip('/')}/chat/completions"
-        if api_key: headers["Authorization"] = f"Bearer {api_key}"
-        print(f"📡 [LOG] {label}【在线模式】 - 接口: {api_url} | 模型: {target_model}")
-    else:
-        ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-        target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
-        base_url = ollama_url.rstrip('/')
-        if '/v1' not in base_url and '11434' not in base_url: api_url = f"{base_url}/v1/chat/completions"
-        elif '11434' in base_url and '/v1' not in base_url: api_url = f"{base_url}/v1/chat/completions"
-        else: api_url = f"{base_url}/chat/completions"
-        print(f"🤖 [LOG] {label}【本地模式】 - 接口: {api_url} | 模型: {target_model}")
-    payload = {"model": target_model, "messages": [{"role": "user", "content": prompt}], "stream": False, "temperature": 0.1}
-    response = None
-    try:
-        with httpx.Client(timeout=120.0, trust_env=True) as client:
-            response = client.post(api_url, json=payload, headers=headers)
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
-            else:
-                print(f"❌ [LOG ERROR] LLM 响应错误, code: {response.status_code}, body: {response.text}")
-                return ""
-    except Exception as e:
-        print(f"❌ [LOG ERROR] LLM 请求超时或建联失败: {e}")
-        return ""
+
 
 def _llm_identify_participants(title: str, episode_content: str, template_names: set, summary_mode: str = None) -> list:
     """
@@ -216,7 +185,11 @@ def _llm_identify_participants(title: str, episode_content: str, template_names:
 请以严格的 JSON 数组格式返回（不要有 ```json 或 Markdown 格式包裹，只返回纯文本数组），例如：
 ["张三", "李四"]"""
     
-    response_str = _call_llm_api(prompt, summary_mode=summary_mode, label="第2阶段-识别在场名单")
+    try:
+        response_str = call_llm(prompt, summary_mode=summary_mode, label="第2阶段-识别在场名单")
+    except LLMError as e:
+        print(f"❌ [LOG ERROR] LLM 请求失败: {e}")
+        response_str = ""
     try:
         cleaned = response_str.strip().replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
@@ -265,7 +238,11 @@ def _llm_match_speakers(participants: list, transcript: list, unmatched_speakers
 2. 不要包含 ```json 或 Markdown 符号包裹，直接输出纯 JSON 字符串。
 3. 如果某个人物实在无法判定，可以不输出在 JSON 中。"""
 
-    response_str = _call_llm_api(prompt, summary_mode=summary_mode, label="第3阶段-声纹与人名匹配")
+    try:
+        response_str = call_llm(prompt, summary_mode=summary_mode, label="第3阶段-声纹与人名匹配")
+    except LLMError as e:
+        print(f"❌ [LOG ERROR] LLM 请求失败: {e}")
+        response_str = ""
     try:
         cleaned = response_str.strip().replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
@@ -389,7 +366,7 @@ def auto_rename_speakers(task_id: str, metadata: dict, transcript: list, speaker
     if final_mappings:
         merged = {**final_mappings, **existing_mappings}
         merged_confidence = {**all_confidence, **existing_confidence}
-        db.update_task(task_id, speaker_mappings=merged, speaker_confidence=merged_confidence)
+        db.update_task_field(task_id, speaker_mappings=merged, speaker_confidence=merged_confidence)
         print(f"🎉 [LOG] 四阶段智能识别完成！已自动应用以下角色命名: {merged}")
 
 def apply_interjection_labels(task_id: str, transcript: list):
@@ -419,4 +396,4 @@ def apply_interjection_labels(task_id: str, transcript: list):
             modified = True
             print(f"🏷️ [LOG] 自动将仅说语气助词的发言人 {sp} 标记为 '未识别语气词'")
     if modified:
-        db.update_task(task_id, speaker_mappings=mappings, speaker_confidence=confidence)
+        db.update_task_field(task_id, speaker_mappings=mappings, speaker_confidence=confidence)

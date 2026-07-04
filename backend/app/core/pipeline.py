@@ -61,7 +61,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         has_full_transcript = bool(task.get("transcript"))
         if existing_paragraphs and len(existing_paragraphs) > 0 and has_full_transcript:
             print(f"🎯 [LOG] 检测到数据库中任务 {task_id} 已有历史转录段落 ({len(existing_paragraphs)} 段)，直接跳过下载与 ASR 转录，进入 AI 总结重算阶段。")
-            db.update_task(task_id, status="summarizing", progress=80.0)
+            db.update_task_field(task_id, status="summarizing", progress=80.0)
             
             task_metadata = task.get("metadata") or {
                 "title": task.get("title") or "未命名任务",
@@ -82,10 +82,10 @@ def run_podcast_pipeline(task_id: str, url: str):
             total_time = time.time() - pipeline_start_time
             time_report = f"\n\n---\n\n### ⏱️ 分析用时统计 (ASR 断点跳过)\n- **AI 总结**: {time.time() - t_summary_start:.1f} 秒\n- **总计耗时**: {total_time:.1f} 秒\n"
             summary_report += time_report
-            db.update_task(task_id, summary=summary_report, progress=95.0)
+            db.update_task_field(task_id, summary=summary_report, progress=95.0)
 
             check_cancelled(task_id)
-            db.update_task(task_id, status="completed", progress=100.0)
+            db.update_task_field(task_id, status="completed", progress=100.0)
 
             notifier.send_desktop_notification(
                 title="播客 AI 总结生成完成！",
@@ -99,14 +99,14 @@ def run_podcast_pipeline(task_id: str, url: str):
             db.delete_paragraphs_by_podcast(task_id)
 
         # Step 1: 下载音频与获取元数据
-        db.update_task(task_id, status="downloading", progress=10.0)
+        db.update_task_field(task_id, status="downloading", progress=10.0)
         
         def download_progress_callback(percent):
             # 实时检查任务是否已被删除或手动取消
             check_cancelled(task_id)
             # 将下载进度 (0-100) 映射到数据库任务 progress 字段 (10-30)
             mapped_progress = 10.0 + (percent / 100.0) * 20.0
-            db.update_task(task_id, progress=round(mapped_progress, 1))
+            db.update_task_field(task_id, progress=round(mapped_progress, 1))
             
         t_download_start = time.time()
         local_mp3, metadata = downloader.download_url_audio(url, progress_callback=download_progress_callback)
@@ -116,7 +116,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         check_cancelled(task_id)
             
         # 将解析到的播客元数据回写数据库
-        db.update_task(
+        db.update_task_field(
             task_id, 
             title=metadata["title"], 
             podcast_name=metadata["podcast_name"],
@@ -128,11 +128,11 @@ def run_podcast_pipeline(task_id: str, url: str):
         # 立即注册音频播放路径，让用户可以边听边等
         check_cancelled(task_id)
         audio_filename = os.path.basename(local_mp3)
-        db.update_task(task_id, audio_url=f"/audio/{audio_filename}", progress=32.0)
+        db.update_task_field(task_id, audio_url=f"/audio/{audio_filename}", progress=32.0)
 
         # Step 2: 音频格式预处理（16kHz Mono WAV）
         check_cancelled(task_id)
-        db.update_task(task_id, status="transcribing", progress=40.0)
+        db.update_task_field(task_id, status="transcribing", progress=40.0)
         t_preprocess_start = time.time()
         standardized_wav = downloader.preprocess_audio(local_mp3)
         timing_stats['音频预处理'] = time.time() - t_preprocess_start
@@ -147,7 +147,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30):
             db.update_task_field(task_id, hf_token_missing=True)
 
-        db.update_task(task_id, progress=60.0)
+        db.update_task_field(task_id, progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
         check_cancelled(task_id)
@@ -181,7 +181,7 @@ def run_podcast_pipeline(task_id: str, url: str):
             on_segment_batch=on_segment_batch
         )
         timing_stats['语音识别转录'] = time.time() - t_transcribe_start
-        db.update_task(task_id, transcript=merged_transcript, progress=75.0)
+        db.update_task_field(task_id, transcript=merged_transcript, progress=75.0)
 
         # Step 4.2: 最终段落聚合（兜底，确保完整性）
         try:
@@ -198,7 +198,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         try:
             print("⏳ [LOG] 正在提取发言人声纹特征向量...")
             speaker_embeddings = transcriber.extract_speaker_embeddings(standardized_wav, diar_data)
-            db.update_task(task_id, speaker_embeddings=speaker_embeddings)
+            db.update_task_field(task_id, speaker_embeddings=speaker_embeddings)
             
             # 如果聚类修正合并了 SPEAKER，需要同步更新已有的 transcript 和段落
             diar_speakers = set(seg["speaker"] for seg in diar_data)
@@ -221,7 +221,7 @@ def run_podcast_pipeline(task_id: str, url: str):
                     for seg in merged_transcript:
                         if seg.get("speaker") in reverse_map:
                             seg["speaker"] = reverse_map[seg["speaker"]]
-                    db.update_task(task_id, transcript=merged_transcript)
+                    db.update_task_field(task_id, transcript=merged_transcript)
                     
                     try:
                         paragraphs = db.get_paragraphs_by_podcast(task_id)
@@ -262,7 +262,7 @@ def run_podcast_pipeline(task_id: str, url: str):
 
         # Step 5: 调用 AI 总结
         check_cancelled(task_id)
-        db.update_task(task_id, status="summarizing", progress=80.0)
+        db.update_task_field(task_id, status="summarizing", progress=80.0)
         task_summary_mode = task.get("summary_mode", "local")
         t_summary_start = time.time()
         summary_report = summarizer.summarize(metadata, merged_transcript, summary_mode=task_summary_mode)
@@ -281,19 +281,19 @@ def run_podcast_pipeline(task_id: str, url: str):
             time_report += f"\n**总计耗时**: {total_time:.1f} 秒"
             
         summary_report += time_report
-        db.update_task(task_id, summary=summary_report, progress=95.0)
+        db.update_task_field(task_id, summary=summary_report, progress=95.0)
 
         # 标志任务已彻底成功（校验关键产出）
         check_cancelled(task_id)
         if not merged_transcript or len(merged_transcript) == 0:
-            db.update_task(task_id, status="failed", error_message="转录结果为空，无法生成总结。", progress=100.0)
+            db.update_task_field(task_id, status="failed", error_message="转录结果为空，无法生成总结。", progress=100.0)
             notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》转录结果为空")
             return
         if not summary_report or len(summary_report.strip()) < 20:
-            db.update_task(task_id, status="failed", error_message="AI 总结生成失败或内容过短。", progress=100.0)
+            db.update_task_field(task_id, status="failed", error_message="AI 总结生成失败或内容过短。", progress=100.0)
             notifier.send_desktop_notification(title="❌ 播客处理失败", message=f"《{metadata.get('title', '')}》AI 总结失败")
             return
-        db.update_task(task_id, status="completed", progress=100.0)
+        db.update_task_field(task_id, status="completed", progress=100.0)
 
         # Step 6: 消息提醒
         duration_str = metadata.get("duration", "")
@@ -321,7 +321,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not task_exists or is_cancelled or str(e) == "TASK_CANCELLED":
             print(f"🗑️ [LOG] 检测到任务 {task_id} 在运行期间已被用户删除或取消，物理流程彻底中断并安全释放磁盘。")
             if is_cancelled:
-                db.update_task(task_id, status="cancelled", progress=100.0, error_message="任务已被手动取消。")
+                db.update_task_field(task_id, status="cancelled", progress=100.0, error_message="任务已被手动取消。")
             if local_mp3 and os.path.exists(local_mp3):
                 try:
                     os.remove(local_mp3)
@@ -331,7 +331,7 @@ def run_podcast_pipeline(task_id: str, url: str):
             
         print(f"❌ [🚨 任务异常中断] 任务 {task_id} 崩盘: {e}")
         traceback.print_exc()
-        db.update_task(task_id, status="failed", error_message=str(e), progress=100.0)
+        db.update_task_field(task_id, status="failed", error_message=str(e), progress=100.0)
         
         err_short = str(e)[:80] + ("..." if len(str(e)) > 80 else "")
         notifier.send_desktop_notification(

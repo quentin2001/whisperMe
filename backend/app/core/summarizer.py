@@ -3,6 +3,7 @@ import httpx
 from app.config import config
 from app.core.prompt_manager import load_prompt
 from app.core.network import doh_dns_bypass
+from app.core.llm_utils import call_llm
 
 class PodcastSummarizer:
     def __init__(self):
@@ -36,40 +37,7 @@ class PodcastSummarizer:
 
         return chunks
 
-    def _call_llm(self, prompt: str, api_url: str, headers: dict, target_model: str, temperature: float = 0.2) -> str:
-        """统一的 LLM 调用方法，支持代理和 DoH 双重回退"""
 
-        payload = {
-            "model": target_model,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-            "temperature": temperature
-        }
-
-        response = None
-        # 1. 优先使用系统代理
-        try:
-            with httpx.Client(timeout=600.0, trust_env=True) as client:
-                response = client.post(api_url, json=payload, headers=headers)
-                response.raise_for_status()
-        except Exception:
-            pass
-
-        # 2. 直连模式兜底 (结合 DoH 绕过)
-        if response is None or response.status_code != 200:
-            try:
-                with doh_dns_bypass(api_url):
-                    with httpx.Client(timeout=600.0, trust_env=False) as client:
-                        response = client.post(api_url, json=payload, headers=headers)
-            except Exception:
-                pass
-
-        if response is None or response.status_code != 200:
-            detail_msg = response.text if response is not None else "无响应"
-            status_code = response.status_code if response is not None else "未知"
-            raise Exception(f"大模型接口请求失败，状态码: {status_code}，详情: {detail_msg}")
-
-        return response.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
 
     def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None) -> str:
         """
@@ -79,33 +47,7 @@ class PodcastSummarizer:
         if not summary_mode:
             summary_mode = config.get("summary_mode", "local")
 
-        # 2. 确定接口地址、API Key 和目标模型
-        if summary_mode == "online":
-            api_key = config.get("online_summary_api_key", "").strip()
-            base_url = config.get("online_summary_base_url", "https://api.openai.com/v1").strip()
-            target_model = config.get("online_summary_model", "gpt-4o-mini").strip()
 
-            # 拼接 completions 地址
-            api_url = f"{base_url.rstrip('/')}/chat/completions"
-            headers = {
-                "Content-Type": "application/json"
-            }
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            print(f"📡 [LOG] 启动【在线 API 总结模式】 - 接口地址: {api_url} | 目标模型: {target_model}")
-        else:
-            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-            target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
-
-            base_url = ollama_url.rstrip('/')
-            if '/v1' not in base_url and '11434' not in base_url:
-                api_url = f"{base_url}/v1/chat/completions"
-            elif '11434' in base_url and '/v1' not in base_url:
-                api_url = f"{base_url}/v1/chat/completions"
-            else:
-                api_url = f"{base_url}/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            print(f"🤖 [LOG] 启动【本地大模型总结模式】 - 接口地址: {api_url} | 目标模型: {target_model}")
 
         # 3. 组装转录文本
         transcript_text_lines = []
@@ -183,7 +125,7 @@ class PodcastSummarizer:
 4. 在报告最末尾增加一行：`本段覆盖时间范围：{chunk_lines[0][:12] if chunk_lines else '?'} — {chunk_lines[-1][:12] if chunk_lines else '?'}`"""
                     chunk_prompt = user_prompt.replace("{{PODCAST_DATA}}", chunk_data + chunk_suffix)
                     print(f"📝 [LOG] 正在总结第 {i+1}/{total_chunks} 段...")
-                    partial = self._call_llm(chunk_prompt, api_url, headers, target_model)
+                    partial = call_llm(chunk_prompt, summary_mode=summary_mode, label="LLM局部总结", timeout=600.0, temperature=0.2)
                     partial_summaries.append(partial)
                     print(f"✅ [LOG] 第 {i+1}/{total_chunks} 段总结完成")
 
@@ -203,7 +145,7 @@ class PodcastSummarizer:
 
 请将以上各段总结合并为一份**完整、连贯、无重复**的最终播客价值总结分析报告，按照标准报告结构组织，去除重复内容，保留所有核心观点、金句和可执行建议。"""
                 print(f"🔗 [LOG] 正在合并 {total_chunks} 段总结为最终报告...")
-                summary_md = self._call_llm(merge_prompt, api_url, headers, target_model)
+                summary_md = call_llm(merge_prompt, summary_mode=summary_mode, label="LLM合并总结", timeout=600.0, temperature=0.2)
                 print("🟢 [LOG] 长播客分段总结报告生成完成！")
 
             else:
@@ -217,7 +159,7 @@ class PodcastSummarizer:
 """
                 prompt = user_prompt.replace("{{PODCAST_DATA}}", data_block)
                 print(f"📝 [LOG] 转录文本长度正常 ({len(full_transcript_text)}字)，使用单次总结模式")
-                summary_md = self._call_llm(prompt, api_url, headers, target_model)
+                summary_md = call_llm(prompt, summary_mode=summary_mode, label="LLM全局总结", timeout=600.0, temperature=0.2)
                 print("🟢 [LOG] 大模型总结报告生成顺利完成！")
 
             return summary_md

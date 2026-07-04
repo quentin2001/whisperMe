@@ -5,6 +5,7 @@ Used by transcriber, summarizer, downloader, and ASR providers to bypass
 Clash fake-IP (198.18.x.x) DNS hijacking via direct DoH resolution.
 """
 import socket
+import threading
 import httpx
 from urllib.parse import urlparse
 from contextlib import contextmanager
@@ -66,21 +67,35 @@ def resolve_host_via_doh(host: str) -> str | None:
     return None
 
 
+_thread_local = threading.local()
+_original_getaddrinfo = socket.getaddrinfo
+_patch_applied = False
+
+def _safe_getaddrinfo(*args, **kwargs):
+    host = args[0] if args else kwargs.get("host")
+    override = getattr(_thread_local, "doh_override", None)
+    if override and override[0] == host:
+        port = args[1] if len(args) > 1 else kwargs.get("port")
+        real_ip = override[1]
+        try: target_port = int(port)
+        except (ValueError, TypeError): target_port = port
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (real_ip, target_port))]
+    return _original_getaddrinfo(*args, **kwargs)
+
+def _ensure_patch():
+    global _patch_applied
+    if not _patch_applied:
+        socket.getaddrinfo = _safe_getaddrinfo
+        _patch_applied = True
+
 @contextmanager
 def doh_dns_bypass(url: str):
-    """上下文管理器：临时绕过代理 DNS 劫持，直连目标真实 IP。
-
-    用法:
-        with doh_dns_bypass("https://api.openai.com/v1/chat/completions"):
-            client.post(...)  # 走直连真实 IP
-    """
+    """上下文管理器：临时绕过代理 DNS 劫持，直连目标真实 IP (线程安全)。"""
     try:
         parsed = urlparse(url)
         host = parsed.hostname
-        port = parsed.port or (80 if parsed.scheme == "http" else 443)
     except Exception:
         host = None
-        port = None
 
     if not host:
         yield
@@ -88,23 +103,12 @@ def doh_dns_bypass(url: str):
 
     real_ip = resolve_host_via_doh(host)
     if real_ip and real_ip != "198.18.0.46":
-        print(f"🎯 [LOG] DoH 拦截 DNS 成功 -> 将域名 {host} 直接映射至公网 IP {real_ip} 进行直连")
-        original_getaddrinfo = socket.getaddrinfo
-        def custom_getaddrinfo(*args, **kwargs):
-            h = args[0] if args else kwargs.get("host")
-            if h == host:
-                p = args[1] if len(args) > 1 else kwargs.get("port")
-                target_port = p
-                if target_port is None: target_port = port
-                try: target_port = int(target_port)
-                except ValueError: target_port = port
-                return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (real_ip, target_port))]
-            return original_getaddrinfo(*args, **kwargs)
-
-        socket.getaddrinfo = custom_getaddrinfo
+        print(f"🎯 [LOG] DoH 拦截 DNS 成功 -> 将域名 {host} 直接映射至公网 IP {real_ip} (线程安全)")
+        _ensure_patch()
+        _thread_local.doh_override = (host, real_ip)
         try:
             yield
         finally:
-            socket.getaddrinfo = original_getaddrinfo
+            _thread_local.doh_override = None
     else:
         yield

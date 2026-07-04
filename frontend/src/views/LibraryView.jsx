@@ -249,20 +249,22 @@ export const AmenBreakWidget = () => {
   );
 };
 
+import { useTranslation } from "../contexts/I18nContext";
+
 export default function LibraryView({
   tasks,
   logs,
-  onOpenSession,
-  onAddNewSession,
-  onAnalyzeLogs,
-  onDeleteTask,
+  configData,
   perfData,
+  onOpenSession,
   onJumpToWorkstation,
   onJumpToSettings,
+  onAnalyzeLogs,
   onNewSessionTrigger,
-  configData,
-  t
+  onDeleteTask
 }) {
+  const { t } = useTranslation();
+  const sortedTasks = [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const [searchQuery, setSearchQuery] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState("00:00");

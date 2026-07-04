@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { confirm } from "../components/Dialog.jsx";
 import { proxyImage } from "../constants.js";
+import { useTaskStore } from "../store/taskStore.js";
 
 const parseDurationToMinutes = (durationStr) => {
   if (!durationStr || typeof durationStr !== "string") return 0;
@@ -101,13 +102,15 @@ const isWithinDays = (dateInput, days) => {
   return diffDays <= days;
 };
 
+import { useTranslation } from "../contexts/I18nContext";
+
 export default function WorkstationView({
-  tasks,
   onOpenSession,
   onNewSessionTrigger,
-  onDeleteTask,
-  t
+  onDeleteTask
 }) {
+  const { t } = useTranslation();
+  const tasks = useTaskStore(state => state.tasks);
   const [selectedSpeaker, setSelectedSpeaker] = useState("All");
   const [importedDateFilter, setImportedDateFilter] = useState("All Time");
   const [publishedDateFilter, setPublishedDateFilter] = useState("All Time");
