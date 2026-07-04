@@ -277,31 +277,11 @@ def check_dependencies(ffmpeg_path: str = None):
     except Exception:
         pass
 
-    # ASR Libraries
-    whisper_installed = False
-    try:
-        import faster_whisper
-        whisper_installed = True
-    except ImportError:
-        pass
-
-    funasr_installed = False
-    try:
-        import funasr
-        import modelscope
-        funasr_installed = True
-    except ImportError:
-        pass
-
     return {
         "ffmpeg": ffmpeg_info,
         "huggingface": {"token_valid": hf_valid},
         "ollama": {"available": ollama_ok, "url": _cfg.OLLAMA_URL, "model": _cfg.OLLAMA_MODEL, "version": ollama_version},
-        "gpu": gpu_info,
-        "asr_providers": {
-            "whisper": whisper_installed,
-            "funasr": funasr_installed
-        }
+        "gpu": gpu_info
     }
 
 @router.get("/version/check")
