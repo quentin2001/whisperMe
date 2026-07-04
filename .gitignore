@@ -77,3 +77,9 @@ frontend/public/logo-*.png
 frontend/public/logo-*.webp
 frontend/public/favicon-32.png
 
+# 13. AI Agent Tooling (OpenSpec, Claude etc.)
+openspec/
+.claude/
+docs/superpowers/
+AGENT.md
+CLAUDE.md
