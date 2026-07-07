@@ -360,6 +360,86 @@ def proxy_image(url: str):
         raise HTTPException(status_code=502, detail="Bad Gateway")
 
 
+@router.get("/models/registry")
+def get_models_registry():
+    """获取本地 ASR / LLM 模型推荐列表，支持从公网动态同步更新"""
+    default_registry = {
+        "asr": [
+            {
+                "id": "funasr-paraformer-zh",
+                "name": "FunASR Paraformer (Chinese)",
+                "type": "local",
+                "size": "120 MB",
+                "description": "Recommended for Chinese offline speech recognition. Runs extremely fast on CPU/GPU.",
+                "url": "https://modelscope.cn/api/v1/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+                "recommended_for": "Chinese / CPU & GPU"
+            },
+            {
+                "id": "whisper-base",
+                "name": "Whisper Base (Multi-language)",
+                "type": "local",
+                "size": "140 MB",
+                "description": "Good accuracy for multi-language or English podcasts. Runs well on average hardware.",
+                "url": "https://hf-mirror.com/Systran/faster-whisper-base",
+                "recommended_for": "Multi-language / Low Spec"
+            },
+            {
+                "id": "whisper-large-v3",
+                "name": "Whisper Large-V3",
+                "type": "local",
+                "size": "3.1 GB",
+                "description": "Best transcription quality. Requires CUDA GPU with at least 6GB VRAM.",
+                "url": "https://hf-mirror.com/Systran/faster-whisper-large-v3",
+                "recommended_for": "Multi-language / GPU >= 6GB VRAM"
+            }
+        ],
+        "llm": [
+            {
+                "id": "qwen2.5:7b-instruct",
+                "name": "Qwen 2.5 7B Instruct",
+                "type": "ollama",
+                "size": "4.7 GB",
+                "description": "Highly recommended for summary and outline generation. Excellent Chinese support. Runs well on 16GB RAM/8GB VRAM.",
+                "command": "ollama run qwen2.5:7b-instruct",
+                "recommended_for": "Chinese & English / RAM >= 16GB"
+            },
+            {
+                "id": "qwen2.5:1.5b-instruct",
+                "name": "Qwen 2.5 1.5B Instruct",
+                "type": "ollama",
+                "size": "980 MB",
+                "description": "Ultra lightweight model for low-spec machines. Runs fast on CPU.",
+                "command": "ollama run qwen2.5:1.5b-instruct",
+                "recommended_for": "Low Spec / CPU Mode"
+            },
+            {
+                "id": "llama3:8b",
+                "name": "Llama 3 8B Instruct",
+                "type": "ollama",
+                "size": "4.7 GB",
+                "description": "Meta's standard 8B model. Best for English podcast analysis.",
+                "command": "ollama run llama3:8b",
+                "recommended_for": "English Only"
+            }
+        ]
+    }
+    
+    try:
+        import httpx
+        url = "https://raw.githubusercontent.com/quentin2001/whisperMe/main/models_registry.json"
+        with httpx.Client(timeout=3.0, trust_env=False) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                if "asr" in data and "llm" in data:
+                    print("✅ [LOG] 成功同步最新云端模型注册表！")
+                    return data
+    except Exception as e:
+        print(f"⚠️ [LOG] 云端模型注册表同步跳过 (使用内置配置): {e}")
+        
+    return default_registry
+
+
 # --- 启动函数 ---
 def start_system_background_tasks():
     t = threading.Thread(target=background_perf_monitor, daemon=True)

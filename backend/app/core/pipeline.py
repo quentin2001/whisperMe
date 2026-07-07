@@ -115,6 +115,8 @@ def run_podcast_pipeline(task_id: str, url: str):
         # 双重检查
         check_cancelled(task_id)
             
+        metadata["enable_speaker_inference"] = config.get("enable_speaker_inference", True)
+        
         # 将解析到的播客元数据回写数据库
         db.update_task_field(
             task_id, 
@@ -160,6 +162,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         t_diarization_start = time.time()
         speaker_embeddings = {}
         if config.get("enable_speaker_inference", True):
+            db.update_task_field(task_id, status="diarizing", progress=45.0)
             diar_data, speaker_embeddings = transcriber.run_diarization_and_embedding(standardized_wav)
         else:
             diar_data = []
@@ -169,7 +172,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         if not diar_data and (not HF_TOKEN or len(HF_TOKEN) < 30) and config.get("enable_speaker_inference", True):
             db.update_task_field(task_id, hf_token_missing=True)
 
-        db.update_task_field(task_id, progress=60.0)
+        db.update_task_field(task_id, status="transcribing", progress=60.0)
 
         # Step 4: Whisper 语音识别与时间轴交叉合并
         check_cancelled(task_id)

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power, Activity, Sparkles } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power, Activity, Sparkles, Download, HardDrive } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -79,6 +79,7 @@ export default function SettingsView({
 
   const [testAsrResult, setTestAsrResult] = useState(null); // 'success' | 'error' | null
   const [testLlmResult, setTestLlmResult] = useState(null);
+  const [modelsRegistry, setModelsRegistry] = useState(null);
 
   const testConnection = async (type) => {
     const isAsr = type === "asr";
@@ -158,6 +159,13 @@ export default function SettingsView({
           setTemplates(list);
         }
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/models/registry`)
+      .then(r => r.json())
+      .then(d => setModelsRegistry(d))
       .catch(() => {});
   }, []);
 
@@ -330,6 +338,108 @@ export default function SettingsView({
                   </div>
 
                 </>
+              )}
+            </div>
+
+
+            {/* Card: Local Model Suggestions */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
+              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
+                <HardDrive size={18} className="text-[var(--accent-red)]" />
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("本地 AI 模型选用推荐", "Local AI Model Recommendations")}</h3>
+              </div>
+
+              {/* Hardware diagnostics summary */}
+              {dependencies?.gpu && (
+                <div className="p-3 bg-[var(--bg-secondary)]/50 rounded-lg border border-[var(--border-primary)]/20 text-xs font-semibold text-[var(--text-secondary)] flex flex-col gap-1.5 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-[var(--text-primary)] font-bold">{t("您的设备硬件诊断", "Your Hardware Diagnostics")}:</span>
+                  </div>
+                  <div>
+                    {t("显卡设备", "GPU")}: {dependencies.gpu.available ? `${dependencies.gpu.name} (${dependencies.gpu.vram_total} VRAM)` : t("未检测到 NVIDIA GPU (使用 CPU)", "NVIDIA GPU not detected (using CPU)")}
+                  </div>
+                  <div className="text-[var(--text-muted)] text-[10px] font-medium leading-normal">
+                    {dependencies.gpu.available 
+                      ? t("💡 显存检测已通过！您可以流畅运行本地大参数模型。", "💡 GPU detected! You can smoothly run local large-parameter models.")
+                      : t("💡 未检测到 NVIDIA GPU，运行本地模型可能会非常缓慢，建议选用轻量级 CPU 模型或使用在线 API。", "💡 GPU not detected. Running local models might be slow; CPU-friendly models or online APIs are recommended.")
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Model Registry List */}
+              {modelsRegistry ? (
+                <div className="flex flex-col gap-4 animate-fade-in">
+                  {/* ASR Models */}
+                  <div className="flex flex-col gap-2.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                      <span>🎧 {t("ASR 语音转录模型", "ASR Speech Models")}</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {modelsRegistry.asr?.map((model) => (
+                        <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
+                          <div>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
+                              <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
+                            <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
+                            {model.url && (
+                              <a href={model.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-red)] hover:underline flex items-center gap-1">
+                                <Download size={10} />
+                                <span>{t("下载", "Download")}</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* LLM Models */}
+                  <div className="flex flex-col gap-2.5 border-t border-[var(--border-primary)]/20 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                      <span>🤖 {t("Ollama 本地大语言模型", "Ollama LLM Models")}</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {modelsRegistry.llm?.map((model) => (
+                        <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
+                          <div>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
+                              <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
+                            <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
+                            {model.command && (
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(model.command);
+                                  alert(t("复制成功！请在您的 Terminal/PowerShell 中运行该命令安装 Ollama 模型。", "Copied! Please run this command in your Terminal/PowerShell to install the Ollama model."), { variant: "success" });
+                                }}
+                                className="text-[10px] font-bold text-[var(--accent-red)] bg-transparent border-0 outline-none hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check size={10} />
+                                <span>{t("复制命令", "Copy Command")}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-xs text-[var(--text-muted)] font-semibold flex items-center justify-center gap-2">
+                  <Loader2 className="animate-spin" size={14} />
+                  <span>{t("正在获取本地模型配置与云端推荐...", "Fetching local models configuration & cloud recommendations...")}</span>
+                </div>
               )}
             </div>
 

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from app.config import config
 
 class TaskRepository:
     def __init__(self, core):
@@ -134,7 +135,8 @@ class TaskRepository:
                 "comment_count": 0,
                 "comments": [],
                 "image_url": "",
-                "source": "unknown"
+                "source": "unknown",
+                "enable_speaker_inference": config.get("enable_speaker_inference", True)
             },
             "transcript": [],
             "summary": "",
