@@ -59,8 +59,14 @@ for tid in target_ids:
         except Exception:
             qa_history = []
 
-    # Sanitize audio URLs to use a public sample file for testing
-    audio_url = "https://www.w3schools.com/html/horse.mp3"
+    # Extract the original public CDN audio URL from metadata if available
+    audio_url = t.get("audio_url") or ""
+    if not (audio_url.startswith("http://") or audio_url.startswith("https://")):
+        audio_url = metadata.get("audio_url") or ""
+    
+    if not (audio_url.startswith("http://") or audio_url.startswith("https://")):
+        # Fallback to sample audio if no public CDN url was parsed
+        audio_url = "https://www.w3schools.com/html/horse.mp3"
 
     mock_task = {
         "id": t["id"],
