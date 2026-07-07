@@ -212,10 +212,8 @@ def get_task_details(task_id: str):
                     print(f"⚠️ [LOG ERROR] 段落重新生成失败: {regen_ex}")
 
             # 仅对已完成任务做 sedimented 检查
-            podcast_cards = db.get_cards_by_podcast(task_id)
-            sedimented_paragraph_ids = {c["paragraph_id"] for c in podcast_cards}
             for p in paragraphs:
-                p["sedimented"] = p["id"] in sedimented_paragraph_ids
+                p["sedimented"] = False
 
         task["paragraphs"] = paragraphs
     except Exception as e:
