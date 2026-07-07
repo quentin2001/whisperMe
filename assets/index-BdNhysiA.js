@@ -2,7 +2,7 @@ var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=
 - **报错详情**：\`LLM API error (code Unknown): [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1006)\`
 - **解决方案**：
   1. 请检查您的配置参数（API Key、Base URL、Model 等）是否正确。
-  2. 如果使用本地模型，请确认显卡的显存是否充足。`,audio_url:`https://www.w3schools.com/html/horse.mp3`,metadata:{title:`078-用脑卫生：如何挣脱越休息越疲惫的漩涡`,podcast_name:`大兔公园`,audio_url:`https://media.xyzcdn.net/624ee875d01d114df44b162a/lnzA9jjLPrJmyLftLC8Lqb7ZYgXy.m4a`,shownotes:`-本期摘要-
+  2. 如果使用本地模型，请确认显卡的显存是否充足。`,audio_url:`https://media.xyzcdn.net/624ee875d01d114df44b162a/lnzA9jjLPrJmyLftLC8Lqb7ZYgXy.m4a`,metadata:{title:`078-用脑卫生：如何挣脱越休息越疲惫的漩涡`,podcast_name:`大兔公园`,audio_url:`https://media.xyzcdn.net/624ee875d01d114df44b162a/lnzA9jjLPrJmyLftLC8Lqb7ZYgXy.m4a`,shownotes:`-本期摘要-
 
 忙碌是年末的底色，大家都在做工作和生活的最后冲刺，在快节奏的当代生活中，你是否常感觉决策做不完，信息吃不下，大脑不堪重负？本期我们带你深入剖析当代人的大脑 “过劳” 困境，并分享实用应对之策。
 
@@ -182,7 +182,7 @@ var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=
   - OpenDID，一个融合了PPT技能的Skill，在GitHub上已有 6 万 star。
   - Yoyo Agent 从一个目标起步，从 0 行代码进化到 10 万行代码。
   - Code Pilot 项目在 GitHub 上有 6000 星标。
-  - Token Grant 项目为每个入选者提供 5 万人民币的算力支持。`,audio_url:`https://www.w3schools.com/html/horse.mp3`,metadata:{title:`Agent 元年第 500 天：什么在消失，什么在诞生——为什么我们不该再投资 GUI 思维的软件？`,podcast_name:`十字路口Crossing`,audio_url:`https://media.xyzcdn.net/60502e253c92d4f62c2a9577/lhWDxFPKE3BMAmjK4E6KNk-5sN-b.m4a`,shownotes:`🚥 这是一期真格基金「此话当真」与「十字路口」的串台播客。
+  - Token Grant 项目为每个入选者提供 5 万人民币的算力支持。`,audio_url:`https://media.xyzcdn.net/60502e253c92d4f62c2a9577/lhWDxFPKE3BMAmjK4E6KNk-5sN-b.m4a`,metadata:{title:`Agent 元年第 500 天：什么在消失，什么在诞生——为什么我们不该再投资 GUI 思维的软件？`,podcast_name:`十字路口Crossing`,audio_url:`https://media.xyzcdn.net/60502e253c92d4f62c2a9577/lhWDxFPKE3BMAmjK4E6KNk-5sN-b.m4a`,shownotes:`🚥 这是一期真格基金「此话当真」与「十字路口」的串台播客。
 
 去年，十字路口的开年对谈播客提到 2025 年是 Agent 元年，现在距离那期播客过去了 500 天。差不多在第 100 天的时候 Manus 爆火，Claude 3.5 Sonnet 提供了 Agent 的基础；在第 300 天左右，Claude Code 刷屏。
 
