@@ -209,6 +209,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         try:
             print("⏳ [LOG] 正在运行最终语义分块聚合...")
             paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
+            db.delete_paragraphs_by_podcast(task_id)
             db.add_paragraphs(paragraphs)
             print(f"✅ [LOG] 成功为任务 {task_id} 聚合出 {len(paragraphs)} 个语义段落。")
         except Exception as chunk_ex:

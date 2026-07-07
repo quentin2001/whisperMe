@@ -165,6 +165,10 @@ class ModelCacheManager:
                 self.last_used_time = time.time()
                 return self.funasr_model
             
+            models_dir = os.path.join(PROJECT_DIR, "models", "funasr")
+            os.environ["MODELSCOPE_CACHE"] = models_dir
+            print(f"📡 [LOG] 设置 FunASR/ModelScope 缓存路径为: {models_dir}")
+
             from funasr import AutoModel
             model_path = "paraformer-zh"
             custom_path = config.get("local_whisper_model_path", "")

@@ -251,13 +251,21 @@ export default function App() {
 
   const handleCreateTask = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!newUrl.trim() || loading) return;
+    const trimmedUrl = newUrl.trim();
+    if (!trimmedUrl || loading) return;
+
+    const exists = tasks.some(t => t.url === trimmedUrl);
+    if (exists) {
+      const proceed = await confirm(t("该链接似乎已经存在于播客库中，是否继续添加？", "This link already exists in the library. Continue?"));
+      if (!proceed) return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: newUrl.trim(), asr_mode: configData.asr_mode || "online" })
+        body: JSON.stringify({ url: trimmedUrl, asr_mode: configData.asr_mode || "online" })
       });
       if (res.status === 200) {
         const result = await res.json();
@@ -583,10 +591,10 @@ export default function App() {
               <div className="flex gap-4 items-center">
                 <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{t("音频来源：", "AUDIO SOURCE:")}</span>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={audioSource === "link"} onChange={() => setAudioSource("link")} className="w-3.5 h-3.5 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("在线链接", "LINK")}
+                  <input type="radio" checked={audioSource === "link"} onChange={() => setAudioSource("link")} style={{ color: '#f62440', backgroundColor: audioSource === "link" ? '#f62440' : 'transparent' }} className="w-3.5 h-3.5 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("在线链接", "LINK")}
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
-                  <input type="radio" checked={audioSource === "file"} onChange={() => setAudioSource("file")} className="w-3.5 h-3.5 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("本地文件", "LOCAL FILE")}
+                  <input type="radio" checked={audioSource === "file"} onChange={() => setAudioSource("file")} style={{ color: '#f62440', backgroundColor: audioSource === "file" ? '#f62440' : 'transparent' }} className="w-3.5 h-3.5 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 cursor-pointer" /> {t("本地文件", "LOCAL FILE")}
                 </label>
               </div>
 

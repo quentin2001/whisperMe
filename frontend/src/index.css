@@ -358,3 +358,14 @@ input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:f
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* Override Tailwind Forms default blue color for checkboxes and radios */
+input[type="checkbox"]:checked, input[type="radio"]:checked {
+  background-color: var(--accent-red) !important;
+  border-color: var(--accent-red) !important;
+  color: var(--accent-red) !important;
+}
+
+input[type="checkbox"]:focus, input[type="radio"]:focus {
+  --tw-ring-color: var(--accent-red) !important;
+}

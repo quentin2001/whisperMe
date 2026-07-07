@@ -77,6 +77,9 @@ export default function SettingsView({
   const [testingAsr, setTestingAsr] = useState(false);
   const [testingLlm, setTestingLlm] = useState(false);
 
+  const [testAsrResult, setTestAsrResult] = useState(null); // 'success' | 'error' | null
+  const [testLlmResult, setTestLlmResult] = useState(null);
+
   const testConnection = async (type) => {
     const isAsr = type === "asr";
     const apiKey = isAsr ? configData.online_api_key : configData.online_summary_api_key;
@@ -84,12 +87,19 @@ export default function SettingsView({
     const model = isAsr ? configData.online_model : configData.online_summary_model;
 
     if (!baseUrl) {
-      alert("请输入 API Base URL");
+      if (isAsr) setTestAsrResult('error');
+      else setTestLlmResult('error');
+      setTimeout(() => isAsr ? setTestAsrResult(null) : setTestLlmResult(null), 3000);
       return;
     }
 
-    if (isAsr) setTestingAsr(true);
-    else setTestingLlm(true);
+    if (isAsr) {
+      setTestingAsr(true);
+      setTestAsrResult(null);
+    } else {
+      setTestingLlm(true);
+      setTestLlmResult(null);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/config/test/${type}`, {
@@ -99,15 +109,23 @@ export default function SettingsView({
       });
       const data = await res.json();
       if (data.success) {
-        await import("../components/Dialog.jsx").then(m => m.alert(`✅ 测试成功：${data.message}`, { variant: 'info' }));
+        if (isAsr) setTestAsrResult('success');
+        else setTestLlmResult('success');
       } else {
-        await import("../components/Dialog.jsx").then(m => m.alert(`❌ 测试失败：${data.message}`, { variant: 'danger' }));
+        if (isAsr) setTestAsrResult('error');
+        else setTestLlmResult('error');
       }
     } catch (e) {
-      await import("../components/Dialog.jsx").then(m => m.alert(`❌ 网络请求异常：${e.message}`, { variant: 'danger' }));
+      if (isAsr) setTestAsrResult('error');
+      else setTestLlmResult('error');
     } finally {
-      if (isAsr) setTestingAsr(false);
-      else setTestingLlm(false);
+      if (isAsr) {
+        setTestingAsr(false);
+        setTimeout(() => setTestAsrResult(null), 3000);
+      } else {
+        setTestingLlm(false);
+        setTimeout(() => setTestLlmResult(null), 3000);
+      }
     }
   };
 
@@ -240,9 +258,19 @@ export default function SettingsView({
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("ASR 引擎设置", "ASR Engine Settings")}</h3>
                 </div>
                 {configData.asr_mode === "online" && (
-                  <button onClick={() => testConnection("asr")} disabled={testingAsr} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-primary)]/40 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0">
-                    {testingAsr ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} className="text-[var(--accent-red)]" />}
-                    <span>{testingAsr ? t("测试中...", "Testing...") : t("连通性测试", "Test Connection")}</span>
+                  <button onClick={() => testConnection("asr")} disabled={testingAsr} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
+                    ${testAsrResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
+                    : testAsrResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
+                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
+                  `}>
+                    {testingAsr ? <Loader2 size={12} className="animate-spin" /> : 
+                     testAsrResult === 'success' ? <Check size={12} className="text-green-600" /> :
+                     testAsrResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
+                     <Activity size={12} className="text-[var(--accent-red)]" />}
+                    <span>{testingAsr ? t("测试中...", "Testing...") : 
+                           testAsrResult === 'success' ? t("测试成功", "Success") :
+                           testAsrResult === 'error' ? t("测试失败", "Failed") :
+                           t("连通性测试", "Test Connection")}</span>
                   </button>
                 )}
               </div>
@@ -314,9 +342,19 @@ export default function SettingsView({
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
                 </div>
                 {configData.summary_mode === "online" && (
-                  <button onClick={() => testConnection("llm")} disabled={testingLlm} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-primary)]/40 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0">
-                    {testingLlm ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} className="text-[var(--accent-red)]" />}
-                    <span>{testingLlm ? t("测试中...", "Testing...") : t("连通性测试", "Test Connection")}</span>
+                  <button onClick={() => testConnection("llm")} disabled={testingLlm} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
+                    ${testLlmResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
+                    : testLlmResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
+                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
+                  `}>
+                    {testingLlm ? <Loader2 size={12} className="animate-spin" /> : 
+                     testLlmResult === 'success' ? <Check size={12} className="text-green-600" /> :
+                     testLlmResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
+                     <Activity size={12} className="text-[var(--accent-red)]" />}
+                    <span>{testingLlm ? t("测试中...", "Testing...") : 
+                           testLlmResult === 'success' ? t("测试成功", "Success") :
+                           testLlmResult === 'error' ? t("测试失败", "Failed") :
+                           t("连通性测试", "Test Connection")}</span>
                   </button>
                 )}
               </div>
@@ -543,7 +581,7 @@ export default function SettingsView({
                     <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("智能声纹推理与说话人分离", "Speaker Diarization & Smart Inference")}</h4>
                     <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("关闭后转录速度极快，但无法区分不同说话人（适合单人播客）。", "Turn off for blazing fast transcription without speaker separation (ideal for solo podcasts).")}</p>
                   </div>
-                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} style={{ color: '#f62440', backgroundColor: configData.enable_speaker_inference !== false ? '#f62440' : 'transparent' }} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
                 </div>
                 {configData.enable_speaker_inference !== false && (
                   <div className="mt-4 pt-4 border-t border-[var(--border-primary)]/20 flex flex-col gap-3 animate-fade-in">
@@ -584,14 +622,14 @@ export default function SettingsView({
                   <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("桌面通知", "Desktop Notifications")}</h4>
                   <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("处理结束时在桌面推送通知提醒。", "Push notification on desktop when processing ends.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_win_notification !== false} onChange={(e) => handleConfigChange("enable_win_notification", e.target.checked)} style={{ color: '#f62440', backgroundColor: configData.enable_win_notification !== false ? '#f62440' : 'transparent' }} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               <div className="flex items-center justify-between p-4 bg-[var(--bg-secondary)]/30 rounded-lg border border-[var(--border-primary)]/30">
                 <div>
                   <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("邮件提醒", "Email Alerts")}</h4>
                   <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("任务结束时发送邮件通知（需要配置 SMTP）。", "Send mail alerts (SMTP) when task completes.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_email_notification === true} onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_email_notification === true} onChange={(e) => handleConfigChange("enable_email_notification", e.target.checked)} style={{ color: '#f62440', backgroundColor: configData.enable_email_notification === true ? '#f62440' : 'transparent' }} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               {configData.enable_email_notification === true && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[var(--border-primary)]/20 pt-4 animate-fade-in">
@@ -638,7 +676,7 @@ export default function SettingsView({
                   <h4 className="font-bold text-xs text-[var(--text-primary)]">{t("启用自动清理", "Enable Auto-Cleanup")}</h4>
                   <p className="text-[var(--text-muted)] text-[10px] mt-0.5">{t("开启后将定时清除过期音频。", "Regularly clean up expired audio files.")}</p>
                 </div>
-                <input type="checkbox" checked={configData.enable_auto_cleanup || false} onChange={(e) => handleConfigChange("enable_auto_cleanup", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-primary)]/60 accent-[var(--accent-red)] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
+                <input type="checkbox" checked={configData.enable_auto_cleanup || false} onChange={(e) => handleConfigChange("enable_auto_cleanup", e.target.checked)} style={{ color: '#f62440', backgroundColor: configData.enable_auto_cleanup ? '#f62440' : 'transparent' }} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
               </div>
               {configData.enable_auto_cleanup && (
                 <div className="flex flex-col gap-2 animate-fade-in">

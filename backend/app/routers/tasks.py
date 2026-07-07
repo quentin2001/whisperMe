@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File,
 from pydantic import BaseModel
 from app.config import (
     config,
+    load_config,
     SHORT_DOWNLOADS_DIR,
     PROJECT_DIR
 )
@@ -513,11 +514,16 @@ def retry_task(task_id: str):
     if status not in ("failed", "cancelled"):
         raise HTTPException(status_code=400, detail=f"当前任务状态为 {status}，仅支持重试失败或已取消的任务")
 
-    # 重置任务状态为 pending，清除错误信息和进度
-    db.update_task_field(task_id, status="pending", progress=0.0, error_message="")
+    # 获取最新全局配置
+    latest_config = load_config()
+    current_asr_mode = latest_config.get("asr_mode", "online")
+    current_summary_mode = latest_config.get("summary_mode", "online")
+
+    # 重置任务状态为 pending，清除错误信息和进度，并强制更新 asr_mode 和 summary_mode 为当前配置
+    db.update_task_field(task_id, status="pending", progress=0.0, error_message="", asr_mode=current_asr_mode, summary_mode=current_summary_mode)
     # 重新加入队列
     queue_manager.add_task(task_id, task.get("url", ""))
-    print(f"🔄 [LOG] 任务 {task_id} 已重新加入队列。")
+    print(f"🔄 [LOG] 任务 {task_id} 已重新加入队列 (asr_mode: {current_asr_mode}, summary_mode: {current_summary_mode})。")
     return {"success": True, "message": "任务已重新加入队列", "task_id": task_id}
 
 

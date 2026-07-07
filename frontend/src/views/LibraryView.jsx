@@ -814,6 +814,10 @@ export default function LibraryView({
                         <span className="bg-[var(--accent-gold)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider text-[10px]">
                           {t("已完成", "Completed")}
                         </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="flex items-center gap-4 mt-3 md:mt-0 self-end md:self-auto">
                   {session.status === 'IN_PROGRESS' ? (
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${session.rawTask.status === 'completed' ? 'bg-[var(--accent-red)] text-white' : 'bg-[var(--border-primary)]/30 text-[var(--text-muted)]'}`}>
