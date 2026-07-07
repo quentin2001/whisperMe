@@ -73,11 +73,23 @@ class PodcastSummarizer:
         # 6. 动态加载 Prompt，支持前端实时编辑
         prompt_dict = load_prompt()
         user_prompt = prompt_dict.get("prompt", "")
-        # 兼容旧格式：如果有 base_prompt + action_prompt，拼接使用
         if not user_prompt:
             base_prompt = prompt_dict.get("base_prompt", "")
             action_prompt = prompt_dict.get("action_prompt", "")
             user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
+
+        # 6.5. 如果未开启或未识别出多个发言人，动态注入 Prompt 刚性约束
+        unique_speakers = set(seg.get("speaker") for seg in transcript_segments if seg.get("speaker"))
+        if len(unique_speakers) <= 1:
+            guard_instruction = """
+[🚨 极重要防错声明]
+检测到本期播客的转录文本中没有区分发言人（所有发言标记均为相同角色或未知）。
+请务必遵守以下刚性约束：
+1. 严禁尝试在总结或分析中臆测、脑补出任何具体的发言人姓名、嘉宾画像或主持人角色（如 Host、Guest 名字）。
+2. 在原计划输出“## 3. 发言人画像与立场分析”章节时，请将其重命名为“## 3. 议题正反核心视点交锋与视角分析”。
+3. 纯粹从播客讨论的议题语义逻辑出发，提炼不同观点的正反论据、共识与分歧，以客观内容取代针对具体人名的画像分析。
+"""
+            user_prompt = guard_instruction + "\n" + user_prompt
 
         # 公共数据块（不含转录文本）
         meta_block = f"""
