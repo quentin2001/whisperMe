@@ -185,7 +185,7 @@ else:
 DOWNLOADS_DIR = storage_base / "downloads"
 TRANSCRIPTS_DIR = storage_base / "transcripts"
 TEMP_SANDBOX_DIR = storage_base / "temp_sandbox"
-HF_CACHE_DIR = storage_base / "hf_cache_models"
+HF_CACHE_DIR = storage_base / "models" / "huggingface"
 
 # 确保文件夹存在
 DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
