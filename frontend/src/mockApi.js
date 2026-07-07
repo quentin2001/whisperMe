@@ -25,7 +25,7 @@ if (isDemoMode) {
     online_summary_api_key: "mock_summary_key",
     online_summary_base_url: "",
     online_summary_model: "gpt-4o",
-    language: "zh",
+    language: "en",
     enable_auto_cleanup: false,
     max_concurrent_tasks: 2
   };

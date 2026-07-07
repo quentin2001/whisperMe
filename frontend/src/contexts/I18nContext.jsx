@@ -7,7 +7,12 @@ export const I18nProvider = ({ children }) => {
   const configData = useConfigStore(state => state.configData);
   const setConfigData = useConfigStore(state => state.setConfigData);
   
-  const lang = configData?.language || 'zh';
+  const isDemo =
+    window.location.hostname.endsWith(".github.io") ||
+    window.location.search.includes("demo=true") ||
+    import.meta.env.VITE_DEMO === "true";
+
+  const lang = configData?.language || (isDemo ? 'en' : 'zh');
 
   const setLang = (newLang) => {
     setConfigData(prev => ({ ...prev, language: newLang }));
