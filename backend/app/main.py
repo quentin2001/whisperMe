@@ -30,7 +30,6 @@ print = logger.info
 from app.routers.tasks import router as tasks_router, upload_router
 from app.routers.config import router as config_router
 from app.routers.system import router as system_router, start_system_background_tasks
-from app.routers.boards import router as boards_router
 
 app = FastAPI(
     title="whisperMe Local Podcast Processor",
@@ -56,7 +55,6 @@ app.include_router(tasks_router)
 app.include_router(upload_router)
 app.include_router(config_router)
 app.include_router(system_router)
-app.include_router(boards_router)
 
 # --- MCP Server 挂载 ---
 try:

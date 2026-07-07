@@ -43,66 +43,6 @@ def init_schema(core):
         )''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_paragraphs_podcast_id ON paragraphs(podcast_id)')
         
-        # insights table
-        c.execute('''CREATE TABLE IF NOT EXISTS insights (
-            id TEXT PRIMARY KEY,
-            podcast_id TEXT,
-            original_text TEXT,
-            refined_content TEXT NOT NULL,
-            review_count INTEGER DEFAULT 0,
-            next_review_date TEXT,
-            status TEXT DEFAULT 'ACTIVE',
-            created_at TEXT,
-            FOREIGN KEY(podcast_id) REFERENCES tasks(id) ON DELETE CASCADE
-        )''')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_insights_podcast_id ON insights(podcast_id)')
-        
-        # cards table
-        c.execute('''CREATE TABLE IF NOT EXISTS cards (
-            id TEXT PRIMARY KEY,
-            paragraph_id TEXT,
-            podcast_id TEXT,
-            spark_title TEXT,
-            why_it_matters TEXT,
-            created_at TEXT,
-            status TEXT,
-            efactor REAL,
-            interval INTEGER,
-            next_review_date TEXT,
-            quote TEXT,
-            pos_x REAL,
-            pos_y REAL
-        )''')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_cards_podcast_id ON cards(podcast_id)')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_cards_paragraph_id ON cards(paragraph_id)')
-        
-        # links table
-        c.execute('''CREATE TABLE IF NOT EXISTS links (
-            id TEXT PRIMARY KEY,
-            source_card_id TEXT,
-            target_card_id TEXT,
-            my_synthesis TEXT,
-            created_at TEXT
-        )''')
-        
-        # boards table
-        c.execute('''CREATE TABLE IF NOT EXISTS boards (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            created_at TEXT
-        )''')
-        
-        # board_cards table
-        c.execute('''CREATE TABLE IF NOT EXISTS board_cards (
-            board_id TEXT,
-            card_id TEXT,
-            pos_x REAL,
-            pos_y REAL,
-            PRIMARY KEY (board_id, card_id),
-            FOREIGN KEY(board_id) REFERENCES boards(id) ON DELETE CASCADE,
-            FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
-        )''')
-
         # speakers table
         c.execute('''CREATE TABLE IF NOT EXISTS speakers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,11 +73,6 @@ def run_migrations(core, facade):
                     facade.task_repo._insert_task_internal(c, t)
                 for p in data.get("paragraphs", []):
                     facade.paragraph_repo._insert_paragraph_internal(c, p)
-                for card in data.get("cards", []):
-                    facade.board_repo._insert_card_internal(c, card)
-                for link in data.get("links", []):
-                    facade.board_repo._insert_link_internal(c, link)
-                    
                 core.conn.commit()
                 print("✅ [MIGRATION] 迁移成功！重命名旧文件为 tasks_db.json.bak")
                 os.rename(OLD_JSON_FILE_PATH, OLD_JSON_FILE_PATH + ".bak")
@@ -159,28 +94,9 @@ def run_migrations(core, facade):
                     core.conn.rollback()
 
         add_column_if_missing("tasks", "audio_url", "TEXT")
-        add_column_if_missing("cards", "pos_x", "REAL")
-        add_column_if_missing("cards", "pos_y", "REAL")
         add_column_if_missing("tasks", "speaker_confidence", "TEXT")
         add_column_if_missing("tasks", "qa_history", "TEXT")
         add_column_if_missing("tasks", "hf_token_missing", "BOOLEAN")
-
-        # Board initialization
-        c.execute("SELECT COUNT(*) as count FROM boards")
-        if c.fetchone()["count"] == 0:
-            try:
-                default_board_id = "board_default"
-                c.execute("INSERT INTO boards (id, name, created_at) VALUES (?, ?, ?)", 
-                          (default_board_id, "全局总览 (All)", datetime.now().isoformat()))
-                c.execute("SELECT id, pos_x, pos_y FROM cards")
-                all_cards = c.fetchall()
-                for crd in all_cards:
-                    c.execute("INSERT OR IGNORE INTO board_cards (board_id, card_id, pos_x, pos_y) VALUES (?, ?, ?, ?)",
-                              (default_board_id, crd["id"], crd.get("pos_x") or 0.0, crd.get("pos_y") or 0.0))
-                core.conn.commit()
-            except Exception as e:
-                core.conn.rollback()
-        
         # Audio duration backfill
         try:
             c.execute("SELECT id, audio_url, metadata FROM tasks WHERE status='completed'")
