@@ -497,25 +497,47 @@ class PodcastTranscriber:
             import torch
             
             device_to_use = self.device
-            # 直接使用 FunASR 进行本地转写
-            model = model_cache_manager.get_funasr_model(device_to_use)
-            print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
-            try:
-                res = model.generate(input=short_wav_path, batch_size_s=300)
-                whisper_segments_raw = []
-                if res and len(res) > 0 and "sentence_info" in res[0]:
-                    for sentence in res[0]["sentence_info"]:
-                        # FunASR returns start/end in ms, convert to seconds
-                        whisper_segments_raw.append(WhisperSegmentDummy(
-                            start=sentence.get("start", 0) / 1000.0,
-                            end=sentence.get("end", 0) / 1000.0,
-                            text=sentence.get("text", "")
-                        ))
-                else:
-                    print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
-            except Exception as e:
-                print(f"❌ [LOG] FunASR 转写发生错误: {e}")
-                whisper_segments_raw = []
+            custom_path = config.get("local_whisper_model_path", "")
+            is_whisper = False
+            if custom_path and os.path.isdir(custom_path):
+                # Faster-Whisper models contain model.bin and config.json
+                if os.path.exists(os.path.join(custom_path, "model.bin")):
+                    is_whisper = True
+
+            if is_whisper:
+                print(f"🚀 [LOG] 检测到本地 CTranslate2 格式，正在加载 Faster-Whisper 模型: {custom_path}")
+                model = model_cache_manager.get_model(custom_path, device_to_use, self.compute_type)
+                print("✨ [LOG] Faster-Whisper 模型已成功载入显存！开始高效转文字...")
+                try:
+                    whisper_segments_raw, info = model.transcribe(
+                        short_wav_path, 
+                        beam_size=5, 
+                        language="zh"
+                    )
+                    whisper_segments_raw = list(whisper_segments_raw)
+                except Exception as e:
+                    print(f"❌ [LOG] Faster-Whisper 转写发生错误: {e}")
+                    whisper_segments_raw = []
+            else:
+                # 使用 FunASR 进行本地转写
+                model = model_cache_manager.get_funasr_model(device_to_use)
+                print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
+                try:
+                    res = model.generate(input=short_wav_path, batch_size_s=300)
+                    whisper_segments_raw = []
+                    if res and len(res) > 0 and "sentence_info" in res[0]:
+                        for sentence in res[0]["sentence_info"]:
+                            # FunASR returns start/end in ms, convert to seconds
+                            whisper_segments_raw.append(WhisperSegmentDummy(
+                                start=sentence.get("start", 0) / 1000.0,
+                                end=sentence.get("end", 0) / 1000.0,
+                                text=sentence.get("text", "")
+                            ))
+                    else:
+                        print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+                except Exception as e:
+                    print(f"❌ [LOG] FunASR 转写发生错误: {e}")
+                    whisper_segments_raw = []
 
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
             def clean_txt(text):
