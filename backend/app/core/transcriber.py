@@ -475,8 +475,9 @@ class PodcastTranscriber:
             if progress_callback:
                 try:
                     progress_callback(75.0)
-                except Exception:
-                    pass
+                except Exception as pe:
+                    if str(pe) == "TASK_CANCELLED":
+                        raise pe
 
             print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
             return merged_results
@@ -512,7 +513,10 @@ class PodcastTranscriber:
                 return re.sub(r'[^\w\s]', '', text).strip()
 
             dedup_prev_text = ""
-            duration = info.duration if info and info.duration else 1.0
+            if whisper_segments_raw:
+                duration = max(seg.end for seg in whisper_segments_raw)
+            else:
+                duration = 1.0
             batch_buffer = []
 
             for seg in whisper_segments_raw:
@@ -560,6 +564,8 @@ class PodcastTranscriber:
                         try:
                             progress_callback(float(current_progress_int))
                         except Exception as pe:
+                            if str(pe) == "TASK_CANCELLED":
+                                raise pe
                             print(f"⚠️ [LOG] 进度回调触发异常: {pe}")
 
             # Flush remaining segments

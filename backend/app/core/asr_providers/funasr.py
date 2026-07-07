@@ -176,8 +176,9 @@ class FunASRProvider(ASRProvider):
                     progress = min(progress, 75.0)
                     try:
                         progress_callback(progress)
-                    except Exception:
-                        pass
+                    except Exception as pe:
+                        if str(pe) == "TASK_CANCELLED":
+                            raise pe
 
             finally:
                 if chunk_path:

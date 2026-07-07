@@ -14,7 +14,7 @@ class ParagraphRepository:
 
     def get_paragraphs_by_podcast(self, podcast_id: str) -> list[dict]:
         c = self.core.conn.cursor()
-        c.execute("SELECT * FROM paragraphs WHERE podcast_id=?", (podcast_id,))
+        c.execute("SELECT * FROM paragraphs WHERE podcast_id=? ORDER BY start_time ASC", (podcast_id,))
         return c.fetchall()
 
     def delete_paragraphs_by_podcast(self, podcast_id: str):

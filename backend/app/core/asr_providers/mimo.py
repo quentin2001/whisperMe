@@ -134,8 +134,9 @@ class MiMoASRProvider(ASRProvider):
                         progress = min(progress, 75.0)
                         try:
                             progress_callback(int(progress))
-                        except Exception:
-                            pass
+                        except Exception as pe:
+                            if str(pe) == "TASK_CANCELLED":
+                                raise pe
 
             return (task["index"], mapped)
 
@@ -149,6 +150,8 @@ class MiMoASRProvider(ASRProvider):
                         with results_lock:
                             all_results.append(result)
                 except Exception as e:
+                    if str(e) == "TASK_CANCELLED":
+                        raise e
                     task = futures[future]
                     print(f"❌ [LOG] 分片 {task['index']+1} 最终失败: {e}")
 
