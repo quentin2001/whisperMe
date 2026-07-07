@@ -1,4 +1,5 @@
 import os
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 import sys
 import re
 import socket
@@ -183,10 +184,18 @@ class ModelCacheManager:
                 print("📡 [LOG] 正在加载 FunASR Paraformer 模型 (如本地无缓存则会自动下载)...")
 
             device_str = "cuda:0" if device == "cuda" else "cpu"
-            model = AutoModel(model=model_path, model_revision="v2.0.4",
-                              vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-                              punc_model="ct-punc", punc_model_revision="v2.0.4",
-                              device=device_str, disable_update=True)
+            try:
+                print("📡 [LOG] 尝试从 ModelScope 加载 FunASR 模型...")
+                model = AutoModel(model=model_path, model_revision="v2.0.4",
+                                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
+                                  punc_model="ct-punc", punc_model_revision="v2.0.4",
+                                  device=device_str, disable_update=True, hub="ms")
+            except Exception as ms_ex:
+                print(f"⚠️ [LOG] 从 ModelScope 加载失败 ({ms_ex})，尝试从 HuggingFace 镜像源加载...")
+                model = AutoModel(model=model_path, model_revision="v2.0.4",
+                                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
+                                  punc_model="ct-punc", punc_model_revision="v2.0.4",
+                                  device=device_str, disable_update=True, hub="hf")
             self.funasr_model = model
             self.last_used_time = time.time()
             return model

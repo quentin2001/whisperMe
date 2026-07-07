@@ -405,6 +405,11 @@ export default function SettingsView({
                     <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
                       <span>🤖 {t("Ollama 本地大语言模型", "Ollama LLM Models")}</span>
                     </h4>
+                    <div className="text-[11px] font-semibold text-[var(--text-muted)] leading-relaxed">
+                      💡 {t("使用本地 LLM 需要您的设备先下载并启动 Ollama。若尚未安装，请访问 ", "Using local LLM requires Ollama to be installed and running on your device. If not installed, please visit ")}
+                      <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-red)] hover:underline font-bold">ollama.com</a>
+                      {t(" 下载安装，并在本地终端运行以下拉取命令。", " to download and install, then run the pull command below in your local terminal.")}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {modelsRegistry.llm?.map((model) => (
                         <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
