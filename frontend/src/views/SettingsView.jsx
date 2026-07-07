@@ -297,14 +297,17 @@ export default function SettingsView({
 
               {configData.asr_mode === "local" && (
                 <div className="flex flex-col gap-2 animate-fade-in">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 Whisper 模型路径", "Local Model Path")}</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 ASR 模型文件夹路径", "Local ASR Model Folder Path")}</label>
                   <input
                     type="text"
                     value={configData.local_whisper_model_path || ""}
                     onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
                     className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
-                    placeholder="/path/to/whisper/models/large-v3.bin"
+                    placeholder="E:/Projects/whisperMe/models/funasr"
                   />
+                  <span className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
+                    {t("指定本地离线 ASR 模型（目前使用 FunASR Paraformer）的存放文件夹目录。若留空，系统将自动定位并使用项目根目录下的 models/funasr 目录。", "Specify the local folder path for the offline ASR model (currently FunASR Paraformer). If left blank, it defaults to the models/funasr directory under the project root.")}
+                  </span>
                 </div>
               )}
 
