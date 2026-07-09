@@ -395,19 +395,50 @@ def clear_qa_history(task_id: str):
 
 @router.post("")
 def create_task(req: CreateTaskRequest):
-    validate_url_safety(req.url)
+    raw_url = req.url.strip()
+    import re
+    # Split by spaces or commas to support multiple URLs pasted into the single URL box
+    urls = [u.strip() for u in re.split(r'[\s,]+', raw_url) if u.strip()]
+    urls = [u for u in urls if u.startswith("http")]
+    
+    if not urls:
+        raise HTTPException(status_code=400, detail="未检测到有效的 URL 链接")
+
+    if len(urls) > 1:
+        # Treat as batch creation
+        curr_summary_mode = config.get("summary_mode", "local")
+        created_tasks = []
+        for u in urls:
+            validate_url_safety(u)
+            existing_task = db.get_task_by_url(u)
+            if existing_task and existing_task["status"] in ["pending", "downloading", "transcribing", "summarizing", "completed", "transcribed"]:
+                created_tasks.append(existing_task["id"])
+                continue
+            task_id = str(uuid.uuid4())
+            db.add_task(task_id, u, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
+            queue_manager.add_task(task_id, u)
+            created_tasks.append(task_id)
+        
+        res = {"task_id": created_tasks[0], "status": "pending", "is_duplicate": False, "batch_count": len(created_tasks)}
+        warning = check_low_disk_space()
+        if warning:
+            res["warning"] = warning
+        return res
+
+    single_url = urls[0]
+    validate_url_safety(single_url)
     
     # Duplicate prevention
-    existing_task = db.get_task_by_url(req.url)
+    existing_task = db.get_task_by_url(single_url)
     if existing_task and existing_task["status"] in ["pending", "downloading", "transcribing", "summarizing", "completed", "transcribed"]:
         return {"task_id": existing_task["id"], "status": existing_task["status"], "is_duplicate": True}
 
     task_id = str(uuid.uuid4())
     curr_summary_mode = config.get("summary_mode", "local")
-    db.add_task(task_id, req.url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
+    db.add_task(task_id, single_url, asr_mode=req.asr_mode, summary_mode=curr_summary_mode)
     
-    # 放入全局单例队列管理器进行排队串行处理，不再直接塞给 background_tasks 并行跑
-    queue_manager.add_task(task_id, req.url)
+    # Put into global queue
+    queue_manager.add_task(task_id, single_url)
     
     res = {"task_id": task_id, "status": "pending", "is_duplicate": False}
     warning = check_low_disk_space()
