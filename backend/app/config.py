@@ -92,7 +92,7 @@ class AppConfigModel(BaseModel):
     enable_auto_cleanup: bool = False
     cleanup_threshold_days: int = 30
     max_concurrent_tasks: int = 4  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
-    enable_speaker_inference: bool = True
+    enable_speaker_inference: bool = False
     preload_models: bool = True
     use_mp3_chunks: bool = False
     use_hf_mirror: bool = True

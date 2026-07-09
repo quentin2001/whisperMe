@@ -51,7 +51,7 @@ class UpdateConfigRequest(BaseModel):
     custom_storage_dir: str = ""
     language: str = "en"
     enable_autostart_windows: bool = False
-    enable_speaker_inference: bool = True
+    enable_speaker_inference: bool = False
 
 class TestConfigRequest(BaseModel):
     api_key: str = ""
@@ -149,62 +149,29 @@ def update_global_config(req: UpdateConfigRequest):
         except Exception:
             pass
 
-    # 自动启动管理 (Windows / macOS)
+    # 清理可能存在的历史自启动配置 (Windows / macOS)
     import sys
     import app.config
-    root_dir = os.path.dirname(app.config.PROJECT_DIR)  # PROJECT_DIR is backend, parent is root
+    root_dir = os.path.dirname(app.config.PROJECT_DIR)
 
     if sys.platform == "win32":
         try:
             startup_dir = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
             bat_path = os.path.join(startup_dir, "whisperMe-autostart.bat")
-            if new_cfg.get("enable_autostart_windows"):
-                start_bat = os.path.join(root_dir, "start.bat")
-                if os.path.exists(start_bat):
-                    with open(bat_path, "w", encoding="utf-8") as f:
-                        f.write(f'@echo off\ncd /d "{root_dir}"\nstart "" /b cmd /c "start.bat"\n')
-            else:
-                if os.path.exists(bat_path):
-                    os.remove(bat_path)
-        except Exception as e:
-            print(f"❌ [STARTUP] Failed to configure Windows autostart: {e}")
+            if os.path.exists(bat_path):
+                os.remove(bat_path)
+        except Exception:
+            pass
             
     elif sys.platform == "darwin":
         try:
-            import platform
             plist_dir = os.path.expanduser("~/Library/LaunchAgents")
-            os.makedirs(plist_dir, exist_ok=True)
             plist_path = os.path.join(plist_dir, "com.whisperme.autostart.plist")
-            
-            if new_cfg.get("enable_autostart_windows"):
-                start_sh = os.path.join(root_dir, "start.sh")
-                if os.path.exists(start_sh):
-                    plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.whisperme.autostart</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>{start_sh}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>WorkingDirectory</key>
-    <string>{root_dir}</string>
-</dict>
-</plist>"""
-                    with open(plist_path, "w", encoding="utf-8") as f:
-                        f.write(plist_content)
-                    os.system(f"launchctl load -w {plist_path} >/dev/null 2>&1")
-            else:
-                if os.path.exists(plist_path):
-                    os.system(f"launchctl unload -w {plist_path} >/dev/null 2>&1")
-                    os.remove(plist_path)
-        except Exception as e:
-            print(f"❌ [STARTUP] Failed to configure macOS autostart: {e}")
+            if os.path.exists(plist_path):
+                os.system(f"launchctl unload -w {plist_path} >/dev/null 2>&1")
+                os.remove(plist_path)
+        except Exception:
+            pass
         
     # 重启更新 notifier SMTP 缓存
     import app.core.notifier

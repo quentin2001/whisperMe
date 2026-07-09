@@ -78,10 +78,6 @@ def run_podcast_pipeline(task_id: str, url: str):
             task_summary_mode = task.get("summary_mode", "local")
             t_summary_start = time.time()
             summary_report = summarizer.summarize(task_metadata, merged_transcript, summary_mode=task_summary_mode)
-            
-            total_time = time.time() - pipeline_start_time
-            time_report = f"\n\n---\n\n### ⏱️ 分析用时统计 (ASR 断点跳过)\n- **AI 总结**: {time.time() - t_summary_start:.1f} 秒\n- **总计耗时**: {total_time:.1f} 秒\n"
-            summary_report += time_report
             db.update_task_field(task_id, summary=summary_report, progress=95.0)
 
             check_cancelled(task_id)
@@ -151,7 +147,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         db.update_task_field(task_id, status="transcribing", progress=40.0)
         t_preprocess_start = time.time()
         if skip_wav:
-            print(f"⏩ [LOG] 检测到当前 ASR 支持原生时间戳且声纹已关闭，跳过 WAV 预处理")
+            pass
             standardized_wav = local_mp3
         else:
             standardized_wav = downloader.preprocess_audio(local_mp3)
@@ -194,7 +190,7 @@ def run_podcast_pipeline(task_id: str, url: str):
                 db.add_paragraphs(paragraphs)
                 paragraph_count[0] += len(paragraphs)
             except Exception as batch_ex:
-                print(f"⚠️ [LOG] 增量段落写入失败: {batch_ex}")
+                pass
 
         asr_mode = task.get("asr_mode", "local")
         t_transcribe_start = time.time()
@@ -214,9 +210,9 @@ def run_podcast_pipeline(task_id: str, url: str):
             paragraphs = transcriber.cluster_segments_to_paragraphs(task_id, merged_transcript)
             db.delete_paragraphs_by_podcast(task_id)
             db.add_paragraphs(paragraphs)
-            print(f"✅ [LOG] 成功为任务 {task_id} 聚合出 {len(paragraphs)} 个语义段落。")
+            pass
         except Exception as chunk_ex:
-            print(f"⚠️ [LOG 警告] 语义分块聚合失败: {chunk_ex}")
+            pass
 
         # Step 4.5 & 4.8: 发言人智能推断 (可选开关)
         check_cancelled(task_id)
@@ -243,7 +239,7 @@ def run_podcast_pipeline(task_id: str, url: str):
                                 break
                     
                     if reverse_map:
-                        print(f"🔄 [LOG] 正在同步聚类修正到转录文本: {reverse_map}")
+                        pass
                         for seg in merged_transcript:
                             if seg.get("speaker") in reverse_map:
                                 seg["speaker"] = reverse_map[seg["speaker"]]
@@ -260,25 +256,25 @@ def run_podcast_pipeline(task_id: str, url: str):
                                 if updated:
                                     db.delete_paragraphs_by_podcast(task_id)
                                     db.add_paragraphs(paragraphs)
-                                    print(f"✅ [LOG] 段落 speaker 标签已同步更新")
+                                    pass
                         except Exception as para_ex:
-                            print(f"⚠️ [LOG] 同步段落 speaker 标签失败: {para_ex}")
+                            pass
                 
                 auto_rename_speakers(task_id, metadata, merged_transcript, speaker_embeddings)
             except Exception as emb_ex:
                 timing_stats['发言人智能推断'] = time.time() - t_rename_start
                 if str(emb_ex) == "TASK_CANCELLED":
                     raise emb_ex
-                print(f"⚠️ [LOG 警告] 提取声纹特征或智能改名失败: {emb_ex}")
+                pass
 
             # Step 4.8: 对仅说语气词/短词的发言人自动打上“未识别语气词”标签
             check_cancelled(task_id)
             try:
                 apply_interjection_labels(task_id, merged_transcript)
             except Exception as label_ex:
-                print(f"⚠️ [LOG 警告] 自动标记语气词发言人失败: {label_ex}")
+                pass
         else:
-            print("⏭️ [LOG] 用户已关闭声纹推断，跳过特征提取与大模型人名推断。")
+            pass
 
         # Step 5: 转录完成，等待手动触发总结
         check_cancelled(task_id)
@@ -286,9 +282,9 @@ def run_podcast_pipeline(task_id: str, url: str):
         if standardized_wav and os.path.exists(standardized_wav):
             try:
                 os.remove(standardized_wav)
-                print(f"🗑️ [LOG] 已物理清理临时大音频: {standardized_wav}")
+                pass
             except Exception as fe:
-                print(f"⚠️ [LOG 警告] 无法物理清理临时 WAV 文件: {fe}")
+                pass
 
         # 标志任务已成功完成转录环节（等待手动总结）
         if not merged_transcript or len(merged_transcript) == 0:
@@ -347,7 +343,7 @@ def run_podcast_pipeline(task_id: str, url: str):
         if standardized_wav and os.path.exists(standardized_wav):
             try:
                 os.remove(standardized_wav)
-                print(f"🗑️ [CLEANUP] 已成功物理清理标准化 WAV: {standardized_wav}")
+                pass
             except Exception:
                 pass
         try:
@@ -358,6 +354,6 @@ def run_podcast_pipeline(task_id: str, url: str):
                 import torch
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                    print("🧹 [CLEANUP] 已成功释放 PyTorch CUDA 显存缓存")
+                    pass
         except Exception as ram_ex:
-            print(f"⚠️ [CLEANUP] 释放内存时出错: {ram_ex}")
+            pass

@@ -261,28 +261,74 @@ def check_dependencies(ffmpeg_path: str = None):
     gpu_info = {"available": False, "name": None, "vram_total": None, "vram_free": None}
     try:
         import subprocess as _sp
-        result = _sp.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
-            creationflags=_sp.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            parts = result.stdout.strip().split(",")
-            if len(parts) >= 3:
+        if sys.platform == "darwin":
+            # macOS GPU/MPS detection
+            try:
+                brand = _sp.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode("utf-8", errors="ignore").strip()
+            except Exception:
+                import os
+                # Fallback check
+                machine = "arm64"
+                try:
+                    machine = os.uname().machine
+                except Exception:
+                    pass
+                brand = "Apple Silicon" if machine == "arm64" else "Intel Mac"
+            
+            has_mps = False
+            try:
+                import torch
+                has_mps = torch.backends.mps.is_available()
+            except Exception:
+                has_mps = "Apple" in brand
+            
+            if has_mps:
                 gpu_info = {
                     "available": True,
-                    "name": parts[0].strip(),
-                    "vram_total": f"{parts[1].strip()} MB",
-                    "vram_free": f"{parts[2].strip()} MB"
+                    "name": brand,
+                    "vram_total": f"{system_ram} GB (Unified)",
+                    "vram_free": f"{round(system_ram * 0.7, 1)} GB (Est.)"
                 }
+        else:
+            # Windows/Linux CUDA detection
+            result = _sp.run(
+                ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=5,
+                creationflags=_sp.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                parts = result.stdout.strip().split(",")
+                if len(parts) >= 3:
+                    gpu_info = {
+                        "available": True,
+                        "name": parts[0].strip(),
+                        "vram_total": f"{parts[1].strip()} MB",
+                        "vram_free": f"{parts[2].strip()} MB"
+                    }
     except Exception:
         pass
+
+    # Get system RAM
+    system_ram = 8.0  # fallback
+    try:
+        import psutil
+        system_ram = round(psutil.virtual_memory().total / (1024 ** 3), 1)
+    except Exception:
+        try:
+            ram_out = subprocess.check_output("wmic OS get TotalVisibleMemorySize /Value", shell=True).decode("utf-8", errors="ignore")
+            for line in ram_out.splitlines():
+                if "TotalVisibleMemorySize=" in line:
+                    total_kb = float(line.split("=")[1].strip())
+                    system_ram = round(total_kb / (1024 * 1024), 1)
+        except Exception:
+            pass
 
     return {
         "ffmpeg": ffmpeg_info,
         "huggingface": {"token_valid": hf_valid},
         "ollama": {"available": ollama_ok, "url": _cfg.OLLAMA_URL, "model": _cfg.OLLAMA_MODEL, "version": ollama_version},
-        "gpu": gpu_info
+        "gpu": gpu_info,
+        "system_ram": system_ram
     }
 
 @router.get("/version/check")
@@ -371,7 +417,7 @@ def get_models_registry():
                 "type": "local",
                 "size": "120 MB",
                 "description": "Recommended for Chinese offline speech recognition. Runs extremely fast on CPU/GPU.",
-                "url": "https://modelscope.cn/api/v1/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+                "url": "https://modelscope.cn/models/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
                 "recommended_for": "Chinese / CPU & GPU"
             },
             {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Terminal, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Power, Activity, Sparkles, Download, HardDrive } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -80,6 +80,8 @@ export default function SettingsView({
   const [testAsrResult, setTestAsrResult] = useState(null); // 'success' | 'error' | null
   const [testLlmResult, setTestLlmResult] = useState(null);
   const [modelsRegistry, setModelsRegistry] = useState(null);
+  const [showAsrRecs, setShowAsrRecs] = useState(false);
+  const [showLlmRecs, setShowLlmRecs] = useState(false);
 
   const testConnection = async (type) => {
     const isAsr = type === "asr";
@@ -284,7 +286,7 @@ export default function SettingsView({
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("引擎工作模式", "Engine Mode")}</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("引擎工作模式", "ASR MODE")}</label>
                 <SettingsDropdown
                   value={configData.asr_mode || "online"}
                   onChange={(val) => handleConfigChange("asr_mode", val)}
@@ -296,26 +298,78 @@ export default function SettingsView({
               </div>
 
               {configData.asr_mode === "local" && (
-                <div className="flex flex-col gap-2 animate-fade-in">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 ASR 模型文件夹路径", "Local ASR Model Folder Path")}</label>
-                  <input
-                    type="text"
-                    value={configData.local_whisper_model_path || ""}
-                    onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
-                    className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
-                    placeholder="E:/Projects/whisperMe/models/funasr"
-                  />
-                  <span className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
-                    {t("指定本地离线 ASR 模型（目前使用 FunASR Paraformer）的存放文件夹目录。若留空，系统将自动定位并使用项目根目录下的 models/funasr 目录。", "Specify the local folder path for the offline ASR model (currently FunASR Paraformer). If left blank, it defaults to the models/funasr directory under the project root.")}
-                  </span>
-                </div>
-              )}
-
-
-              {configData.asr_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "API Base URL")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {t("本地 ASR 模型文件夹路径", "Local ASR Model Path")}
+                    </label>
+                    <input
+                      type="text"
+                      value={configData.local_whisper_model_path || ""}
+                      onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
+                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
+                      placeholder="models/funasr"
+                    />
+                    <span className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
+                      {t("指定本地ASR模型目录例如：E:/whisperMe/models/funasr", "Specify the local ASR model directory, e.g., E:/whisperMe/models/funasr")}
+                    </span>
+                  </div>
+
+                  {/* Toggle button for ASR Recommendations */}
+                  <div className="border-t border-[var(--border-primary)]/10 pt-3 mt-1 flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAsrRecs(!showAsrRecs)}
+                      className="w-full py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 rounded-lg text-xs font-bold text-[var(--text-secondary)] flex items-center justify-center gap-2 transition-all cursor-pointer outline-none select-none"
+                    >
+                      <span>{showAsrRecs ? t("收起 ASR 语音模型推荐", "Hide Recommended ASR Models") : t("查看推荐本地 ASR 语音模型", "View Recommended Local ASR Models")}</span>
+                      <span className={`transform transition-transform duration-200 ${showAsrRecs ? "rotate-180" : ""}`}>▼</span>
+                    </button>
+
+                    {showAsrRecs && (
+                      <div className="flex flex-col gap-2.5 animate-fade-in mt-1 select-text border-t border-[var(--border-primary)]/10 pt-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
+                          <span>{t("推荐本地 ASR 语音模型", "Recommended Local ASR Models")}</span>
+                        </h4>
+                        {modelsRegistry ? (
+                          <div className="flex flex-col gap-2">
+                            {modelsRegistry.asr?.map((model) => (
+                              <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
+                                <div>
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
+                                    <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
+                                  </div>
+                                  <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium leading-relaxed">{model.description}</p>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
+                                  <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
+                                  {model.url && (
+                                    <a href={model.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-red)] hover:underline flex items-center gap-1">
+                                      <Download size={10} />
+                                      <span>{t("下载", "Download")}</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-[var(--text-muted)] font-semibold flex items-center gap-2 py-1 justify-center">
+                            <Loader2 className="animate-spin" size={12} />
+                            <span>{t("正在获取本地 ASR 模型推荐...", "Fetching ASR recommendations...")}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+                            {configData.asr_mode === "online" && (
+                <>
+                  <div className="flex flex-col gap-2 animate-fade-in">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("API Base URL", "ASR Base URL")}</label>
                     <input type="text" value={configData.online_base_url || ""} onChange={(e) => handleConfigChange("online_base_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_base_url)}`}
                       placeholder="https://api.openai.com/v1" />
@@ -345,114 +399,7 @@ export default function SettingsView({
             </div>
 
 
-            {/* Card: Local Model Suggestions */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <HardDrive size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("本地 AI 模型选用推荐", "Local AI Model Recommendations")}</h3>
-              </div>
-
-              {/* Hardware diagnostics summary */}
-              {dependencies?.gpu && (
-                <div className="p-3 bg-[var(--bg-secondary)]/50 rounded-lg border border-[var(--border-primary)]/20 text-xs font-semibold text-[var(--text-secondary)] flex flex-col gap-1.5 animate-fade-in">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    <span className="text-[var(--text-primary)] font-bold">{t("您的设备硬件诊断", "Your Hardware Diagnostics")}:</span>
-                  </div>
-                  <div>
-                    {t("显卡设备", "GPU")}: {dependencies.gpu.available ? `${dependencies.gpu.name} (${dependencies.gpu.vram_total} VRAM)` : t("未检测到 NVIDIA GPU (使用 CPU)", "NVIDIA GPU not detected (using CPU)")}
-                  </div>
-                  <div className="text-[var(--text-muted)] text-[10px] font-medium leading-normal">
-                    {dependencies.gpu.available 
-                      ? t("💡 显存检测已通过！您可以流畅运行本地大参数模型。", "💡 GPU detected! You can smoothly run local large-parameter models.")
-                      : t("💡 未检测到 NVIDIA GPU，运行本地模型可能会非常缓慢，建议选用轻量级 CPU 模型或使用在线 API。", "💡 GPU not detected. Running local models might be slow; CPU-friendly models or online APIs are recommended.")
-                    }
-                  </div>
-                </div>
-              )}
-
-              {/* Model Registry List */}
-              {modelsRegistry ? (
-                <div className="flex flex-col gap-4 animate-fade-in">
-                  {/* ASR Models */}
-                  <div className="flex flex-col gap-2.5">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-                      <span>🎧 {t("ASR 语音转录模型", "ASR Speech Models")}</span>
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {modelsRegistry.asr?.map((model) => (
-                        <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
-                          <div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
-                              <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
-                            </div>
-                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
-                          </div>
-                          <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
-                            <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
-                            {model.url && (
-                              <a href={model.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-red)] hover:underline flex items-center gap-1">
-                                <Download size={10} />
-                                <span>{t("下载", "Download")}</span>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* LLM Models */}
-                  <div className="flex flex-col gap-2.5 border-t border-[var(--border-primary)]/20 pt-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-                      <span>🤖 {t("Ollama 本地大语言模型", "Ollama LLM Models")}</span>
-                    </h4>
-                    <div className="text-[11px] font-semibold text-[var(--text-muted)] leading-relaxed">
-                      💡 {t("使用本地 LLM 需要您的设备先下载并启动 Ollama。若尚未安装，请访问 ", "Using local LLM requires Ollama to be installed and running on your device. If not installed, please visit ")}
-                      <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-red)] hover:underline font-bold">ollama.com</a>
-                      {t(" 下载安装，并在本地终端运行以下拉取命令。", " to download and install, then run the pull command below in your local terminal.")}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {modelsRegistry.llm?.map((model) => (
-                        <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
-                          <div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
-                              <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
-                            </div>
-                            <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
-                          </div>
-                          <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
-                            <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
-                            {model.command && (
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(model.command);
-                                  alert(t("复制成功！请在您的 Terminal/PowerShell 中运行该命令安装 Ollama 模型。", "Copied! Please run this command in your Terminal/PowerShell to install the Ollama model."), { variant: "success" });
-                                }}
-                                className="text-[10px] font-bold text-[var(--accent-red)] bg-transparent border-0 outline-none hover:underline flex items-center gap-1 cursor-pointer"
-                              >
-                                <Check size={10} />
-                                <span>{t("复制命令", "Copy Command")}</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-4 text-xs text-[var(--text-muted)] font-semibold flex items-center justify-center gap-2">
-                  <Loader2 className="animate-spin" size={14} />
-                  <span>{t("正在获取本地模型配置与云端推荐...", "Fetching local models configuration & cloud recommendations...")}</span>
-                </div>
-              )}
-            </div>
-
-
-            {/* Card 2: LLM Summary Settings */}
+                        {/* Card 2: LLM Summary Settings */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
               <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/20">
                 <div className="flex items-center gap-2">
@@ -491,32 +438,93 @@ export default function SettingsView({
 
               {configData.summary_mode === "local" && (
                 <>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 API 接口地址", "Local API URL")}</label>
-                    <input type="text" value={configData.ollama_url || ""} onChange={(e) => handleConfigChange("ollama_url", e.target.value)}
-                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_url)}`}
-                      placeholder="http://localhost:11434" />
-                  </div>
-                  <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
-                    <input type="text" value={configData.ollama_model || ""} onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
-                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_model)}`}
-                      placeholder="qwen2.5:7b-instruct" />
+                  <div className="flex flex-col gap-4 animate-fade-in border-t border-[var(--border-primary)]/10 pt-4 mt-2">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 LLM 接口地址", "Local LLM Model Path")}</label>
+                      <input type="text" value={configData.ollama_url || ""} onChange={(e) => handleConfigChange("ollama_url", e.target.value)}
+                        className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_url)}`}
+                        placeholder="http://localhost:11434" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
+                      <input type="text" value={configData.ollama_model || ""} onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
+                        className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_model)}`}
+                        placeholder="qwen2.5:7b-instruct" />
+                    </div>
+
+                    {/* Toggle button for LLM Recommendations */}
+                    <div className="border-t border-[var(--border-primary)]/10 pt-3 mt-1 flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowLlmRecs(!showLlmRecs)}
+                        className="w-full py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 rounded-lg text-xs font-bold text-[var(--text-secondary)] flex items-center justify-center gap-2 transition-all cursor-pointer outline-none select-none"
+                      >
+                        <span>{showLlmRecs ? t("收起 Ollama 模型推荐", "Hide Ollama Recommendations") : t("查看推荐本地 Ollama 模型", "View Recommended Ollama Models")}</span>
+                        <span className={`transform transition-transform duration-200 ${showLlmRecs ? "rotate-180" : ""}`}>▼</span>
+                      </button>
+
+                      {showLlmRecs && (
+                        <div className="flex flex-col gap-2.5 animate-fade-in mt-1 select-text border-t border-[var(--border-primary)]/10 pt-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
+                            <span>{t("推荐本地 Ollama 模型", "Recommended Local Ollama Models")}</span>
+                          </h4>
+                          <div className="text-[10px] font-semibold text-[var(--text-muted)] leading-relaxed mb-1">
+                            💡 {t("需要在本地运行以下拉取命令：", "Please run the pull command below in your local terminal:")}
+                          </div>
+                          {modelsRegistry ? (
+                            <div className="flex flex-col gap-2">
+                              {modelsRegistry.llm?.map((model) => (
+                                <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2 hover:border-[var(--accent-red)]/35 transition-colors">
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
+                                      <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
+                                    </div>
+                                    <p className="text-[10px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
+                                  </div>
+                                  <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
+                                    <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
+                                    {model.command && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(model.command);
+                                          alert(t("复制成功！请在您的 Terminal/PowerShell 中运行该命令安装 Ollama 模型。", "Copied! Please run this command in your Terminal/PowerShell to install the Ollama model."), { variant: "success" });
+                                        }}
+                                        className="text-[10px] font-bold text-[var(--accent-red)] bg-transparent border-0 outline-none hover:underline flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Check size={10} />
+                                        <span>{t("复制命令", "Copy Command")}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-[var(--text-muted)] font-semibold flex items-center gap-2 py-1 justify-center">
+                              <Loader2 className="animate-spin" size={12} />
+                              <span>{t("正在获取本地 LLM 模型推荐...", "Fetching LLM recommendations...")}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
 
-              {configData.summary_mode === "online" && (
+                            {configData.summary_mode === "online" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线 API 基础地址", "Online API Base URL")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线 API 基础地址", "LLM Base URL")}</label>
                     <input type="text" value={configData.online_summary_base_url || ""} onChange={(e) => handleConfigChange("online_summary_base_url", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_base_url)}`}
                       placeholder="https://api.openai.com/v1" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("样例：https://api.openai.com/v1 或第三方中转 API 地址", "Example: https://api.openai.com/v1 or a third-party OpenAI-compatible API base URL")}</span>
                   </div>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线大模型 ID", "Online Model ID")}</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("在线大模型 ID", "Model ID")}</label>
                     <input type="text" value={configData.online_summary_model || ""} onChange={(e) => handleConfigChange("online_summary_model", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_model)}`}
                       placeholder="gpt-4o-mini" />
@@ -534,95 +542,7 @@ export default function SettingsView({
               )}
             </div>
 
-            {/* Card: LLM Prompt Template Settings */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/20">
-                <div className="flex items-center gap-2">
-                  <Terminal size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("总结 Prompt 模板配置", "Summary Prompt Template")}</h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={handleResetPrompt}
-                    className="px-3 py-1.5 bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-primary)]/30 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none flex items-center gap-1.5">
-                    <RotateCcw size={13} />
-                    <span>{t("恢复默认", "Reset to Default")}</span>
-                  </button>
-                  <button type="button" onClick={handleSavePrompt} disabled={promptSaveStatus === "saving"}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border-0 outline-none flex items-center gap-1.5 ${
-                      promptSaveStatus === "saved" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      : promptSaveStatus === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                      : "bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white"
-                    }`}>
-                    {promptSaveStatus === "saving" && <Loader2 size={13} className="animate-spin" />}
-                    {promptSaveStatus === "saved" && <Check size={13} />}
-                    {promptSaveStatus === "error" && <AlertCircle size={13} />}
-                    {promptSaveStatus !== "saving" && promptSaveStatus !== "saved" && promptSaveStatus !== "error" && <Save size={13} />}
-                    <span>
-                      {promptSaveStatus === "saving" ? t("保存中...", "Saving...")
-                        : promptSaveStatus === "saved" ? t("已保存", "Saved")
-                        : promptSaveStatus === "error" ? t("保存失败", "Failed")
-                        : t("保存 Prompt", "Save Prompt")}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Template Preset Selector */}
-              {templates.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    <FileText size={13} className="inline mr-1 -mt-0.5" />
-                    {t("快速选用预设模板", "Quick Preset Templates")}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {templates.map((tpl) => (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        onClick={() => handleTemplateSelect(tpl.id)}
-                        disabled={loadingTemplate}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all border outline-none flex items-center gap-1.5 ${
-                          selectedTemplate === tpl.id
-                            ? "bg-[var(--accent-red)] text-white border-[var(--accent-red)]"
-                            : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40 hover:border-[var(--accent-red)]/50 hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        {loadingTemplate && selectedTemplate === tpl.id && <Loader2 size={12} className="animate-spin" />}
-                        <span>{configData.language === "en" ? (tpl.name_en || tpl.name) : tpl.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {selectedTemplate && templates.find(t => t.id === selectedTemplate)?.description && (
-                    <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
-                      {configData.language === "en"
-                        ? (templates.find(t => t.id === selectedTemplate).description_en || templates.find(t => t.id === selectedTemplate).description)
-                        : templates.find(t => t.id === selectedTemplate).description}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Single Prompt Editor */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {t("📝 总结 Prompt（完整指令）", "📝 Summary Prompt (Full Instructions)")}
-                </label>
-                <textarea
-                  value={promptData?.prompt || ""}
-                  onChange={(e) => setPromptData(prev => ({ ...prev, prompt: e.target.value }))}
-                  rows={18}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-sm font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-y min-h-[360px]"
-                  placeholder={t(
-                    "输入完整的总结 Prompt... 使用 {{PODCAST_DATA}} 标记数据注入位置。",
-                    "Enter full summary prompt... Use {{PODCAST_DATA}} to mark data injection point."
-                  )}
-                />
-              </div>
-
-            </div>
-
-            <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-3 mt-2">
               <button onClick={handleSaveConfig}
                 className="flex-1 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs border-0 outline-none cursor-pointer">
                 <Save size={16} />
@@ -659,73 +579,6 @@ export default function SettingsView({
                     { value: "en", label: t("ENGLISH (EN-US)", "ENGLISH (EN-US)") }
                   ]}
                 />
-              </div>
-            </div>
-
-            {/* Windows Autostart Card */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-4 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/10 text-[var(--accent-red)]">
-                <Power size={16} />
-                <h3 className="font-bold text-sm text-[var(--text-primary)]">{t("开机自启动", "Auto Start on Boot")}</h3>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={configData.enable_autostart_windows || false}
-                      onChange={(e) => handleConfigChange("enable_autostart_windows", e.target.checked)}
-                    />
-                    <div className={`block w-10 h-6 rounded-full transition-colors ${configData.enable_autostart_windows ? 'bg-[var(--accent-red)]' : 'bg-[var(--border-primary)]'}`}></div>
-                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configData.enable_autostart_windows ? 'transform translate-x-4' : ''}`}></div>
-                  </div>
-                  <span className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-red)] transition-colors">
-                    {t("随系统开机自动后台运行", "Start automatically in background on system boot")}
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* AI Lab Beta Features Card */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <Sparkles size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("实验室选项 (Beta)", "Lab Options (Beta)")}</h3>
-              </div>
-              <div className="flex flex-col p-4 bg-[var(--bg-secondary)]/30 rounded-lg border border-[var(--border-primary)]/30 transition-all duration-300">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-sm text-[var(--text-primary)]">{t("智能声纹推理与说话人分离", "Speaker Diarization & Smart Inference")}</h4>
-                    <p className="text-[var(--text-muted)] text-xs mt-0.5">{t("关闭后转录速度极快，但无法区分不同说话人（适合单人播客）。", "Turn off for blazing fast transcription without speaker separation (ideal for solo podcasts).")}</p>
-                  </div>
-                  <input type="checkbox" checked={configData.enable_speaker_inference !== false} onChange={(e) => handleConfigChange("enable_speaker_inference", e.target.checked)} style={{ color: '#f62440', backgroundColor: configData.enable_speaker_inference !== false ? '#f62440' : 'transparent' }} className="w-4 h-4 rounded border-[var(--border-primary)]/60 text-[#f62440] focus:ring-[var(--accent-red)] focus:ring-offset-0 transition-colors cursor-pointer" />
-                </div>
-                {configData.enable_speaker_inference !== false && (
-                  <div className="mt-4 pt-4 border-t border-[var(--border-primary)]/20 flex flex-col gap-3 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 flex-1">
-                        <ShieldAlert size={14} className="text-[var(--accent-red)] shrink-0" />
-                        {t("Hugging Face Token", "Hugging Face Token")}
-                        <span className="text-[var(--accent-red)]">*</span>
-                      </label>
-                      <button type="button" onClick={handleVerifyHF} disabled={hfChecking} className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] text-[11px] font-bold rounded-md transition-all disabled:opacity-50 cursor-pointer border border-[var(--border-primary)]/40 outline-none whitespace-nowrap shrink-0">
-                        {hfChecking ? <Loader2 size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
-                        <span>{t("验证 Token", "Verify Token")}</span>
-                      </button>
-                    </div>
-                    <input type="password" value={configData.hf_token || ""} onChange={(e) => handleConfigChange("hf_token", e.target.value)} className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.hf_token)}`} placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                    <div className="flex items-center gap-2">
-                      {hfTokenStatus && (
-                        hfTokenStatus.status === "valid" ? (
-                          <span className="text-[var(--success-color,green)] text-xs font-bold flex items-center gap-1.5"><Check size={14} /> {t("Token 验证通过", "Token is valid")}</span>
-                        ) : (
-                          <span className="text-[var(--accent-red)] text-xs font-bold flex items-center gap-1.5"><AlertCircle size={14} /> {hfTokenStatus.message}</span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -809,26 +662,6 @@ export default function SettingsView({
                   />
                 </div>
               )}
-            </div>
-
-            {/* Core Dependencies */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
-              <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/20">
-                <Terminal size={18} className="text-[var(--accent-red)]" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">Core Dependencies</h3>
-              </div>
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border-primary)]/30 bg-[var(--bg-secondary)]/20">
-                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${ffmpegStatus?.available ? "bg-green-500" : ffmpegStatus === null ? "bg-yellow-400 animate-pulse" : "bg-red-500"}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-[var(--text-primary)]">
-                    {ffmpegStatus === null ? "Detecting FFmpeg..." : ffmpegStatus?.available ? `FFmpeg ${ffmpegStatus.version || ""}` : "FFmpeg not found"}
-                  </div>
-                  {ffmpegStatus?.available && ffmpegStatus?.path && <div className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">{ffmpegStatus.path.split(/[\\/]/).slice(-2).join("/")}</div>}
-                  {!ffmpegStatus?.available && ffmpegStatus !== null && <div className="text-xs text-[var(--accent-red)] mt-1">Install: winget install Gyan.FFmpeg</div>}
-                </div>
-                <button onClick={() => handleVerifyFfmpeg(configData.ffmpeg_path)} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors font-semibold cursor-pointer bg-transparent">Re-check</button>
-              </div>
-              {/* FFmpeg 路径已内置，无需手动配置 */}
             </div>
 
             {/* GitHub Repo & Version Info */}

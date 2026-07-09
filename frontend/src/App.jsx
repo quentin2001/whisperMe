@@ -331,6 +331,10 @@ export default function App() {
 
   const handleSaveConfig = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (configData.asr_mode === "local" && (!configData.local_whisper_model_path || configData.local_whisper_model_path.trim() === "")) {
+      await alert(t("本地 ASR 模型文件夹路径不能为空！", "Local ASR model folder path cannot be empty!"));
+      return;
+    }
     try {
       const res = await fetch(`${BACKEND_URL}/api/config`, {
         method: "POST",

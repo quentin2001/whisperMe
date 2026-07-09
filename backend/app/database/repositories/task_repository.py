@@ -180,10 +180,13 @@ class TaskRepository:
             c.execute("DELETE FROM tasks WHERE id=?", (task_id,))
             if c.rowcount > 0:
                 c.execute("DELETE FROM paragraphs WHERE podcast_id=?", (task_id,))
-                c.execute("DELETE FROM cards WHERE podcast_id=?", (task_id,))
-                c.execute('''DELETE FROM links 
-                             WHERE source_card_id NOT IN (SELECT id FROM cards) 
-                             OR target_card_id NOT IN (SELECT id FROM cards)''')
+                try:
+                    c.execute("DELETE FROM cards WHERE podcast_id=?", (task_id,))
+                    c.execute('''DELETE FROM links 
+                                 WHERE source_card_id NOT IN (SELECT id FROM cards) 
+                                 OR target_card_id NOT IN (SELECT id FROM cards)''')
+                except Exception:
+                    pass
                 self.core.conn.commit()
                 return True
             return False

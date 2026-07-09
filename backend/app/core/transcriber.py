@@ -44,7 +44,7 @@ class ModelCacheManager:
             self.running = True
             self._watcher_thread = threading.Thread(target=self._watch_idle, daemon=True)
             self._watcher_thread.start()
-            print("⚙️ [LOG] WhisperModel VRAM/内存闲置回收监控线程已启动。")
+            pass
 
     def _watch_idle(self):
         while self.running:
@@ -53,7 +53,7 @@ class ModelCacheManager:
                 if self.cached_model is not None:
                     timeout = int(config.get("local_model_idle_timeout", 300))
                     if time.time() - self.last_used_time > timeout:
-                        print(f"🧹 [LOG] WhisperModel 闲置超时 ({timeout}s)，自动释放显存/内存...")
+                        pass
                         self.cached_model = None
                         self.model_path = None
                         self.device = None
@@ -70,28 +70,29 @@ class ModelCacheManager:
                             import torch
                             if torch.cuda.is_available():
                                 torch.cuda.empty_cache()
-                                print("🧹 [LOG] 已清空 PyTorch CUDA 显存缓存")
+                                pass
 
     def get_model(self, model_path_or_size: str, device: str, compute_type: str):
+        actual_device = "cpu" if device == "mps" else device
         self.start_watcher()
         with self.lock:
             if (self.cached_model is not None and 
                 self.model_path == model_path_or_size and 
-                self.device == device and 
+                self.device == actual_device and 
                 self.compute_type == compute_type):
-                print("🎯 [LOG] 命中 WhisperModel 内存常驻缓存，复用已有实例！")
+                pass
                 self.last_used_time = time.time()
                 return self.cached_model
 
-            print(f"🚀 [LOG] 正在加载 Whisper 模型: {model_path_or_size} (设备: {device.upper()} | 精度: {compute_type})")
+            print("⏩ 正在加载 Whisper 模型进行语音转录...")
             from faster_whisper import WhisperModel
 
             # CPU 模式下优化 CTranslate2 线程参数
             model_kwargs = dict(
-                device=device,
+                device=actual_device,
                 compute_type=compute_type,
             )
-            if device == "cpu":
+            if actual_device == "cpu":
                 model_kwargs["cpu_threads"] = 6  # R5 5600 物理核心数，通用甜点值
                 model_kwargs["num_workers"] = 1
 
@@ -113,7 +114,7 @@ class ModelCacheManager:
 
             self.cached_model = model
             self.model_path = model_path_or_size
-            self.device = device
+            self.device = actual_device
             self.compute_type = compute_type
             self.last_used_time = time.time()
             return model
@@ -122,13 +123,13 @@ class ModelCacheManager:
         self.start_watcher()
         with self.lock:
             if self.pyannote_diarization is not None:
-                print("🎯 [LOG] 命中 PyAnnote Diarization 内存缓存！")
+                pass
                 self.last_used_time = time.time()
                 import torch
                 self.pyannote_diarization.to(torch.device(device))
                 return self.pyannote_diarization
             
-            print("📡 [LOG] 正在加载 PyAnnote 3.1 声纹模型管道...")
+            pass
             import torch
             from pyannote.audio import Pipeline
             pipeline = Pipeline.from_pretrained(
@@ -144,14 +145,14 @@ class ModelCacheManager:
         self.start_watcher()
         with self.lock:
             if self.pyannote_embedding is not None:
-                print("🎯 [LOG] 命中 PyAnnote Embedding 内存缓存！")
+                pass
                 self.last_used_time = time.time()
                 import torch
                 # Embedding model's Inference object wraps the Model, we recreate Inference later
                 # We just cache the Model
                 return self.pyannote_embedding
                 
-            print("📡 [LOG] 正在加载 PyAnnote 声纹特征提取模型...")
+            pass
             from pyannote.audio import Model
             model = Model.from_pretrained("pyannote/embedding", use_auth_token=HF_TOKEN)
             self.pyannote_embedding = model
@@ -162,37 +163,82 @@ class ModelCacheManager:
         self.start_watcher()
         with self.lock:
             if self.funasr_model is not None:
-                print("🎯 [LOG] 命中 FunASR (Paraformer) 内存缓存！")
+                pass
                 self.last_used_time = time.time()
                 return self.funasr_model
             
             models_dir = os.path.join(PROJECT_DIR, "models", "funasr")
             os.environ["MODELSCOPE_CACHE"] = models_dir
-            print(f"📡 [LOG] 设置 FunASR/ModelScope 缓存路径为: {models_dir}")
+            pass
 
             from funasr import AutoModel
-            model_path = "paraformer-zh"
             custom_path = config.get("local_whisper_model_path", "")
-            if custom_path and os.path.isdir(custom_path) and (
-                os.path.exists(os.path.join(custom_path, "configuration.json")) or 
-                os.path.exists(os.path.join(custom_path, "model.onnx")) or 
-                "funasr" in custom_path.lower() or "paraformer" in custom_path.lower()
-            ):
-                model_path = custom_path
-                print(f"📂 [LOG] 检测到本地自定义路径，将从该路径加载 FunASR 模型: {custom_path}")
+            
+            # Default model IDs for ModelScope and HuggingFace
+            ms_model = "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+            hf_model = "funasr/paraformer-zh"  # Fallback for HF
+            
+            # Determine default local paths to enable 100% offline loading without any network queries
+            local_ms_model_dir = os.path.join(models_dir, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+            local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+            local_punc_dir = os.path.join(models_dir, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
+            
+            vad_param = "fsmn-vad"
+            punc_param = "ct-punc"
+            
+            # Resolve custom path
+            if custom_path:
+                # If custom_path is relative, make it absolute relative to project root
+                if not os.path.isabs(custom_path):
+                    custom_path = os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                
+                if os.path.isdir(custom_path):
+                    # Check if the folder directly contains the model configurations
+                    if os.path.exists(os.path.join(custom_path, "configuration.json")) or os.path.exists(os.path.join(custom_path, "model.onnx")):
+                        ms_model = custom_path
+                        hf_model = custom_path
+                    else:
+                        # Check if it is the parent models/funasr folder containing the iic subfolder
+                        potential_ms = os.path.join(custom_path, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+                        if os.path.exists(potential_ms) and os.path.isdir(potential_ms):
+                            ms_model = potential_ms
+                            
+                            potential_vad = os.path.join(custom_path, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+                            if os.path.exists(potential_vad) and os.path.isdir(potential_vad):
+                                vad_param = potential_vad
+                                
+                            potential_punc = os.path.join(custom_path, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
+                            if os.path.exists(potential_punc) and os.path.isdir(potential_punc):
+                                punc_param = potential_punc
+                        else:
+                            ms_model = custom_path
+                            hf_model = custom_path
             else:
-                print("📡 [LOG] 正在加载 FunASR Paraformer 模型 (如本地无缓存则会自动下载)...")
+                # Default empty path logic: check if the default project folder has the ModelScope model
+                if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
+                    ms_model = local_ms_model_dir
+                
+                if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
+                    vad_param = local_vad_dir
+                    
+                if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
+                    punc_param = local_punc_dir
 
-            device_str = "cuda:0" if device == "cuda" else "cpu"
+            if device == "cuda":
+                device_str = "cuda:0"
+            elif device == "mps":
+                device_str = "mps"
+            else:
+                device_str = "cpu"
             try:
-                print("📡 [LOG] 尝试从 ModelScope 加载 FunASR 模型...")
-                model = AutoModel(model=model_path, model_revision="v2.0.4",
-                                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-                                  punc_model="ct-punc", punc_model_revision="v2.0.4",
+                pass
+                model = AutoModel(model=ms_model, model_revision="v2.0.4",
+                                  vad_model=vad_param, vad_model_revision="v2.0.4",
+                                  punc_model=punc_param, punc_model_revision="v2.0.4",
                                   device=device_str, disable_update=True, hub="ms")
             except Exception as ms_ex:
-                print(f"⚠️ [LOG] 从 ModelScope 加载失败 ({ms_ex})，尝试从 HuggingFace 镜像源加载...")
-                model = AutoModel(model=model_path, model_revision="v2.0.4",
+                pass
+                model = AutoModel(model=hf_model, model_revision="v2.0.4",
                                   vad_model="fsmn-vad", vad_model_revision="v2.0.4",
                                   punc_model="ct-punc", punc_model_revision="v2.0.4",
                                   device=device_str, disable_update=True, hub="hf")
@@ -203,13 +249,13 @@ class ModelCacheManager:
     def preload_models(self):
         if config.get("preload_models", True):
             if HF_TOKEN and len(HF_TOKEN) >= 30:
-                print("⏳ [LOG] 预加载 PyAnnote 模型...")
+                pass
                 try:
                     self.get_pyannote_diarization("cpu")
                     self.get_pyannote_embedding("cpu")
-                    print("✅ [LOG] PyAnnote 模型预加载成功！")
+                    pass
                 except Exception as e:
-                    print(f"⚠️ [LOG] 预加载失败: {e}")
+                    pass
 
 model_cache_manager = ModelCacheManager()
 
@@ -225,12 +271,20 @@ class PodcastTranscriber:
     def __init__(self):
         # 懒加载设备检测，彻底脱离对 torch 的全局依赖
         self.device = "cpu"
-        try:
-            # 使用原生的命令行探测是否有 NVIDIA 显卡
-            subprocess.check_output("nvidia-smi", shell=True, stderr=subprocess.STDOUT)
-            self.device = "cuda"
-        except Exception:
-            pass
+        if sys.platform == "darwin":
+            try:
+                import torch
+                if torch.backends.mps.is_available():
+                    self.device = "mps"
+            except Exception:
+                pass
+        else:
+            try:
+                # 使用原生的命令行探测是否有 NVIDIA 显卡
+                subprocess.check_output("nvidia-smi", shell=True, stderr=subprocess.STDOUT)
+                self.device = "cuda"
+            except Exception:
+                pass
         # 自适应精度策略：基于 GPU 总显存（不是 free）智能选择 compute_type
         if self.device == "cuda":
             try:
@@ -243,12 +297,12 @@ class PodcastTranscriber:
                     self.compute_type = "int8_float16"  # RTX 3070 8GB 甜点值
                 else:
                     self.compute_type = "int8"
-                print(f"🖥️ [LOG] GPU 总显存: {total_gb:.1f}GB → compute_type={self.compute_type}")
+                pass
             except Exception:
                 self.compute_type = "float16"  # 无法检测时保守选择
         else:
             self.compute_type = "int8"  # CPU 上用 INT8 加速
-        print(f"🖥️ [LOG] 初始化转录引擎 - 默认运行设备: {self.device.upper()} | 运算精度: {self.compute_type}")
+        pass
 
     def run_diarization_and_embedding(self, wav_path: str) -> tuple[list[dict], dict[str, list[float]]]:
         """
@@ -259,7 +313,7 @@ class PodcastTranscriber:
         
         # 验证 Hugging Face Token 长度是否合理
         if not HF_TOKEN or len(HF_TOKEN) < 30:
-            print("⚠️ [LOG 严重警告] 检测到未配置或无效的 Hugging Face Token。自动触发熔断降级：跳过声纹角色切分，直接进入语音文本识别！")
+            pass
             return [], {}
 
         try:
@@ -280,16 +334,16 @@ class PodcastTranscriber:
                     free_mem, total_mem = torch.cuda.mem_get_info()
                     free_gb = free_mem / (1024 ** 3)
                     total_gb = total_mem / (1024 ** 3)
-                    print(f"ℹ️ [LOG] GPU 显存监控 - 当前可用: {free_gb:.2f} GB / 总计: {total_gb:.2f} GB")
+                    pass
                     if free_gb < 1.5:
-                        print(f"⚠️ [LOG] 检测到 GPU 剩余可用显存 ({free_gb:.2f} GB) 小于安全阈值 1.5 GB。为了防止系统卡死及 WDDM 内存交换，声纹分割降级至 CPU 运行。")
+                        pass
                         device_to_use = "cpu"
                 except Exception as mem_ex:
-                    print(f"⚠️ [LOG] 获取 GPU 显存失败: {mem_ex}")
+                    pass
 
             pipeline = model_cache_manager.get_pyannote_diarization(device_to_use)
             
-            print(f"⏳ [LOG] 声纹网络分析中... 运行设备: {device_to_use.upper()} | 音频已加载至内存")
+            pass
             diarization = pipeline(audio_in_memory)
             
             diarization_list = []
@@ -301,12 +355,12 @@ class PodcastTranscriber:
                 })
                 
             unique_speakers = set([d["speaker"] for d in diarization_list])
-            print(f"🟢 [LOG] 声纹角色分割顺利完成！检测到 {len(unique_speakers)} 位发言人: {list(unique_speakers)}")
+            pass
             
             # 立即在内存中进行特征提取
             speaker_embeddings = {}
             if unique_speakers:
-                print("📡 [LOG] 正在从内存中直接提取特征向量...")
+                pass
                 emb_model = model_cache_manager.get_pyannote_embedding(device_to_use)
                 inference = Inference(emb_model, window="whole", device=torch.device(device_to_use))
                 
@@ -332,7 +386,7 @@ class PodcastTranscriber:
                                 if norm > 0:
                                     embeddings_list.append(emb / norm)
                         except Exception as seg_ex:
-                            print(f"⚠️ [LOG] 提取 {speaker} 片段声纹失败: {seg_ex}")
+                            pass
                             continue
                             
                     if embeddings_list:
@@ -342,7 +396,7 @@ class PodcastTranscriber:
                             avg_emb = avg_emb / norm
                         speaker_embeddings[speaker] = avg_emb.tolist()
                         
-                print(f"🟢 [LOG] 成功完成 {len(speaker_embeddings)} 个发言人的特征提取！")
+                pass
                 
                 # ====== 单集内声纹聚类修正 ======
                 if len(speaker_embeddings) >= 2:
@@ -360,7 +414,7 @@ class PodcastTranscriber:
                                 sim = np.dot(emb_i, emb_j) / (norm_i * norm_j)
                                 if sim >= 0.92:
                                     merge_map[sp_ids[j]] = sp_ids[i]
-                                    print(f"🔗 [LOG] 声纹聚类修正: {sp_ids[j]} 与 {sp_ids[i]} 高度相似 (cos={sim:.4f})，合并为 {sp_ids[i]}")
+                                    pass
                                     
                     if merge_map:
                         for seg in diarization_list:
@@ -369,7 +423,7 @@ class PodcastTranscriber:
                         for merged_sp in merge_map:
                             if merged_sp in speaker_embeddings:
                                 del speaker_embeddings[merged_sp]
-                        print(f"🎯 [LOG] 聚类修正完成，当前剩余 {len(speaker_embeddings)} 个独立发言人")
+                        pass
 
             # 清理内存中的音频
             del audio_in_memory
@@ -382,7 +436,7 @@ class PodcastTranscriber:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"❌ [🚨 熔断拦截] 声纹分割过程中报错: {e}。系统已自动降级为纯语音转文字，不包含说话人姓名区分。")
+            pass
             return []
 
     def _find_speaker(self, seg, diarization_segments: list[dict]) -> str:
@@ -424,7 +478,7 @@ class PodcastTranscriber:
             provider_name = _online_config.get("online_asr_provider", "mimo")
             provider = get_provider(provider_name)
 
-            print(f"[LOG] Using online ASR provider: {provider.get_display_name()} ({provider_name})")
+            pass
 
             # Provider handles chunking, API calls, and response parsing
             # Returns standardized format: [{"start": float, "end": float, "text": str}]
@@ -446,7 +500,7 @@ class PodcastTranscriber:
                 except Exception:
                     duration = 1.0
 
-            print(f"[LOG] Online ASR completed: {len(whisper_segments)} segments.")
+            pass
 
             # Online ASR: merge with diarization and batch callback
             batch_buffer = []
@@ -471,14 +525,14 @@ class PodcastTranscriber:
                     try:
                         on_segment_batch(list(batch_buffer))
                     except Exception as batch_ex:
-                        print(f"⚠️ [LOG] Incremental paragraph batch failed: {batch_ex}")
+                        pass
                     batch_buffer = []
 
             if on_segment_batch and batch_buffer:
                 try:
                     on_segment_batch(list(batch_buffer))
                 except Exception as batch_ex:
-                    print(f"⚠️ [LOG] Final paragraph batch failed: {batch_ex}")
+                    pass
 
             # Progress callback for online mode
             if progress_callback:
@@ -488,7 +542,7 @@ class PodcastTranscriber:
                     if str(pe) == "TASK_CANCELLED":
                         raise pe
 
-            print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
+            print("✅ 语音识别转录成功完成！")
             return merged_results
 
         else:
@@ -504,10 +558,11 @@ class PodcastTranscriber:
                 if os.path.exists(os.path.join(custom_path, "model.bin")):
                     is_whisper = True
 
+            asr_start_time = time.time()
             if is_whisper:
-                print(f"🚀 [LOG] 检测到本地 CTranslate2 格式，正在加载 Faster-Whisper 模型: {custom_path}")
+                print("⏩ 正在加载本地 Faster-Whisper 模型进行语音转录...")
                 model = model_cache_manager.get_model(custom_path, device_to_use, self.compute_type)
-                print("✨ [LOG] Faster-Whisper 模型已成功载入显存！开始高效转文字...")
+                pass
                 try:
                     whisper_segments_raw, info = model.transcribe(
                         short_wav_path, 
@@ -521,20 +576,53 @@ class PodcastTranscriber:
             else:
                 # 使用 FunASR 进行本地转写
                 model = model_cache_manager.get_funasr_model(device_to_use)
-                print("✨ [LOG] FunASR (Paraformer) 模型已就绪！开始极速转写...")
+                pass
                 try:
                     res = model.generate(input=short_wav_path, batch_size_s=300)
                     whisper_segments_raw = []
-                    if res and len(res) > 0 and "sentence_info" in res[0]:
-                        for sentence in res[0]["sentence_info"]:
-                            # FunASR returns start/end in ms, convert to seconds
-                            whisper_segments_raw.append(WhisperSegmentDummy(
-                                start=sentence.get("start", 0) / 1000.0,
-                                end=sentence.get("end", 0) / 1000.0,
-                                text=sentence.get("text", "")
-                            ))
+                    if res and len(res) > 0:
+                        if "sentence_info" in res[0] and res[0]["sentence_info"]:
+                            for sentence in res[0]["sentence_info"]:
+                                # FunASR returns start/end in ms, convert to seconds
+                                whisper_segments_raw.append(WhisperSegmentDummy(
+                                    start=sentence.get("start", 0) / 1000.0,
+                                    end=sentence.get("end", 0) / 1000.0,
+                                    text=sentence.get("text", "")
+                                ))
+                        elif "text" in res[0] and res[0]["text"]:
+                            # Fallback: model generated full text but without segment timestamps (e.g. HuggingFace version)
+                            full_text = res[0]["text"]
+                            print(f"⚠️ [LOG] FunASR 返回结果缺少 sentence_info。已采用全文断句估计模式 (字数: {len(full_text)})")
+                            
+                            # Estimate and split sentences by Chinese punctuation
+                            import re
+                            sentences = re.split(r'([。！？；…?])', full_text)
+                            sentence_list = []
+                            current_sentence = ""
+                            for part in sentences:
+                                if not part:
+                                    continue
+                                current_sentence += part
+                                if part in "。！？；…?":
+                                    sentence_list.append(current_sentence.strip())
+                                    current_sentence = ""
+                            if current_sentence.strip():
+                                sentence_list.append(current_sentence.strip())
+                                
+                            current_time = 0.0
+                            for sentence in sentence_list:
+                                N = len(sentence)
+                                duration_est = max(N / 3.5, 1.5) # Estimate 3.5 Chinese characters per second, min 1.5s
+                                whisper_segments_raw.append(WhisperSegmentDummy(
+                                    start=current_time,
+                                    end=current_time + duration_est,
+                                    text=sentence
+                                ))
+                                current_time += duration_est
+                        else:
+                            print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
                     else:
-                        print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+                        print("⚠️ [LOG] FunASR 返回结果为空")
                 except Exception as e:
                     print(f"❌ [LOG] FunASR 转写发生错误: {e}")
                     whisper_segments_raw = []
@@ -548,6 +636,16 @@ class PodcastTranscriber:
                 duration = max(seg.end for seg in whisper_segments_raw)
             else:
                 duration = 1.0
+
+            # Calculate and print ASR performance metrics
+            asr_end_time = time.time()
+            asr_duration = asr_end_time - asr_start_time
+            rtf = asr_duration / max(duration, 1.0)
+            speed_ratio = max(duration, 1.0) / max(asr_duration, 0.001)
+            
+            engine_name = 'Faster-Whisper' if is_whisper else 'FunASR Paraformer'
+            print(f"📊 [ASR REPORT] Engine: {engine_name} | Audio: {duration/60.0:.1f}m | Time: {asr_duration:.1f}s | Speed: {speed_ratio:.1f}x (RTF: {rtf:.3f})")
+
             batch_buffer = []
 
             for seg in whisper_segments_raw:
@@ -582,7 +680,7 @@ class PodcastTranscriber:
                     try:
                         on_segment_batch(list(batch_buffer))
                     except Exception as batch_ex:
-                        print(f"⚠️ [LOG] Incremental paragraph batch failed: {batch_ex}")
+                        pass
                     batch_buffer = []
 
                 # Progress update
@@ -604,9 +702,9 @@ class PodcastTranscriber:
                 try:
                     on_segment_batch(list(batch_buffer))
                 except Exception as batch_ex:
-                    print(f"⚠️ [LOG] Final paragraph batch failed: {batch_ex}")
+                    pass
 
-            print("="*50 + f"\n🎉 [LOG] 转录与声纹角色合并工作顺利完成！共识别出 {len(merged_results)} 段对话。")
+            print("✅ 语音识别转录成功完成！")
             return merged_results
 
     def extract_speaker_embeddings(self, wav_path: str, diarization_segments: list[dict]) -> dict[str, list[float]]:
@@ -719,7 +817,7 @@ class PodcastTranscriber:
                             sim = np.dot(emb_i, emb_j) / (norm_i * norm_j)
                             if sim >= 0.92:
                                 merge_map[sp_ids[j]] = sp_ids[i]
-                                print(f"🔗 [LOG] 声纹聚类修正: {sp_ids[j]} 与 {sp_ids[i]} 高度相似 (cos={sim:.4f})，合并为 {sp_ids[i]}")
+                                pass
                 
                 if merge_map:
                     # 更新 diarization_segments 中的 speaker 标签（原地修改）
@@ -733,7 +831,7 @@ class PodcastTranscriber:
                         if merged_sp in speaker_embeddings:
                             del speaker_embeddings[merged_sp]
                     
-                    print(f"🎯 [LOG] 聚类修正完成，合并了 {len(merge_map)} 个重复发言人，当前剩余 {len(speaker_embeddings)} 个独立发言人")
+                    pass
             
             return speaker_embeddings
 

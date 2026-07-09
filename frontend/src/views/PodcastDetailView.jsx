@@ -3,7 +3,7 @@ import {
   Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
   MessageSquare, History, Calendar, FileText, Users, Compass, Download,
-  GitMerge, Trash2, AlertCircle
+  GitMerge, Trash2, AlertCircle, Save, Loader2
 } from "lucide-react";
 import { API_BASE, proxyImage } from "../constants.js";
 import { alert, confirm } from "../components/Dialog.jsx";
@@ -477,6 +477,98 @@ export default function PodcastDetailView({
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
+  // Prompt Selector Modal States
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [promptTemplates, setPromptTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [savingDefaultPrompt, setSavingDefaultPrompt] = useState(false);
+
+  useEffect(() => {
+    if (showPromptModal) {
+      // 1. Fetch templates
+      fetch(`${API_BASE}/api/prompt/templates`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && typeof data === "object") {
+            const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
+            setPromptTemplates(list);
+          }
+        })
+        .catch(() => {});
+
+      // 2. Fetch current active prompt
+      fetch(`${API_BASE}/api/prompt`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.prompt) {
+            setCustomPrompt(data.prompt);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [showPromptModal]);
+
+  const handleTemplateSelect = (templateId) => {
+    if (!templateId) return;
+    setSelectedTemplate(templateId);
+    setLoadingTemplate(true);
+    fetch(`${API_BASE}/api/prompt/template/${templateId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.prompt) {
+          setCustomPrompt(data.prompt);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTemplate(false));
+  };
+
+  const handleSaveAsDefaultPrompt = async () => {
+    setSavingDefaultPrompt(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: customPrompt })
+      });
+      if (res.ok) {
+        await alert(t("当前 Prompt 已成功保存为系统默认模板！", "Current prompt saved as default!"), { variant: 'success' });
+      } else {
+        await alert(t("保存默认 Prompt 失败。", "Failed to save default prompt."));
+      }
+    } catch (e) {
+      console.error(e);
+      await alert(t("保存出错：", "Save error: ") + e.message);
+    } finally {
+      setSavingDefaultPrompt(false);
+    }
+  };
+
+  const handleConfirmSummary = async () => {
+    setShowPromptModal(false);
+    setAnalyzing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/summary/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt_text: customPrompt })
+      });
+      if (res.ok) {
+        await alert(t("AI总结与深度分析已排队生成，请稍候！", "AI summary and deep analysis have been queued for generation, please wait!"), { variant: 'info', confirmText: t('好的', 'OK') });
+        if (onRefreshTask) onRefreshTask();
+      } else {
+        await alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
+      }
+    } catch (err) {
+      console.error(err);
+      await alert(t("通信出错：", "Communication error: ") + err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   // Scroll debounce state
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef(null);
@@ -710,25 +802,9 @@ export default function PodcastDetailView({
   };
 
   // Trigger manual AI summary analysis regeneration
-  const triggerAIAnalysis = async () => {
+  const triggerAIAnalysis = () => {
     if (!activeTask) return;
-    setAnalyzing(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/summary/start`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        await alert(t("AI总结与深度分析已排队生成，请稍候！", "AI summary and deep analysis have been queued for generation, please wait!"), { variant: 'info', confirmText: t('好的', 'OK') });
-        if (onRefreshTask) onRefreshTask();
-      } else {
-        await alert(t("无法联系服务器发起AI总结。", "Could not connect to server to initiate AI summary."));
-      }
-    } catch (err) {
-      console.error(err);
-      await alert(t("通信出错：", "Communication error: ") + err.message);
-    } finally {
-      setAnalyzing(false);
-    }
+    setShowPromptModal(true);
   };
 
   // Handle Resizable Split Screen dragging
@@ -888,13 +964,7 @@ export default function PodcastDetailView({
             </button>
           )}
 
-          <button
-            onClick={() => setShowSpeakerModal(true)}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none animate-fade-in"
-          >
-            <Users size={13} className="text-[var(--accent-red)]" />
-            <span>{t("发言人管理", "Speaker Management")}</span>
-          </button>
+          {/* Speaker Management hidden as requested */}
         </div>
       </header>
 
@@ -1056,8 +1126,17 @@ export default function PodcastDetailView({
                 ) : activeTask.summary ? (
                   <MarkdownRenderer text={activeTask.summary} />
                 ) : (
-                  <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none">
+                  <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none flex flex-col items-center gap-4">
                     <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无总结内容", "No summary available")}</span>
+                    {(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") && (
+                      <button
+                        onClick={triggerAIAnalysis}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
+                      >
+                        <Sparkles size={13} fill="white" />
+                        <span>{t("✨ 运行 AI 深度总结", "Run AI Summary")}</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1105,6 +1184,93 @@ export default function PodcastDetailView({
         onRefreshTask={onRefreshTask}
         
       />
+
+      {/* Prompt Selector Modal */}
+      {showPromptModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-fade-in select-none">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)]/40 rounded-2xl w-full max-w-[640px] shadow-2xl flex flex-col overflow-hidden max-h-[85vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-[var(--border-primary)]/20">
+              <div className="flex items-center gap-2 text-[var(--accent-red)]">
+                <Sparkles size={18} fill="currentColor" />
+                <h3 className="text-base font-bold text-[var(--text-primary)]">{t("选用并定制 AI 总结 Prompt", "Select & Customize AI Prompt")}</h3>
+              </div>
+              <button
+                onClick={() => setShowPromptModal(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-transparent border-0 outline-none cursor-pointer text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("选择总结模板", "Select Summary Template")}</label>
+                <div className="relative">
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => handleTemplateSelect(e.target.value)}
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-red)] appearance-none cursor-pointer"
+                  >
+                    <option value="">{t("-- 使用当前配置的 Prompt --", "-- Use Current Prompt --")}</option>
+                    {promptTemplates.map(tpl => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.emoji || "📝"} {tpl.name}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)] text-xs">▼</div>
+                </div>
+                {loadingTemplate && <div className="text-[10px] text-[var(--text-muted)] animate-pulse mt-0.5">{t("正在载入模版...", "Loading template...")}</div>}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("当前 Prompt 文本 (可现场微调编辑)", "Current Prompt (Editable On the Spot)")}</label>
+                <textarea
+                  value={customPrompt || ""}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  rows={12}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-y min-h-[220px] select-text"
+                  placeholder={t(
+                    "输入总结 Prompt... 使用 {{PODCAST_DATA}} 标记数据注入位置。",
+                    "Enter summary prompt... Use {{PODCAST_DATA}} to mark data injection point."
+                  )}
+                />
+                <span className="text-[10px] text-[var(--text-muted)] leading-relaxed font-semibold">
+                  {t("提示：现场对 Prompt 的任意修改仅会作用于本次生成的播客总结，不会覆盖系统默认模板。", "Note: Any temporary edits to this prompt will only apply to this run, without altering system defaults.")}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[var(--border-primary)]/20 flex items-center justify-between gap-3 bg-[var(--bg-hover)]/30">
+              <button
+                onClick={handleSaveAsDefaultPrompt}
+                disabled={savingDefaultPrompt}
+                className="px-4 py-2 rounded-lg text-xs font-bold border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-50 cursor-pointer bg-transparent outline-none flex items-center gap-1.5"
+              >
+                {savingDefaultPrompt ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>{t("设为系统默认", "Save as Default")}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPromptModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-bold border border-0 text-[var(--text-secondary)] hover:bg-[var(--bg-card)] cursor-pointer bg-transparent outline-none"
+                >
+                  {t("取消", "Cancel")}
+                </button>
+                <button
+                  onClick={handleConfirmSummary}
+                  className="px-5 py-2 rounded-lg text-xs font-bold bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white cursor-pointer border-0 outline-none flex items-center gap-1.5"
+                >
+                  <Sparkles size={13} fill="white" />
+                  <span>{t("确认并启动总结", "Confirm & Generate")}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

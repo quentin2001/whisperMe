@@ -79,14 +79,6 @@ const TranscriptList = memo(function TranscriptList({
         </div>
       )}
 
-      {/* HF Token 缺失降级提示 */}
-      {activeTask.hf_token_missing && (
-        <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs font-semibold text-yellow-600">
-          <AlertCircle size={14} />
-          <span>{t("本次转录未启用说话人识别（HuggingFace Token 未配置）。", "Speaker identification was skipped — HuggingFace Token not configured.")}</span>
-        </div>
-      )}
-
       <div className="flex flex-col gap-6">
         {paragraphs
           .filter(p => p.text.toLowerCase().includes(searchWord.toLowerCase()))
@@ -107,11 +99,7 @@ const TranscriptList = memo(function TranscriptList({
                 <p className="font-mono text-xs text-[var(--accent-red)] font-bold mb-1.5 hover:underline">
                   {p.timeStart} — {p.timeEnd}
                 </p>
-                <div className="mb-2.5">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--accent-red)]/8 text-[var(--accent-red)] font-bold text-[10px] tracking-wider uppercase select-none">
-                    👤 {p.speaker}
-                  </span>
-                </div>
+                {/* Speaker indicator hidden as requested */}
                 <p className="text-[var(--text-primary)] text-[15px] leading-relaxed select-text font-medium">
                   {p.text}
                 </p>
