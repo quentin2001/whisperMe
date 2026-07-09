@@ -194,8 +194,11 @@ def run_podcast_pipeline(task_id: str, url: str):
 
         asr_mode = task.get("asr_mode", "local")
         t_transcribe_start = time.time()
+        # For local ASR (FunASR/Whisper), always use 16kHz standardized WAV to avoid timestamp stretching.
+        # For online ASR, use local_mp3 to reduce upload payload.
+        audio_to_transcribe = standardized_wav if asr_mode == "local" else local_mp3
         merged_transcript = transcriber.transcribe_and_merge(
-            local_mp3,  # Whisper 直读原始 MP3，不再需要 WAV 预处理
+            audio_to_transcribe,
             diar_data,
             progress_callback=progress_callback,
             asr_mode=asr_mode,
