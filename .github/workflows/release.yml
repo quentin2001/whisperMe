@@ -110,13 +110,11 @@ jobs:
 
       - name: Install dependencies (Windows)
         if: matrix.platform == 'Windows'
-        shell: pwsh
+        shell: bash
         run: |
-          # Use system pip to install into the embedded python's site-packages
-          $target = "release/whisperMe/python/Lib/site-packages"
-          New-Item -ItemType Directory -Force -Path $target
-          python -m pip install -r backend/requirements.txt --target $target --no-deps 2>$null
-          python -m pip install -r backend/requirements.txt --target $target
+          target="release/whisperMe/python/Lib/site-packages"
+          mkdir -p "$target"
+          python -m pip install -r backend/requirements.txt --target "$target"
 
       - name: Install dependencies (macOS)
         if: matrix.platform == 'macOS'
