@@ -56,7 +56,7 @@ jobs:
         run: |
           cp -r backend release/whisperMe/
           rm -rf release/whisperMe/backend/__pycache__
-          rm -rf release/whisperMe/backend/**/__pycache__
+          find release/whisperMe/backend -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
           rm -rf release/whisperMe/backend/venv
         shell: bash
 
@@ -66,9 +66,9 @@ jobs:
 
       - name: Copy launcher files
         run: |
-          cp launcher.py release/whisperMe/
+          cp scripts/launcher.py release/whisperMe/
           cp start.bat release/whisperMe/ 2>/dev/null || true
-          cp start.sh release/whisperMe/
+          cp start.sh release/whisperMe/ 2>/dev/null || true
           cp config.example.json release/whisperMe/
           cp README.md release/whisperMe/
           cp -r docs release/whisperMe/
@@ -97,7 +97,6 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install get-pip.py 2>/dev/null || true
           # Download get-pip for embedded python
           curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 
@@ -139,7 +138,7 @@ jobs:
 
       - name: Make launcher executable (macOS)
         if: matrix.platform == 'macOS'
-        run: chmod +x release/whisperMe/start.sh
+        run: chmod +x release/whisperMe/start.sh 2>/dev/null || true
 
       # ── Package ──
       - name: Create zip
@@ -153,25 +152,6 @@ jobs:
         with:
           name: whisperMe-${{ matrix.platform }}
           path: release/whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip
-
-      - name: Upload debug log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-log-${{ matrix.platform }}
-          path: debug_log.txt
-
-      - name: Push debug log to repo on failure
-        if: failure() && matrix.platform == 'Windows'
-        shell: bash
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b debug-logs || git checkout debug-logs
-          cp debug_log.txt debug_log_windows.txt
-          git add debug_log_windows.txt
-          git commit -m "debug: add windows build failure log"
-          git push origin debug-logs --force
 
   release:
     needs: build
