@@ -13,13 +13,9 @@ jobs:
           - os: windows-latest
             platform: Windows
             python_version: "3.12"
-            ffmpeg_url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-            ffmpeg_bin: "ffmpeg-master-latest-win64-gpl/bin"
           - os: macos-latest
             platform: macOS
             python_version: "3.12"
-            ffmpeg_url: "https://evermeet.cx/ffmpeg/getrelease/zip"
-            ffmpeg_bin: "."
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -34,6 +30,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Set up FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
 
       # ── Frontend ──
       - name: Install frontend dependencies
@@ -129,28 +128,21 @@ jobs:
         working-directory: release/whisperMe
 
       # ── FFmpeg ──
-      - name: Download FFmpeg (Windows)
+      - name: Copy FFmpeg (Windows)
         if: matrix.platform == 'Windows'
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "${{ matrix.ffmpeg_url }}" -OutFile ffmpeg.zip
-          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extract
-          $bin = Get-ChildItem -Path ffmpeg-extract -Recurse -Directory -Filter "bin" | Select-Object -First 1
-          Copy-Item "$($bin.FullName)/ffmpeg.exe" release/whisperMe/ffmpeg/
-          Copy-Item "$($bin.FullName)/ffprobe.exe" release/whisperMe/ffmpeg/ -ErrorAction SilentlyContinue
-          Remove-Item -Recurse ffmpeg-extract, ffmpeg.zip
+          $ffmpegPath = (Get-Command ffmpeg).Source
+          $ffprobePath = (Get-Command ffprobe).Source
+          Copy-Item $ffmpegPath release/whisperMe/ffmpeg/
+          Copy-Item $ffprobePath release/whisperMe/ffmpeg/
 
-      - name: Download FFmpeg (macOS)
+      - name: Copy FFmpeg (macOS)
         if: matrix.platform == 'macOS'
         shell: bash
         run: |
-          curl -sL "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
-          unzip -o ffmpeg.zip -d release/whisperMe/ffmpeg/
-          rm ffmpeg.zip
-          # Also get ffprobe
-          curl -sL "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
-          unzip -o ffprobe.zip -d release/whisperMe/ffmpeg/ 2>/dev/null || true
-          rm -f ffprobe.zip
+          cp $(which ffmpeg) release/whisperMe/ffmpeg/
+          cp $(which ffprobe) release/whisperMe/ffmpeg/
           chmod +x release/whisperMe/ffmpeg/*
 
       # ── Clean up ──
