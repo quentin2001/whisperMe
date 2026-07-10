@@ -17,6 +17,8 @@ jobs:
             platform: macOS
             python_version: "3.12"
 
+    permissions:
+      contents: write
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -173,6 +175,18 @@ jobs:
         with:
           name: debug-log-${{ matrix.platform }}
           path: debug_log.txt
+
+      - name: Push debug log to repo on failure
+        if: failure() && matrix.platform == 'Windows'
+        shell: bash
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b debug-logs || git checkout debug-logs
+          cp debug_log.txt debug_log_windows.txt
+          git add debug_log_windows.txt
+          git commit -m "debug: add windows build failure log"
+          git push origin debug-logs --force
 
   release:
     needs: build
