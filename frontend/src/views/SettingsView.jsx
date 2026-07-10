@@ -476,7 +476,7 @@ export default function SettingsView({
 
               {configData.summary_mode === "local" && (
                 <>
-                  <div className="flex flex-col gap-4 animate-fade-in border-t border-[var(--border-primary)]/10 pt-4 mt-2">
+                  <div className="flex flex-col gap-4 animate-fade-in">
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("本地 LLM 接口地址", "Local LLM Model Path")}</label>
                       <input type="text" value={configData.ollama_url || ""} onChange={(e) => handleConfigChange("ollama_url", e.target.value)}
