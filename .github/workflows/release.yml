@@ -45,6 +45,7 @@ jobs:
 
       # ── Backend dependencies ──
       - name: Create release directory
+        shell: bash
         run: |
           mkdir -p release/whisperMe/python
           mkdir -p release/whisperMe/ffmpeg
@@ -128,17 +129,7 @@ jobs:
         working-directory: release/whisperMe
 
       # ── FFmpeg ──
-      - name: Copy FFmpeg (Windows)
-        if: matrix.platform == 'Windows'
-        shell: pwsh
-        run: |
-          $ffmpegPath = (Get-Command ffmpeg).Source
-          $ffprobePath = (Get-Command ffprobe).Source
-          Copy-Item $ffmpegPath release/whisperMe/ffmpeg/
-          Copy-Item $ffprobePath release/whisperMe/ffmpeg/
-
-      - name: Copy FFmpeg (macOS)
-        if: matrix.platform == 'macOS'
+      - name: Copy FFmpeg
         shell: bash
         run: |
           cp $(which ffmpeg) release/whisperMe/ffmpeg/
