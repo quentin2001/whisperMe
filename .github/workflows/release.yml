@@ -59,6 +59,7 @@ jobs:
         shell: bash
 
       - name: Copy frontend build
+        shell: bash
         run: cp -r frontend/dist release/whisperMe/frontend/
 
       - name: Copy launcher files
