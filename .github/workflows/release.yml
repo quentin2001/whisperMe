@@ -115,8 +115,8 @@ jobs:
           # Use system pip to install into the embedded python's site-packages
           $target = "release/whisperMe/python/Lib/site-packages"
           New-Item -ItemType Directory -Force -Path $target
-          pip install -r backend/requirements.txt --target $target --no-deps 2>$null
-          pip install -r backend/requirements.txt --target $target
+          python -m pip install -r backend/requirements.txt --target $target --no-deps 2>$null
+          python -m pip install -r backend/requirements.txt --target $target
 
       - name: Install dependencies (macOS)
         if: matrix.platform == 'macOS'
@@ -124,7 +124,7 @@ jobs:
         run: |
           target="release/whisperMe/python/lib/python${{ matrix.python_version }}/site-packages"
           mkdir -p "$target"
-          pip install -r backend/requirements.txt --target "$target"
+          python3 -m pip install -r backend/requirements.txt --target "$target"
 
       # ── FFmpeg ──
       - name: Copy FFmpeg
