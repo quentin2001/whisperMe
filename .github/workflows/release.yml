@@ -107,7 +107,6 @@ jobs:
           python -m pip install get-pip.py 2>/dev/null || true
           # Download get-pip for embedded python
           curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-        working-directory: release/whisperMe
 
       - name: Install dependencies (Windows)
         if: matrix.platform == 'Windows'
@@ -118,7 +117,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $target
           pip install -r backend/requirements.txt --target $target --no-deps 2>$null
           pip install -r backend/requirements.txt --target $target
-        working-directory: release/whisperMe
 
       - name: Install dependencies (macOS)
         if: matrix.platform == 'macOS'
@@ -127,7 +125,6 @@ jobs:
           target="release/whisperMe/python/lib/python${{ matrix.python_version }}/site-packages"
           mkdir -p "$target"
           pip install -r backend/requirements.txt --target "$target"
-        working-directory: release/whisperMe
 
       # ── FFmpeg ──
       - name: Copy FFmpeg
