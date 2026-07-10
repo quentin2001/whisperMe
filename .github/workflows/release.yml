@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -141,11 +142,18 @@ jobs:
         run: chmod +x release/whisperMe/start.sh 2>/dev/null || true
 
       # ── Package ──
-      - name: Create zip
+      - name: Create zip (Windows)
+        if: matrix.platform == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path release/whisperMe/* -DestinationPath "release/whisperMe-${{ github.ref_name }}-Windows.zip"
+
+      - name: Create zip (macOS)
+        if: matrix.platform == 'macOS'
         shell: bash
         run: |
           cd release
-          zip -r "whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip" whisperMe/
+          zip -r "whisperMe-${{ github.ref_name }}-macOS.zip" whisperMe/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
