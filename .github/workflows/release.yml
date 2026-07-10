@@ -14,7 +14,7 @@ jobs:
           - os: windows-latest
             platform: Windows
             python_version: "3.12"
-          - os: macos-13
+          - os: macos-latest
             platform: macOS
             python_version: "3.12"
 
@@ -34,8 +34,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Set up FFmpeg
+      - name: Set up FFmpeg (Windows)
+        if: matrix.platform == 'Windows'
         uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: Set up FFmpeg (macOS)
+        if: matrix.platform == 'macOS'
+        run: |
+          if ! command -v ffmpeg &> /dev/null; then
+            brew install ffmpeg
+          fi
 
       # ── Frontend ──
       - name: Install frontend dependencies
