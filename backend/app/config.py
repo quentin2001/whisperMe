@@ -53,7 +53,7 @@ from pydantic import BaseModel, Field
 class AppConfigModel(BaseModel):
     ffmpeg_path: str = ""
     ffmpeg_bin_dir: str = ""
-    local_whisper_model_path: str = ""
+    local_whisper_model_path: str = str((PROJECT_DIR / "models" / "funasr").resolve()).replace("\\", "/")
     local_whisper_model_size: str = "large-v3-turbo"
     local_model_idle_timeout: int = 300
     hf_token: str = ""
@@ -109,6 +109,10 @@ def load_config() -> dict:
     try:
         with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             loaded = json.load(f)
+
+        # 默认本地 ASR 路径自动转换为绝对路径
+        if not loaded.get("local_whisper_model_path"):
+            loaded["local_whisper_model_path"] = str((PROJECT_DIR / "models" / "funasr").resolve()).replace("\\", "/")
 
         # ==================== 自动迁移：旧配置 → online_asr_provider 字段 ====================
         if "online_asr_provider" not in loaded:
