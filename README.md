@@ -219,7 +219,7 @@ npm run dev
 whisperMe/
 ├── CLAUDE.md                    # Claude Code 项目指令
 ├── README.md                    # 使用文档
-├── VERSION                      # 版本号（当前 v1.0.0）
+├── VERSION                      # 版本号（当前 v1.0.1）
 ├── config.example.json          # 配置模板（脱敏）
 ├── config.json                  # 运行时配置（本地，git 忽略）
 ├── prompt.json                  # AI 总结 Prompt 模板

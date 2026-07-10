@@ -38,7 +38,7 @@ def check_port_in_use(port):
 
 def print_banner():
     """品牌启动横幅"""
-    version = "1.0.0"
+    version = "1.0.1"
     if os.path.isfile(_version_file):
         try:
             with open(_version_file, encoding="utf-8") as f:

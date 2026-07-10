@@ -23,9 +23,9 @@ export const useConfigStore = create((set) => ({
     prompt: ""
   },
   versionInfo: {
-    version: "1.0.0",
+    version: "1.0.1",
     update_available: false,
-    latest_version: "1.0.0",
+    latest_version: "1.0.1",
     release_notes: ""
   },
   perfData: null,

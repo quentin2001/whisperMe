@@ -284,5 +284,5 @@ _VERSION_FILE = PROJECT_DIR / "VERSION"
 if _VERSION_FILE.exists():
     CURRENT_VERSION = _VERSION_FILE.read_text(encoding="utf-8").strip()
 else:
-    CURRENT_VERSION = "1.0.0"
+    CURRENT_VERSION = "1.0.1"
 
