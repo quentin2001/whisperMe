@@ -369,9 +369,6 @@ export default function SettingsView({
                         <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
                           <span>{t("推荐本地 ASR 语音模型", "Recommended Local ASR Models")}</span>
                         </h4>
-                        <div className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-1 font-medium bg-[var(--bg-secondary)]/15 p-2.5 rounded-lg border border-[var(--border-primary)]/20 animate-fade-in">
-                          {t("💡 提示：在本地模型模式下首次运行转录时，后端会自动在后台将模型拉取并部署存入本地 models/ 目录下（国内下载极快），您无需手动下载。若网络受限，可点击下方【下载】前往源站下载后解压存入该目录中。", "💡 Tip: When running transcription in Local Mode for the first time, the system will automatically download models to the local models/ directory in the background. You don't need to download manually. If your connection is limited, click [Download] below to download and unzip it manually into that directory.")}
-                        </div>
                         {modelsRegistry ? (
                           <div className="flex flex-col gap-2">
                             {modelsRegistry.asr?.map((model) => (
