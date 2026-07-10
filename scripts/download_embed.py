@@ -7,9 +7,6 @@ import sys
 
 def main():
     pyver = "3.12.4"
-    url = f"https://www.python.org/ftp/python/{pyver}/python-{pyver-embed-amd64.zip}"
-    # Wait, the URL has a typo in python-{pyver-embed-amd64.zip}
-    # It should be python-{pyver}-embed-amd64.zip
     url = f"https://www.python.org/ftp/python/{pyver}/python-{pyver}-embed-amd64.zip"
     dest = "release/whisperMe/python"
     
