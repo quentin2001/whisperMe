@@ -80,7 +80,7 @@ jobs:
           pyver="${{ matrix.python_version }}.4"
           url="https://www.python.org/ftp/python/${pyver}/python-${pyver}-embed-amd64.zip"
           curl -sSL "$url" -o python-embed.zip
-          unzip -o python-embed.zip -d release/whisperMe/python
+          tar -xf python-embed.zip -C release/whisperMe/python
           rm python-embed.zip
           # Enable site-packages
           pth_file=$(find release/whisperMe/python -name "*._pth" | head -n 1)
