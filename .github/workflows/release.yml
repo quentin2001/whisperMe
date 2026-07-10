@@ -79,13 +79,17 @@ jobs:
         run: |
           pyver="${{ matrix.python_version }}.4"
           url="https://www.python.org/ftp/python/${pyver}/python-${pyver}-embed-amd64.zip"
-          curl -sSL "$url" -o python-embed.zip
-          tar -xf python-embed.zip -C release/whisperMe/python
-          rm python-embed.zip
+          echo "Downloading from $url..." > debug_log.txt
+          curl -v -sSL "$url" -o python-embed.zip >> debug_log.txt 2>&1
+          echo "Extracting using tar..." >> debug_log.txt
+          tar -xvf python-embed.zip -C release/whisperMe/python >> debug_log.txt 2>&1
+          echo "Removing zip..." >> debug_log.txt
+          rm python-embed.zip >> debug_log.txt 2>&1
           # Enable site-packages
           pth_file=$(find release/whisperMe/python -name "*._pth" | head -n 1)
+          echo "Found pth file: $pth_file" >> debug_log.txt
           if [ -n "$pth_file" ]; then
-            sed -i 's/#import site/import site/g' "$pth_file"
+            sed -i 's/#import site/import site/g' "$pth_file" >> debug_log.txt 2>&1
           fi
 
       - name: Download Python (macOS)
@@ -162,6 +166,13 @@ jobs:
         with:
           name: whisperMe-${{ matrix.platform }}
           path: release/whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip
+
+      - name: Upload debug log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-log-${{ matrix.platform }}
+          path: debug_log.txt
 
   release:
     needs: build
