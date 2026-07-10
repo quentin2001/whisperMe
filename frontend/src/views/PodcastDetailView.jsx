@@ -3,7 +3,7 @@ import {
   Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
   MessageSquare, History, Calendar, FileText, Users, Compass, Download,
-  GitMerge, Trash2, AlertCircle, Save, Loader2
+  GitMerge, Trash2, AlertCircle, Save, Loader2, ChevronDown, Check
 } from "lucide-react";
 import { API_BASE, proxyImage } from "../constants.js";
 import { alert, confirm } from "../components/Dialog.jsx";
@@ -444,6 +444,55 @@ function CommentItemRenderer({ comment, onTimeJump }) {
   );
 }
 
+function TemplateDropdown({ value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-[var(--bg-input)]/40 hover:bg-[var(--bg-input)]/80 border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] flex justify-between items-center transition-colors text-left"
+      >
+        <span>{selectedOption?.label || ""}</span>
+        <ChevronDown size={16} className={`text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-fade-in">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center justify-between text-left font-semibold cursor-pointer border-0 bg-transparent"
+            >
+              <span>{option.label}</span>
+              {option.value === value && <Check size={14} className="text-[var(--accent-red)]" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ==================== 🎙️ Main View Component ====================
 import { useTranslation } from "../contexts/I18nContext";
 
@@ -480,13 +529,15 @@ export default function PodcastDetailView({
   // Prompt Selector Modal States
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [promptTemplates, setPromptTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("standard");
   const [customPrompt, setCustomPrompt] = useState("");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [savingDefaultPrompt, setSavingDefaultPrompt] = useState(false);
 
   useEffect(() => {
     if (showPromptModal) {
+      setSelectedTemplate("standard");
+      setLoadingTemplate(true);
       // 1. Fetch templates
       fetch(`${API_BASE}/api/prompt/templates`)
         .then(r => r.json())
@@ -498,15 +549,16 @@ export default function PodcastDetailView({
         })
         .catch(() => {});
 
-      // 2. Fetch current active prompt
-      fetch(`${API_BASE}/api/prompt`)
+      // 2. Fetch standard template prompt
+      fetch(`${API_BASE}/api/prompt/template/standard`)
         .then(r => r.json())
         .then(data => {
           if (data && data.prompt) {
             setCustomPrompt(data.prompt);
           }
+          setLoadingTemplate(false);
         })
-        .catch(() => {});
+        .catch(() => setLoadingTemplate(false));
     }
   }, [showPromptModal]);
 
@@ -949,20 +1001,7 @@ export default function PodcastDetailView({
             />
           </div>
 
-          {(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") && (
-            <button
-              onClick={triggerAIAnalysis}
-              disabled={analyzing || activeTask.status === "summarizing"}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:bg-neutral-300 text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
-            >
-              {analyzing || activeTask.status === "summarizing" ? (
-                <RefreshCw size={13} className="animate-spin" />
-              ) : (
-                <Sparkles size={13} fill="white" />
-              )}
-              <span>{analyzing || activeTask.status === "summarizing" ? t("生成中...", "Generating...") : (activeTask.status === "completed" ? t("重新生成总结", "Regenerate Summary") : t("✨ 运行 AI 深度总结", "Run AI Summary"))}</span>
-            </button>
-          )}
+
 
           {/* Speaker Management hidden as requested */}
         </div>
@@ -1105,15 +1144,27 @@ export default function PodcastDetailView({
                     <Sparkles size={18} className="text-[var(--accent-red)]" />
                     <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("AI 价值分析报告", "AI VALUE ANALYSIS REPORT")}</h3>
                   </div>
-                  {activeTask.summary && (
-                    <button
-                      onClick={handleExportMarkdown}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
-                    >
-                      <Download size={13} className="text-[var(--accent-red)]" />
-                      <span>MD</span>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {activeTask.summary && (
+                      <button
+                        onClick={triggerAIAnalysis}
+                        disabled={analyzing || activeTask.status === "summarizing"}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw size={13} className={analyzing || activeTask.status === "summarizing" ? "animate-spin" : ""} />
+                        <span>{t("重新生成总结", "Regenerate Summary")}</span>
+                      </button>
+                    )}
+                    {activeTask.summary && (
+                      <button
+                        onClick={handleExportMarkdown}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                      >
+                        <Download size={13} className="text-[var(--accent-red)]" />
+                        <span>MD</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {activeTask.status === "summarizing" ? (
@@ -1128,15 +1179,18 @@ export default function PodcastDetailView({
                 ) : (
                   <div className="border-2 border-dashed border-[var(--border-primary)]/40 p-8 text-center rounded-xl select-none flex flex-col items-center gap-4">
                     <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">{t("暂无总结内容", "No summary available")}</span>
-                    {(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") && (
-                      <button
-                        onClick={triggerAIAnalysis}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
-                      >
-                        <Sparkles size={13} fill="white" />
-                        <span>{t("✨ 运行 AI 深度总结", "Run AI Summary")}</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={triggerAIAnalysis}
+                      disabled={!(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") || analyzing}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] disabled:bg-neutral-300 dark:disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-all cursor-pointer border-0 outline-none"
+                    >
+                      <Sparkles size={13} fill={!(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") ? "gray" : "white"} />
+                      <span>
+                        {!(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") 
+                          ? t("⏳ 转录中，完成后可运行AI总结", "Run AI Summary (available after transcription)") 
+                          : t("✨ 运行 AI 深度总结", "Run AI Summary")}
+                      </span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1207,19 +1261,11 @@ export default function PodcastDetailView({
             <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("选择总结模板", "Select Summary Template")}</label>
-                <div className="relative">
-                  <select
-                    value={selectedTemplate}
-                    onChange={(e) => handleTemplateSelect(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-red)] appearance-none cursor-pointer"
-                  >
-                    <option value="">{t("-- 使用当前配置的 Prompt --", "-- Use Current Prompt --")}</option>
-                    {promptTemplates.map(tpl => (
-                      <option key={tpl.id} value={tpl.id}>{tpl.emoji || "📝"} {tpl.name}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)] text-xs">▼</div>
-                </div>
+                <TemplateDropdown
+                  value={selectedTemplate}
+                  onChange={(val) => handleTemplateSelect(val)}
+                  options={promptTemplates.map(tpl => ({ value: tpl.id, label: tpl.name }))}
+                />
                 {loadingTemplate && <div className="text-[10px] text-[var(--text-muted)] animate-pulse mt-0.5">{t("正在载入模版...", "Loading template...")}</div>}
               </div>
 
@@ -1228,8 +1274,8 @@ export default function PodcastDetailView({
                 <textarea
                   value={customPrompt || ""}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  rows={12}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-y min-h-[220px] select-text"
+                  rows={22}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-none select-text overflow-y-auto"
                   placeholder={t(
                     "输入总结 Prompt... 使用 {{PODCAST_DATA}} 标记数据注入位置。",
                     "Enter summary prompt... Use {{PODCAST_DATA}} to mark data injection point."

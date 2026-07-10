@@ -741,16 +741,17 @@ export default function LibraryView({
                     )}
                   </div>
 
-                  <div>
-                    <h4 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-0.5">
                       {session.rawTask.podcast_name && (
-                        <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
+                        <span className="text-[10px] font-extrabold text-[var(--accent-red)] uppercase tracking-wider truncate max-w-md" title={session.rawTask.podcast_name}>
                           {session.rawTask.podcast_name}
-                          <span className="text-[var(--border-primary)] font-normal ml-1.5">|</span>
                         </span>
                       )}
-                      <span>{session.title}</span>
-                    </h4>
+                      <h4 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug truncate" title={session.title}>
+                        {session.title}
+                      </h4>
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] font-semibold select-none text-[var(--text-tertiary)]">
                       <span>{t("时长：", "Duration: ")}{session.duration}</span>
                       <span className="text-[var(--border-primary)]/40">•</span>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -148,7 +148,7 @@ export default function SettingsView({
 
   // Prompt template system
   const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("standard");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
 
@@ -162,6 +162,18 @@ export default function SettingsView({
         }
       })
       .catch(() => {});
+
+    // Auto-select standard template on mount
+    setLoadingTemplate(true);
+    fetch(`${API_BASE}/api/prompt/template/standard`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.prompt) {
+          setPromptData({ prompt: data.prompt });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTemplate(false));
   }, []);
 
   useEffect(() => {
@@ -184,6 +196,22 @@ export default function SettingsView({
       })
       .catch(() => {})
       .finally(() => setLoadingTemplate(false));
+  };
+
+  const handleSelectLocalModelPath = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/system/select-directory`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.directory) {
+          handleConfigChange("local_whisper_model_path", data.directory);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to pick directory:", e);
+    }
   };
 
   const handleVerifyFfmpeg = async (p = "") => {
@@ -303,13 +331,23 @@ export default function SettingsView({
                     <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                       {t("本地 ASR 模型文件夹路径", "Local ASR Model Path")}
                     </label>
-                    <input
-                      type="text"
-                      value={configData.local_whisper_model_path || ""}
-                      onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
-                      className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
-                      placeholder="models/funasr"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={configData.local_whisper_model_path || ""}
+                        onChange={(e) => handleConfigChange("local_whisper_model_path", e.target.value)}
+                        className={`flex-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.local_whisper_model_path)}`}
+                        placeholder="models/funasr"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSelectLocalModelPath}
+                        className="px-4 py-2.5 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-bold rounded-lg transition-all cursor-pointer outline-none select-none flex items-center gap-1.5"
+                      >
+                        <Folder size={14} className="text-[var(--accent-red)]" />
+                        <span>{t("选择目录", "Select Folder")}</span>
+                      </button>
+                    </div>
                     <span className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
                       {t("指定本地ASR模型目录例如：E:/whisperMe/models/funasr", "Specify the local ASR model directory, e.g., E:/whisperMe/models/funasr")}
                     </span>
@@ -540,6 +578,80 @@ export default function SettingsView({
 
                 </>
               )}
+            </div>
+
+            {/* AI Summary Prompt Template Manager Card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex flex-col gap-5 transition-colors duration-300">
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/20">
+                <div className="flex items-center gap-2">
+                  <FileText size={18} className="text-[var(--accent-red)]" />
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("AI 总结 Prompt 模板管理", "AI Summary Prompt Template Manager")}</h3>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t("选择模板载入并编辑", "Select Template to Load & Edit")}
+                </label>
+                <div className="flex gap-2">
+                  {templates.map(tpl => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => handleTemplateSelect(tpl.id)}
+                      className={`flex-1 py-2 px-3 border rounded-lg text-xs font-bold transition-all cursor-pointer outline-none select-none
+                        ${selectedTemplate === tpl.id
+                          ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/20 text-[var(--accent-red)] font-extrabold'
+                          : 'border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
+                        }
+                      `}
+                    >
+                      {tpl.name}
+                    </button>
+                  ))}
+                </div>
+                {loadingTemplate && <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t("正在载入模板内容...", "Loading template content...")}</span>}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t("当前 Prompt 内容", "Current Prompt Content")}
+                </label>
+                <textarea
+                  value={promptData.prompt || ""}
+                  onChange={(e) => setPromptData({ prompt: e.target.value })}
+                  rows={15}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-none select-text"
+                  placeholder={t("Prompt 内容...", "Prompt content...")}
+                />
+                <span className="text-[10px] text-[var(--text-muted)] leading-relaxed font-semibold">
+                  {t("提示：在此处编辑后，点击下方“保存 Prompt 为系统默认”会更新系统全局运行 AI 总结时使用的默认 Prompt。", "Note: After editing here, clicking 'Save Prompt as System Default' will update the system's global default prompt used for summaries.")}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={handleSavePrompt}
+                  disabled={promptSaveStatus === "saving"}
+                  className="flex-1 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 text-[var(--text-secondary)] py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer outline-none"
+                >
+                  <Save size={13} className="text-[var(--accent-red)]" />
+                  <span>
+                    {promptSaveStatus === "saving" ? t("保存中...", "Saving...") :
+                     promptSaveStatus === "saved" ? t("保存成功", "Saved Successfully") :
+                     promptSaveStatus === "error" ? t("保存失败", "Failed to Save") :
+                     t("保存 Prompt 为系统默认", "Save Prompt as System Default")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetPrompt}
+                  className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
+                >
+                  {t("恢复默认值", "Reset to Default")}
+                </button>
+              </div>
             </div>
 
                         <div className="flex items-center gap-3 mt-2">

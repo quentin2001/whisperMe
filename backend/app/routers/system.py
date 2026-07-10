@@ -486,6 +486,84 @@ def get_models_registry():
     return default_registry
 
 
+@router.post("/system/select-directory")
+def select_directory():
+    """打开系统原生文件夹选择对话框，返回选中的绝对路径"""
+    import platform
+    system = platform.system()
+
+    def pick_win():
+        ps_script = (
+            "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null;"
+            "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog;"
+            "$dialog.Description = 'Select Local ASR Model Directory';"
+            "$dialog.ShowNewFolderButton = $true;"
+            "if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }"
+        )
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
+            proc = subprocess.Popen(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo
+            )
+            stdout, _ = proc.communicate(timeout=60)
+            if proc.returncode == 0:
+                return stdout.strip()
+        except Exception as e:
+            print(f"Error picking directory on Windows: {e}")
+        return None
+
+    def pick_mac():
+        apple_script = (
+            'tell application "System Events"\n'
+            '   activate\n'
+            '   set myFolder to choose folder with prompt "Select Local ASR Model Directory"\n'
+            '   POSIX path of myFolder\n'
+            'end tell'
+        )
+        try:
+            proc = subprocess.Popen(
+                ["osascript", "-e", apple_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, _ = proc.communicate(timeout=60)
+            if proc.returncode == 0:
+                return stdout.strip()
+        except Exception as e:
+            print(f"Error picking directory on macOS: {e}")
+        return None
+
+    directory = None
+    if system == "Windows":
+        directory = pick_win()
+    elif system == "Darwin":
+        directory = pick_mac()
+    else:
+        # Linux / Other GUI fallbacks
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            directory = filedialog.askdirectory()
+            root.destroy()
+        except Exception as e:
+            print(f"Tkinter fallback failed: {e}")
+
+    if directory:
+        return {"directory": directory}
+    else:
+        raise HTTPException(status_code=400, detail="User cancelled or failed to select directory")
+
+
 # --- 启动函数 ---
 def start_system_background_tasks():
     t = threading.Thread(target=background_perf_monitor, daemon=True)

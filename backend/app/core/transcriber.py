@@ -190,29 +190,44 @@ class ModelCacheManager:
             if custom_path:
                 # If custom_path is relative, make it absolute relative to project root
                 if not os.path.isabs(custom_path):
-                    custom_path = os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                    custom_path_abs = os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                else:
+                    custom_path_abs = custom_path
                 
-                if os.path.isdir(custom_path):
+                if os.path.isdir(custom_path_abs):
                     # Check if the folder directly contains the model configurations
-                    if os.path.exists(os.path.join(custom_path, "configuration.json")) or os.path.exists(os.path.join(custom_path, "model.onnx")):
-                        ms_model = custom_path
-                        hf_model = custom_path
+                    if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.onnx")):
+                        ms_model = custom_path_abs
+                        hf_model = custom_path_abs
                     else:
                         # Check if it is the parent models/funasr folder containing the iic subfolder
-                        potential_ms = os.path.join(custom_path, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+                        potential_ms = os.path.join(custom_path_abs, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
                         if os.path.exists(potential_ms) and os.path.isdir(potential_ms):
                             ms_model = potential_ms
                             
-                            potential_vad = os.path.join(custom_path, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+                            potential_vad = os.path.join(custom_path_abs, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
                             if os.path.exists(potential_vad) and os.path.isdir(potential_vad):
                                 vad_param = potential_vad
                                 
-                            potential_punc = os.path.join(custom_path, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
+                            potential_punc = os.path.join(custom_path_abs, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
                             if os.path.exists(potential_punc) and os.path.isdir(potential_punc):
                                 punc_param = potential_punc
                         else:
                             ms_model = custom_path
                             hf_model = custom_path
+                else:
+                    # If it is NOT a directory (e.g. legacy 'paraformer-zh' string),
+                    # check if it matches paraformer to use local offline model dirs.
+                    if "paraformer" in custom_path.lower():
+                        if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
+                            ms_model = local_ms_model_dir
+                        if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
+                            vad_param = local_vad_dir
+                        if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
+                            punc_param = local_punc_dir
+                    else:
+                        ms_model = custom_path
+                        hf_model = custom_path
             else:
                 # Default empty path logic: check if the default project folder has the ModelScope model
                 if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
@@ -507,9 +522,13 @@ class PodcastTranscriber:
             for seg in whisper_segments:
                 current_speaker = self._find_speaker(seg, diarization_segments)
 
-                start_min, start_sec = divmod(int(seg.start), 60)
-                start_hour, start_min = divmod(start_min, 60)
-                timestamp = f"[{start_hour:02d}:{start_min:02d}:{start_sec:02d}]"
+                # Generate timestamp with hour:minute:second (including fractional seconds)
+                total_seconds = seg.start
+                hour = int(total_seconds // 3600)
+                minute = int((total_seconds % 3600) // 60)
+                second = total_seconds % 60
+                # Format seconds with two decimal places
+                timestamp = f"[{hour:02d}:{minute:02d}:{second:05.2f}]"
 
                 merged_seg = {
                     "start": seg.start,
@@ -578,7 +597,7 @@ class PodcastTranscriber:
                 model = model_cache_manager.get_funasr_model(device_to_use)
                 pass
                 try:
-                    res = model.generate(input=short_wav_path, batch_size_s=300)
+                    res = model.generate(input=short_wav_path, batch_size_s=300, sentence_timestamp=True)
                     whisper_segments_raw = []
                     if res and len(res) > 0:
                         if "sentence_info" in res[0] and res[0]["sentence_info"]:
@@ -589,13 +608,53 @@ class PodcastTranscriber:
                                     end=sentence.get("end", 0) / 1000.0,
                                     text=sentence.get("text", "")
                                 ))
+                        elif "timestamp" in res[0] and res[0]["timestamp"]:
+                            # Fallback: character-level timestamps without sentence segmentation.
+                            # FunASR's text is post-processed (no spaces), but timestamp[] entries
+                            # are per-token. For Chinese CharTokenizer, 1 char ≈ 1 timestamp entry.
+                            full_text = res[0].get("text", "")
+                            timestamps = res[0]["timestamp"]  # [[start_ms, end_ms], ...]
+                            print(f"⚠️ [LOG] FunASR 返回结果缺少 sentence_info，使用字符级时间戳构建段落 (字数: {len(full_text)}, ts: {len(timestamps)})")
+
+                            # Split into sentences by Chinese punctuation
+                            parts = re.split(r'([。！？；…?])', full_text) if full_text else []
+                            sentence_list = []
+                            current = ""
+                            for p in parts:
+                                if not p:
+                                    continue
+                                current += p
+                                if p in "。！？；…?":
+                                    sentence_list.append(current.strip())
+                                    current = ""
+                            if current.strip():
+                                sentence_list.append(current.strip())
+
+                            # Map each sentence to timestamps using character positions.
+                            # IMPORTANT: Punctuation characters (。！？；…?,) are inserted by
+                            # the CT-punc model AFTER timestamps are generated. They do NOT
+                            # have corresponding entries in the timestamp[] array. We must
+                            # count only speech characters when advancing through timestamps.
+                            _PUNC_CHARS = set("。！？；…?,.!;:，、")
+                            char_pos = 0
+                            for sent in sentence_list:
+                                speech_len = sum(1 for c in sent if c not in _PUNC_CHARS)
+                                if char_pos < len(timestamps) and speech_len > 0:
+                                    end_pos = min(char_pos + speech_len, len(timestamps))
+                                    seg_start = timestamps[char_pos][0] / 1000.0
+                                    seg_end   = timestamps[end_pos - 1][1] / 1000.0
+                                    whisper_segments_raw.append(WhisperSegmentDummy(
+                                        start=seg_start,
+                                        end=seg_end,
+                                        text=sent
+                                    ))
+                                    char_pos = end_pos
                         elif "text" in res[0] and res[0]["text"]:
-                            # Fallback: model generated full text but without segment timestamps (e.g. HuggingFace version)
+                            # Last resort: model generated full text but without any timestamps
                             full_text = res[0]["text"]
-                            print(f"⚠️ [LOG] FunASR 返回结果缺少 sentence_info。已采用全文断句估计模式 (字数: {len(full_text)})")
-                            
+                            print(f"⚠️ [LOG] FunASR 返回结果缺少时间戳信息。已采用全文断句估计模式 (字数: {len(full_text)})")
+
                             # Estimate and split sentences by Chinese punctuation
-                            import re
                             sentences = re.split(r'([。！？；…?])', full_text)
                             sentence_list = []
                             current_sentence = ""
@@ -608,7 +667,7 @@ class PodcastTranscriber:
                                     current_sentence = ""
                             if current_sentence.strip():
                                 sentence_list.append(current_sentence.strip())
-                                
+
                             current_time = 0.0
                             for sentence in sentence_list:
                                 N = len(sentence)
@@ -624,7 +683,9 @@ class PodcastTranscriber:
                     else:
                         print("⚠️ [LOG] FunASR 返回结果为空")
                 except Exception as e:
-                    print(f"❌ [LOG] FunASR 转写发生错误: {e}")
+                    import traceback as _traceback
+                    _err_detail = _traceback.format_exc()
+                    print(f"❌ [LOG] FunASR 转写发生错误: {e}\n详细堆栈:\n{_err_detail}")
                     whisper_segments_raw = []
 
             # 过滤相邻重复句，防止本地 Whisper 幻觉循环
@@ -660,10 +721,12 @@ class PodcastTranscriber:
                 # Speaker matching via helper
                 current_speaker = self._find_speaker(seg, diarization_segments)
 
-                # Timestamp
-                start_min, start_sec = divmod(int(seg.start), 60)
-                start_hour, start_min = divmod(start_min, 60)
-                timestamp = f"[{start_hour:02d}:{start_min:02d}:{start_sec:02d}]"
+                # Timestamp (fractional seconds for precise alignment)
+                total_seconds = seg.start
+                hour = int(total_seconds // 3600)
+                minute = int((total_seconds % 3600) // 60)
+                second = total_seconds % 60
+                timestamp = f"[{hour:02d}:{minute:02d}:{second:05.2f}]"
 
                 merged_seg = {
                     "start": seg.start,

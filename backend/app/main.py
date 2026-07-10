@@ -207,7 +207,7 @@ def startup_event():
         requeued_count = 0
         for t in tasks:
             status = t.get("status")
-            if status not in ["completed", "failed"]:
+            if status in ["pending", "downloading", "transcribing", "summarizing"]:
                 db.update_task_field(
                     t["id"],
                     status="pending",

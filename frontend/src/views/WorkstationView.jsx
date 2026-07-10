@@ -325,18 +325,19 @@ export default function WorkstationView({
               </div>
 
               {/* Information body panel */}
-              <div className="p-5 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start">
-                    <h3 className="font-bold text-base text-[var(--text-primary)] font-display leading-snug group-hover:text-[var(--accent-red)] transition-colors w-full">
+              <div className="p-5 flex-1 flex flex-col justify-between min-w-0">
+                <div className="min-w-0">
+                  <div className="flex items-start min-w-0">
+                    <div className="flex flex-col gap-0.5 w-full min-w-0">
                       {session.rawTask.podcast_name && (
-                        <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
+                        <span className="text-[10px] font-extrabold text-[var(--accent-red)] uppercase tracking-wider truncate" title={session.rawTask.podcast_name}>
                           {session.rawTask.podcast_name}
-                          <span className="text-[var(--border-primary)] font-normal ml-1.5">|</span>
                         </span>
                       )}
-                      <span>{session.title}</span>
-                    </h3>
+                      <h3 className="font-bold text-base text-[var(--text-primary)] font-display leading-snug group-hover:text-[var(--accent-red)] transition-colors w-full line-clamp-2" title={session.title}>
+                        {session.title}
+                      </h3>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)] mt-2 font-semibold select-none">
@@ -375,7 +376,7 @@ export default function WorkstationView({
               onClick={() => onOpenSession(session.rawTask)}
               className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[var(--accent-red)]/55 rounded-xl cursor-pointer hover:shadow-xs transition-all"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
                 <img
                   src={session.thumbnail}
                   alt=""
@@ -390,16 +391,17 @@ export default function WorkstationView({
                     }
                   }}
                 />
-                <div>
-                  <h3 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-0.5">
                     {session.rawTask.podcast_name && (
-                      <span className="text-[var(--accent-red)] font-extrabold mr-1.5">
+                      <span className="text-[10px] font-extrabold text-[var(--accent-red)] uppercase tracking-wider truncate max-w-md" title={session.rawTask.podcast_name}>
                         {session.rawTask.podcast_name}
-                        <span className="text-[var(--border-primary)] font-normal ml-1.5">|</span>
                       </span>
                     )}
-                    <span>{session.title}</span>
-                  </h3>
+                    <h3 className="font-bold text-sm text-[var(--text-primary)] font-display leading-snug truncate" title={session.title}>
+                      {session.title}
+                    </h3>
+                  </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-semibold text-[var(--text-muted)] select-none">
                     <span>{t("时长：", "Duration: ")}{session.duration}</span>
                     <span className="text-[var(--border-primary)]/40">•</span>
