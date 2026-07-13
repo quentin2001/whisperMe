@@ -118,8 +118,8 @@ def main():
                 arcname = os.path.relpath(file_path, app_dir_win)
                 zf.write(file_path, arcname)
                 
-    # Archive whisperMe Unix
-    app_zip_unix = os.path.join(release_dir, 'whisperMe-macOS-Linux.zip')
+    # Archive whisperMe macOS
+    app_zip_unix = os.path.join(release_dir, 'whisperMe-macOS.zip')
     print(f"Archiving app to {app_zip_unix}...")
     with zipfile.ZipFile(app_zip_unix, 'w', zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(app_dir_unix):
