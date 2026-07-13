@@ -14,9 +14,6 @@ jobs:
           - os: windows-latest
             platform: Windows
             python_version: "3.12"
-          - os: macos-latest
-            platform: macOS
-            python_version: "3.12"
 
     permissions:
       contents: write
@@ -38,152 +35,20 @@ jobs:
         if: matrix.platform == 'Windows'
         uses: FedericoCarboni/setup-ffmpeg@v3
 
-      - name: Set up FFmpeg (macOS)
-        if: matrix.platform == 'macOS'
-        run: |
-          if ! command -v ffmpeg &> /dev/null; then
-            brew install ffmpeg
-          fi
-
-      # ── Frontend ──
-      - name: Install frontend dependencies
-        run: npm install
-        working-directory: frontend
-
-      - name: Build frontend
-        run: npm run build
-        working-directory: frontend
-
-      # ── Backend dependencies ──
-      - name: Create release directory
-        shell: bash
-        run: |
-          mkdir -p release/whisperMe/python
-          mkdir -p release/whisperMe/ffmpeg
-
-      - name: Copy backend code
-        run: |
-          cp -r backend release/whisperMe/
-          rm -rf release/whisperMe/backend/__pycache__
-          find release/whisperMe/backend -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
-          rm -rf release/whisperMe/backend/venv
-          rm -rf release/whisperMe/backend/.pytest_cache
-          rm -rf release/whisperMe/backend/tests
-          rm -rf release/whisperMe/backend/whisperme.db*
-          rm -rf release/whisperMe/backend/logs
-          rm -rf release/whisperMe/backend/temp_sandbox
-        shell: bash
-
-      - name: Copy frontend build
-        shell: bash
-        run: cp -r frontend/dist release/whisperMe/frontend/
-
-      - name: Copy launcher files
-        run: |
-          cp scripts/launcher.py release/whisperMe/
-          cp start.bat release/whisperMe/ 2>/dev/null || true
-          cp start.sh release/whisperMe/ 2>/dev/null || true
-          cp config.example.json release/whisperMe/
-          cp README.md release/whisperMe/
-        shell: bash
-
-      # ── Python embedded ──
-      - name: Download Python (Windows)
-        if: matrix.platform == 'Windows'
-        run: python scripts/download_embed.py
-
-      - name: Download Python (macOS)
-        if: matrix.platform == 'macOS'
-        shell: bash
-        run: |
-          # Use the system Python framework for packaging
-          PYTHON_PATH=$(which python3)
-          PYTHON_PREFIX=$(python3 -c "import sys; print(sys.prefix)")
-          # Create a portable Python using the installed one
-          mkdir -p release/whisperMe/python/bin
-          mkdir -p release/whisperMe/python/lib
-          cp $PYTHON_PATH release/whisperMe/python/bin/python3
-          # Copy essential libs
-          cp -r $PYTHON_PREFIX/lib/python${{ matrix.python_version }} release/whisperMe/python/lib/ 2>/dev/null || true
-
-      - name: Install pip
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          # Download get-pip for embedded python
-          curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-
-      - name: Install dependencies (Windows)
-        if: matrix.platform == 'Windows'
-        shell: bash
-        run: |
-          target="release/whisperMe/python/Lib/site-packages"
-          mkdir -p "$target"
-          python -m pip install -r backend/requirements.txt --target "$target"
-
-      - name: Install dependencies (macOS)
-        if: matrix.platform == 'macOS'
-        shell: bash
-        run: |
-          target="release/whisperMe/python/lib/python${{ matrix.python_version }}/site-packages"
-          mkdir -p "$target"
-          python3 -m pip install -r backend/requirements.txt --target "$target"
-
-      # ── FFmpeg ──
-      - name: Copy FFmpeg
-        shell: bash
-        run: |
-          cp $(which ffmpeg) release/whisperMe/ffmpeg/
-          cp $(which ffprobe) release/whisperMe/ffmpeg/
-          chmod +x release/whisperMe/ffmpeg/*
-
-      # ── Clean up ──
-      - name: Clean up runtime files
-        shell: bash
-        run: |
-          cd release/whisperMe
-          rm -rf downloads temp_sandbox transcripts hf_cache_models
-          rm -f whisperMe.db whisperMe.db-shm whisperMe.db-wal config.json
-          rm -rf python/include python/share python/Scripts 2>/dev/null || true
-          
-          # Find site-packages directory dynamically (works for both Windows python/Lib and macOS python/lib/python3.12)
-          SITE_PACKAGES=$(find python -type d -name "site-packages" | head -n 1)
-          if [ -n "$SITE_PACKAGES" ]; then
-            echo "Pruning site-packages at $SITE_PACKAGES"
-            rm -rf "$SITE_PACKAGES/torch/include" 2>/dev/null || true
-            rm -f "$SITE_PACKAGES/torch/lib"/*.lib 2>/dev/null || true
-            rm -rf "$SITE_PACKAGES/torch/test" 2>/dev/null || true
-            rm -rf "$SITE_PACKAGES/torch/tests" 2>/dev/null || true
-            rm -rf "$SITE_PACKAGES/numpy/tests" 2>/dev/null || true
-            rm -rf "$SITE_PACKAGES/pip" "$SITE_PACKAGES/setuptools" 2>/dev/null || true
-          fi
-          
-          # Clean up all python bytecode files to reduce file count
-          find python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-
-      - name: Make launcher executable (macOS)
-        if: matrix.platform == 'macOS'
-        run: chmod +x release/whisperMe/start.sh 2>/dev/null || true
-
-      # ── Package ──
-      - name: Create zip (Windows)
-        if: matrix.platform == 'Windows'
-        shell: pwsh
-        run: |
-          Compress-Archive -Path release/whisperMe/* -DestinationPath "release/whisperMe-${{ github.ref_name }}-Windows.zip"
-
-      - name: Create zip (macOS)
-        if: matrix.platform == 'macOS'
-        shell: bash
-        run: |
-          cd release
-          zip -r "whisperMe-${{ github.ref_name }}-macOS.zip" whisperMe/
+      - name: Run Build Script
+        run: python scripts/build_release.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: whisperMe-${{ matrix.platform }}
-          path: release/whisperMe-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          path: release/*.zip
+
+      - name: Upload dependencies artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisperMe-Dependencies-${{ matrix.platform }}
+          path: release/*.tar.gz
 
   release:
     needs: build
@@ -200,4 +65,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: artifacts/**/*.zip
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz

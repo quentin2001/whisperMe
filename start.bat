@@ -15,6 +15,7 @@ ping 127.0.0.1 -n 2 > nul
 
 if exist "%~dp0python\python.exe" (
     echo [INFO] Detected packaged embedded Python environment.
+    "%~dp0python\python.exe" scripts\lazy_load_env.py
     "%~dp0python\python.exe" scripts\launcher.py --foreground
 ) else (
     where python >nul 2>&1
