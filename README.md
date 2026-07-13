@@ -110,9 +110,18 @@ cp config.example.json config.json
 | `online_api_key` | 仅在线 ASR | 在线语音识别 API Key |
 | `online_summary_api_key` | 仅在线 LLM | 在线大模型 API Key |
 
-> 完整配置说明见 [使用手册](docs/user_guide.md)。
+### 4. 离线模型部署（可选）
 
-### 4. 启动
+对于需要 100% 离线运行的用户，您可以在本地提前下载好所需的模型权重，并将其放置在对应的目录下：
+- **ASR/转录模型（本地模式）**：
+  - 如果使用 `FunASR`（默认），请在 ModelScope / Hugging Face 下载 `speech_paraformer-large-vad-punc_asr_nat-zh-cn` 语音包。
+  - 将下载好的权重文件夹整体放入项目根目录下的 `models/funasr/` 目录中。
+  - 后端会自动探测该路径并跳过网络验证，实现 100% 离线转录。
+- **Ollama / LM Studio 本地大模型**：
+  - 请启动 Ollama/LM Studio 并加载对应的模型（如 `qwen2.5:7b-instruct`）。
+  - 在配置面板中，确保“模型 ID”填写正确（Ollama 模式下须与本地已拉取名称完全匹配，LM Studio 下须与当前加载的 ID 匹配）。
+
+### 5. 启动
 
 **方式一：一键启动（开发）**
 

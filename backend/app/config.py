@@ -91,7 +91,7 @@ class AppConfigModel(BaseModel):
     enable_autostart_windows: bool = False
     enable_auto_cleanup: bool = False
     cleanup_threshold_days: int = 30
-    max_concurrent_tasks: int = 4  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
+    max_concurrent_tasks: int = 0  # 0 = 自动检测 GPU 显存决定，1 = 串行，2+ = 并行
     enable_speaker_inference: bool = False
     preload_models: bool = True
     use_mp3_chunks: bool = False

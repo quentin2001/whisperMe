@@ -484,7 +484,12 @@ export default function SettingsView({
                         placeholder="http://localhost:11434" />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
+                        <p className="text-[10px] text-[var(--text-muted)] opacity-85 italic">
+                          {t("* Ollama 模式下模型 ID 须与本地已拉取名称（如 qwen2.5:7b-instruct）完全匹配；LM Studio 多模型加载下也须匹配具体加载的 ID", "* For Ollama, Model ID must match the downloaded name exactly. For LM Studio, it must match the loaded model ID.")}
+                        </p>
+                      </div>
                       <input type="text" value={configData.ollama_model || ""} onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
                         className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_model)}`}
                         placeholder="qwen2.5:7b-instruct" />
