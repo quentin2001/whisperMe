@@ -63,7 +63,9 @@ def test_asr_connection(req: TestConfigRequest):
     try:
         # 简单探测基础域名连通性
         test_url = req.base_url.rstrip("/") + "/models"
-        headers = {"Authorization": f"Bearer {req.api_key}"}
+        headers = {}
+        if req.api_key:
+            headers["Authorization"] = f"Bearer {req.api_key}"
         # 如果是 mimo，可能没有 /models 接口，我们只做基本的网络联通探测
         if "mimo" in req.base_url.lower():
             test_url = req.base_url.rstrip("/")
@@ -82,6 +84,9 @@ def test_local_asr_connection(req: TestLocalAsrRequest):
     try:
         path = req.model_path.strip()
         
+        if path and not os.path.isabs(path):
+            return {"success": False, "message": "错误：必须使用绝对路径（例如 E:\\Projects\\whisperMe\\models\\funasr），不支持相对路径。"}
+
         # 校验 FunASR 依赖是否完好
         try:
             import funasr
@@ -99,7 +104,12 @@ def test_local_asr_connection(req: TestLocalAsrRequest):
             return {"success": False, "message": f"错误：未在您的电脑上找到该目录 ({path})"}
         
         # 简单验证目录下是否有关键文件
-        has_config = os.path.exists(os.path.join(path, "config.yaml")) or os.path.exists(os.path.join(path, "config.json"))
+        has_config = os.path.exists(os.path.join(path, "config.yaml")) or os.path.exists(os.path.join(path, "config.json")) or os.path.exists(os.path.join(path, "model.onnx"))
+        if not has_config:
+            potential_ms = os.path.join(path, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+            if os.path.exists(os.path.join(potential_ms, "configuration.json")) or os.path.exists(os.path.join(potential_ms, "config.yaml")):
+                has_config = True
+        
         if not has_config:
             return {"success": False, "message": f"错误：目录已找到，但里面似乎没有模型文件 (缺少 config.yaml/json)"}
 
@@ -112,7 +122,9 @@ def test_llm_connection(req: TestConfigRequest):
     try:
         # LLM 探测可以调用 /chat/completions 或 /models
         test_url = req.base_url.rstrip("/") + "/models"
-        headers = {"Authorization": f"Bearer {req.api_key}"}
+        headers = {}
+        if req.api_key:
+            headers["Authorization"] = f"Bearer {req.api_key}"
         resp = httpx.get(test_url, headers=headers, timeout=5.0)
         if resp.status_code in [200, 401, 403, 404]: # 404 is allowed because root endpoints of APIs often have no GET route
             return {"success": True, "message": "连接成功"}

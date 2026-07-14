@@ -329,10 +329,10 @@ export default function App() {
     }
   };
 
-  const handleSaveConfig = async (e) => {
+  const handleSaveConfig = async (e, isSilent = false) => {
     if (e && e.preventDefault) e.preventDefault();
     if (configData.asr_mode === "local" && (!configData.local_whisper_model_path || configData.local_whisper_model_path.trim() === "")) {
-      await alert(t("本地 ASR 模型文件夹路径不能为空！", "Local ASR model folder path cannot be empty!"));
+      if (!isSilent) await alert(t("本地 ASR 模型文件夹路径不能为空！", "Local ASR model folder path cannot be empty!"));
       return;
     }
     try {
@@ -342,11 +342,11 @@ export default function App() {
         body: JSON.stringify(configData)
       });
       if (res.status === 200) {
-        await alert(t("配置已成功更新！", "Configuration updated successfully!"), { variant: 'success' });
+        if (!isSilent) await alert(t("配置已成功更新！", "Configuration updated successfully!"), { variant: 'success' });
         fetchConfig();
       }
     } catch (e) {
-      await alert(t("保存配置失败", "Failed to save configuration"));
+      if (!isSilent) await alert(t("保存配置失败", "Failed to save configuration"));
     }
   };
 

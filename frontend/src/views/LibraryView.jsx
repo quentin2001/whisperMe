@@ -314,7 +314,12 @@ export default function LibraryView({
       return configData.online_model || "V3-NOIR";
     } else {
       if (configData.local_whisper_model_path) {
-        return configData.local_whisper_model_path.split(/[\\/]/).pop() || "V3-NOIR";
+        const parts = configData.local_whisper_model_path.split(/[\\/]/);
+        let name = parts.pop() || "V3-NOIR";
+        if (name === "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch" || name.includes("paraformer") || name.toLowerCase() === "funasr") {
+          return "FunASR Paraformer";
+        }
+        return name;
       }
       return "V3-NOIR";
     }

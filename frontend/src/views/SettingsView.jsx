@@ -69,6 +69,17 @@ export default function SettingsView({
   const checkingVersion = useConfigStore(state => state.checkingVersion);
 
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+
+  useEffect(() => {
+    if (!autoSaveEnabled || !configData) return;
+    const timer = setTimeout(() => {
+      if (typeof handleSaveConfig === 'function') {
+        handleSaveConfig(null, true);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [configData, autoSaveEnabled, handleSaveConfig]);
+
   const [isFlashing, setIsFlashing] = useState(true);
   const [ffmpegStatus, setFfmpegStatus] = useState(null);
   const [dependencies, setDependencies] = useState(null);

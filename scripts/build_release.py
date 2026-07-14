@@ -134,6 +134,21 @@ def main():
                 else:
                     zf.write(file_path, arcname)
 
+    # Archive Model Expansion Pack
+    models_dir = os.path.join(base_dir, 'models')
+    models_zip = os.path.join(release_dir, 'whisperMe-Models-Expansion-Pack.zip')
+    print(f"Archiving models to {models_zip}...")
+    if os.path.exists(models_dir):
+        with zipfile.ZipFile(models_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, _, files in os.walk(models_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if '.DS_Store' in file or '.gitkeep' in file:
+                        continue
+                    # preserve the 'models' root folder inside the zip for easier extraction
+                    arcname = os.path.join('models', os.path.relpath(file_path, models_dir))
+                    zf.write(file_path, arcname)
+
     # Clean up temp_deps and intermediate folders
     shutil.rmtree(temp_deps, ignore_errors=True)
     shutil.rmtree(app_dir_win, ignore_errors=True)
