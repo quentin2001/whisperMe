@@ -31,7 +31,39 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 # 基础目录定义
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BACKEND_DIR.parent
-CONFIG_FILE_PATH = PROJECT_DIR / "config.json"
+DATA_DIR = PROJECT_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_FILE_PATH = DATA_DIR / "config.json"
+
+# ==================== 🔄 自动结构升级 (Auto-Migration) ====================
+# 如果旧版本的配置或数据还在根目录，自动将其迁移至 data 隔离区
+_old_config = PROJECT_DIR / "config.json"
+if _old_config.exists() and not CONFIG_FILE_PATH.exists():
+    try:
+        import shutil
+        shutil.move(str(_old_config), str(CONFIG_FILE_PATH))
+    except Exception:
+        pass
+
+_old_prompt = PROJECT_DIR / "prompt.json"
+_new_prompt = DATA_DIR / "prompt.json"
+if _old_prompt.exists() and not _new_prompt.exists():
+    try:
+        import shutil
+        shutil.move(str(_old_prompt), str(_new_prompt))
+    except Exception:
+        pass
+
+for _db_ext in ["", "-shm", "-wal", ".bak"]:
+    _old_db = PROJECT_DIR / f"whisperMe.db{_db_ext}"
+    _new_db = DATA_DIR / f"whisperMe.db{_db_ext}"
+    if _old_db.exists() and not _new_db.exists():
+        try:
+            import shutil
+            shutil.move(str(_old_db), str(_new_db))
+        except Exception:
+            pass
+
 
 # Windows 内核级 8.3 短路径转换器（规避一切中文路径报错）
 def get_short_path_name(long_name_path):
@@ -184,7 +216,7 @@ CUSTOM_STORAGE_DIR = config.get("custom_storage_dir", "").strip()
 if CUSTOM_STORAGE_DIR and Path(CUSTOM_STORAGE_DIR).exists():
     storage_base = Path(CUSTOM_STORAGE_DIR)
 else:
-    storage_base = PROJECT_DIR
+    storage_base = DATA_DIR
 
 DOWNLOADS_DIR = storage_base / "downloads"
 TRANSCRIPTS_DIR = storage_base / "transcripts"

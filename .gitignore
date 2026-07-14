@@ -8,6 +8,8 @@ ffmpeg/
 
 # 1. Credentials & Configuration (🛡️ CRITICAL - DO NOT SECURELY UN-IGNORE)
 config.json
+prompt.json
+data/
 
 # 2. Local Databases & User Data
 tasks_db.json
@@ -71,6 +73,7 @@ logs/
 *.db
 *.db-shm
 *.db-wal
+runs.json
 
 # 12. Local Logo Conversion Assets (Keep git repo clean and light)
 frontend/public/logo-*.png

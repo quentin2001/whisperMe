@@ -1,4 +1,0 @@
-{
-  "system_prompt": "你是一个播客分析助手。",
-  "user_prompt_template": "请分析以下播客转录内容：{transcript}"
-}

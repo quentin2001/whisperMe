@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from app.config import PROJECT_DIR
+from app.config import PROJECT_DIR, DATA_DIR
 
-PROMPT_FILE = PROJECT_DIR / "prompt.json"
+PROMPT_FILE = DATA_DIR / "prompt.json"
 
 DEFAULT_PROMPT = """请根据下面提供的播客数据，生成一份详尽、结构清晰的【播客价值总结分析报告】。
 
