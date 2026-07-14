@@ -81,8 +81,19 @@ class TestLocalAsrRequest(BaseModel):
 def test_local_asr_connection(req: TestLocalAsrRequest):
     try:
         path = req.model_path.strip()
+        
+        # 校验 FunASR 依赖是否完好
+        try:
+            import funasr
+            import torch
+        except ImportError:
+            return {"success": False, "message": "依赖缺失：未能加载 FunASR 或 PyTorch。"}
+
         if not path:
-            return {"success": False, "message": "错误：为了避免意外的巨型文件下载，本地模式必须填写准确的模型绝对路径！"}
+            return {
+                "success": True, 
+                "message": "提示：路径为空。首次转录时，系统将自动在国内高速节点下载模型(约1GB)，请留意黑色控制台窗口的进度条。"
+            }
         
         if not os.path.exists(path):
             return {"success": False, "message": f"错误：未在您的电脑上找到该目录 ({path})"}
@@ -91,13 +102,6 @@ def test_local_asr_connection(req: TestLocalAsrRequest):
         has_config = os.path.exists(os.path.join(path, "config.yaml")) or os.path.exists(os.path.join(path, "config.json"))
         if not has_config:
             return {"success": False, "message": f"错误：目录已找到，但里面似乎没有模型文件 (缺少 config.yaml/json)"}
-
-        # 校验 FunASR 依赖是否完好
-        try:
-            import funasr
-            import torch
-        except ImportError:
-            return {"success": False, "message": "依赖缺失：当前核心极速版未包含 FunASR 与 PyTorch，请确认您下载的是否是完整版。"}
 
         return {"success": True, "message": "本地环境一切正常，模型路径有效！"}
     except Exception as e:
