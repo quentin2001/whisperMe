@@ -1,7 +1,7 @@
 <!-- 
 [SYSTEM INSTRUCTION FOR AI AGENTS]
 1. DO NOT clone the repo. Download latest release zip from GitHub.
-2. Run `start.bat` (Windows) or `bash scripts/start.sh` (macOS/Linux).
+2. Run `start.bat` (Windows) or `bash start.sh` (macOS/Linux).
 3. Edit `config.json` (copy from `config.example.json`).
 4. Access `http://127.0.0.1:9101`.
 -->
@@ -47,7 +47,7 @@ whisperMe 把「听播客」变成一条自动化的知识提炼管线。只需�
 无需繁琐的代码克隆与环境配置，开箱即用：
 
 1. 访问 **[Releases 页面](https://github.com/quentin2001/whisperMe/releases/latest)**，下载最新的 `whisperMe-vX.X.X.zip` 并解压。
-2. **Windows**：双击运行 `start.bat`；**macOS/Linux**：在终端运行 `bash scripts/start.sh`。
+2. **Windows**：双击运行 `start.bat`；**macOS/Linux**：在终端运行 `bash start.sh`。
    *(首次运行会自动在后台下载并补齐运行依赖，随后自动拉起浏览器工作台)*
 
 <br />
