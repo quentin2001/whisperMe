@@ -13,4 +13,5 @@ websocket-client
 pyyaml
 mcp
 imageio-ffmpeg
-
+funasr
+modelscope

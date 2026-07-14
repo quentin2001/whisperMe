@@ -391,7 +391,7 @@ export default function App() {
     // FFmpeg is auto-detected, no need to validate on frontend
 
     if (configData.asr_mode === "local") {
-      if (!configData.local_whisper_model_path || !configData.hf_token) return true;
+      if (!configData.local_whisper_model_path) return true;
     } else if (configData.asr_mode === "online") {
       const provider = configData.online_asr_provider || "mimo";
       if (provider === "custom") {
