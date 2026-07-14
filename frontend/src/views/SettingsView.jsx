@@ -75,9 +75,10 @@ export default function SettingsView({
   const [hfTokenStatus, setHfTokenStatus] = useState(null);
   const [hfChecking, setHfChecking] = useState(false);
   const [testingAsr, setTestingAsr] = useState(false);
+  const [testAsrResult, setTestAsrResult] = useState(null); // 'success' | 'error' | null
+  const [testAsrMessage, setTestAsrMessage] = useState("");
   const [testingLlm, setTestingLlm] = useState(false);
 
-  const [testAsrResult, setTestAsrResult] = useState(null); // 'success' | 'error' | null
   const [testLlmResult, setTestLlmResult] = useState(null);
   const [modelsRegistry, setModelsRegistry] = useState(null);
   const [showAsrRecs, setShowAsrRecs] = useState(false);
@@ -85,17 +86,7 @@ export default function SettingsView({
 
   const testConnection = async (type) => {
     const isAsr = type === "asr";
-    const apiKey = isAsr ? configData.online_api_key : configData.online_summary_api_key;
-    const baseUrl = isAsr ? configData.online_base_url : configData.online_summary_base_url;
-    const model = isAsr ? configData.online_model : configData.online_summary_model;
-
-    if (!baseUrl) {
-      if (isAsr) setTestAsrResult('error');
-      else setTestLlmResult('error');
-      setTimeout(() => isAsr ? setTestAsrResult(null) : setTestLlmResult(null), 3000);
-      return;
-    }
-
+    
     if (isAsr) {
       setTestingAsr(true);
       setTestAsrResult(null);
@@ -105,26 +96,63 @@ export default function SettingsView({
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/config/test/${type}`, {
+      let endpoint = "";
+      let payload = {};
+
+      if (isAsr && configData.asr_mode === "local") {
+        endpoint = `${API_BASE}/api/config/test/local_asr`;
+        payload = { model_path: configData.local_whisper_model_path || "" };
+      } else if (!isAsr && configData.summary_mode === "local") {
+        endpoint = `${API_BASE}/api/config/test/llm`;
+        payload = { api_key: "", base_url: configData.ollama_url || "", model: configData.ollama_model || "" };
+        if (!payload.base_url) throw new Error("Base URL is empty");
+      } else {
+        const apiKey = isAsr ? configData.online_api_key : configData.online_summary_api_key;
+        const baseUrl = isAsr ? configData.online_base_url : configData.online_summary_base_url;
+        const model = isAsr ? configData.online_model : configData.online_summary_model;
+        
+        if (!baseUrl) {
+          throw new Error("Base URL is empty");
+        }
+        endpoint = `${API_BASE}/api/config/test/${type}`;
+        payload = { api_key: apiKey || "", base_url: baseUrl, model: model || "" };
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey || "", base_url: baseUrl, model: model || "" })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
+      
       if (data.success) {
-        if (isAsr) setTestAsrResult('success');
-        else setTestLlmResult('success');
+        if (isAsr) {
+          setTestAsrResult('success');
+          setTestAsrMessage(data.message || t("测试成功", "Success"));
+        } else {
+          setTestLlmResult('success');
+        }
       } else {
-        if (isAsr) setTestAsrResult('error');
-        else setTestLlmResult('error');
+        if (isAsr) {
+          setTestAsrResult('error');
+          setTestAsrMessage(data.message || t("测试失败", "Failed"));
+        } else {
+          setTestLlmResult('error');
+        }
       }
     } catch (e) {
-      if (isAsr) setTestAsrResult('error');
+      if (isAsr) {
+        setTestAsrResult('error');
+        setTestAsrMessage(e.message || "Network Error");
+      }
       else setTestLlmResult('error');
     } finally {
       if (isAsr) {
         setTestingAsr(false);
-        setTimeout(() => setTestAsrResult(null), 3000);
+        setTimeout(() => {
+          setTestAsrResult(null);
+          setTestAsrMessage("");
+        }, 5000);
       } else {
         setTestingLlm(false);
         setTimeout(() => setTestLlmResult(null), 3000);
@@ -295,7 +323,7 @@ export default function SettingsView({
                   <Sliders size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("ASR 引擎设置", "ASR Engine Settings")}</h3>
                 </div>
-                {configData.asr_mode === "online" && (
+                <div className="flex items-center gap-2">
                   <button onClick={() => testConnection("asr")} disabled={testingAsr} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
                     ${testAsrResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
                     : testAsrResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
@@ -308,9 +336,14 @@ export default function SettingsView({
                     <span>{testingAsr ? t("测试中...", "Testing...") : 
                            testAsrResult === 'success' ? t("测试成功", "Success") :
                            testAsrResult === 'error' ? t("测试失败", "Failed") :
-                           t("连通性测试", "Test Connection")}</span>
+                           t("测试连通性", "Test Connection")}</span>
                   </button>
-                )}
+                  {testAsrMessage && (
+                    <span className={`text-[11px] ${testAsrResult === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                      {testAsrMessage}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -444,22 +477,20 @@ export default function SettingsView({
                   <Cpu size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
                 </div>
-                {configData.summary_mode === "online" && (
-                  <button onClick={() => testConnection("llm")} disabled={testingLlm} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
-                    ${testLlmResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
-                    : testLlmResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
-                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
-                  `}>
-                    {testingLlm ? <Loader2 size={12} className="animate-spin" /> : 
-                     testLlmResult === 'success' ? <Check size={12} className="text-green-600" /> :
-                     testLlmResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
-                     <Activity size={12} className="text-[var(--accent-red)]" />}
-                    <span>{testingLlm ? t("测试中...", "Testing...") : 
-                           testLlmResult === 'success' ? t("测试成功", "Success") :
-                           testLlmResult === 'error' ? t("测试失败", "Failed") :
-                           t("连通性测试", "Test Connection")}</span>
-                  </button>
-                )}
+                <button onClick={() => testConnection("llm")} disabled={testingLlm} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
+                  ${testLlmResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
+                  : testLlmResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
+                  : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
+                `}>
+                  {testingLlm ? <Loader2 size={12} className="animate-spin" /> : 
+                   testLlmResult === 'success' ? <Check size={12} className="text-green-600" /> :
+                   testLlmResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
+                   <Activity size={12} className="text-[var(--accent-red)]" />}
+                  <span>{testingLlm ? t("测试中...", "Testing...") : 
+                         testLlmResult === 'success' ? t("测试成功", "Success") :
+                         testLlmResult === 'error' ? t("测试失败", "Failed") :
+                         t("连通性测试", "Test Connection")}</span>
+                </button>
               </div>
 
               <div className="flex flex-col gap-2">

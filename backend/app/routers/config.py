@@ -73,6 +73,35 @@ def test_asr_connection(req: TestConfigRequest):
         return {"success": False, "message": f"服务器返回异常状态码: {resp.status_code}"}
     except Exception as e:
         return {"success": False, "message": f"连接失败: {str(e)}"}
+
+class TestLocalAsrRequest(BaseModel):
+    model_path: str
+
+@router.post("/config/test/local_asr")
+def test_local_asr_connection(req: TestLocalAsrRequest):
+    try:
+        path = req.model_path.strip()
+        if not path:
+            return {"success": False, "message": "错误：为了避免意外的巨型文件下载，本地模式必须填写准确的模型绝对路径！"}
+        
+        if not os.path.exists(path):
+            return {"success": False, "message": f"错误：未在您的电脑上找到该目录 ({path})"}
+        
+        # 简单验证目录下是否有关键文件
+        has_config = os.path.exists(os.path.join(path, "config.yaml")) or os.path.exists(os.path.join(path, "config.json"))
+        if not has_config:
+            return {"success": False, "message": f"错误：目录已找到，但里面似乎没有模型文件 (缺少 config.yaml/json)"}
+
+        # 校验 FunASR 依赖是否完好
+        try:
+            import funasr
+            import torch
+        except ImportError:
+            return {"success": False, "message": "依赖缺失：当前核心极速版未包含 FunASR 与 PyTorch，请确认您下载的是否是完整版。"}
+
+        return {"success": True, "message": "本地环境一切正常，模型路径有效！"}
+    except Exception as e:
+        return {"success": False, "message": f"测试异常: {str(e)}"}
  
 @router.post("/config/test/llm")
 def test_llm_connection(req: TestConfigRequest):
