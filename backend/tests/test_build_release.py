@@ -1,23 +1,9 @@
 import os
 import zipfile
-import pytest
-
-def mock_unix_archive_logic(app_dir_unix, app_zip_unix):
-    with zipfile.ZipFile(app_zip_unix, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(app_dir_unix):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, app_dir_unix)
-                if file.endswith('.sh'):
-                    zinfo = zipfile.ZipInfo.from_file(file_path, arcname)
-                    zinfo.external_attr = 0o755 << 16
-                    with open(file_path, 'rb') as f:
-                        content = f.read()
-                    # Ensure LF line endings in release package
-                    content = content.replace(b'\r\n', b'\n')
-                    zf.writestr(zinfo, content)
-                else:
-                    zf.write(file_path, arcname)
+# Ensure project root is in sys.path so we can import scripts
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from scripts.build_release import archive_unix_app
 
 def test_unix_sh_line_ending_conversion(tmp_path):
     # Setup test directories and files
@@ -39,7 +25,7 @@ def test_unix_sh_line_ending_conversion(tmp_path):
     zip_path = tmp_path / "whisperMe-macOS.zip"
     
     # Run the archiving logic
-    mock_unix_archive_logic(str(src_dir), str(zip_path))
+    archive_unix_app(str(src_dir), str(zip_path))
     
     # Verify the contents of the generated ZIP file
     assert zip_path.exists()

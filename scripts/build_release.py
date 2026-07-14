@@ -21,6 +21,23 @@ def ignore_files(dir, contents):
             ignored.append(item)
     return ignored
 
+def archive_unix_app(app_dir_unix, app_zip_unix):
+    with zipfile.ZipFile(app_zip_unix, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(app_dir_unix):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, app_dir_unix)
+                if file.endswith('.sh'):
+                    zinfo = zipfile.ZipInfo.from_file(file_path, arcname)
+                    zinfo.external_attr = 0o755 << 16
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                    # Ensure LF line endings in release package
+                    content = content.replace(b'\r\n', b'\n')
+                    zf.writestr(zinfo, content)
+                else:
+                    zf.write(file_path, arcname)
+
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     release_dir = os.path.join(base_dir, 'release')
@@ -121,21 +138,7 @@ def main():
     # Archive whisperMe macOS
     app_zip_unix = os.path.join(release_dir, 'whisperMe-macOS.zip')
     print(f"Archiving app to {app_zip_unix}...")
-    with zipfile.ZipFile(app_zip_unix, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(app_dir_unix):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, app_dir_unix)
-                if file.endswith('.sh'):
-                    zinfo = zipfile.ZipInfo.from_file(file_path, arcname)
-                    zinfo.external_attr = 0o755 << 16
-                    with open(file_path, 'rb') as f:
-                        content = f.read()
-                    # Ensure LF line endings in release package
-                    content = content.replace(b'\r\n', b'\n')
-                    zf.writestr(zinfo, content)
-                else:
-                    zf.write(file_path, arcname)
+    archive_unix_app(app_dir_unix, app_zip_unix)
 
     # Archive Model Expansion Pack
     models_dir = os.path.join(base_dir, 'models')
