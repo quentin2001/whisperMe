@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export const useConfigStore = create((set) => ({
   configData: {
-    language: "zh",
+    language: localStorage.getItem("whisperme_language") || "zh",
     output_dir: "",
     default_model: "base",
     device: "auto",

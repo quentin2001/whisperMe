@@ -12,6 +12,7 @@ import socket
 import argparse
 import subprocess
 import webbrowser
+import urllib.request
 
 # PyInstaller 打包后 __file__ 指向临时目录，需要用 exe 所在目录
 if getattr(sys, 'frozen', False):
@@ -75,13 +76,15 @@ def find_python():
 
 
 def wait_for_server(timeout=30):
-    """轮询等待服务器就绪"""
+    """轮询等待服务器就绪并成功返回网页"""
     start = time.time()
     while time.time() - start < timeout:
         try:
-            with socket.create_connection(("127.0.0.1", PORT), timeout=1):
-                return True
-        except (ConnectionRefusedError, OSError):
+            req = urllib.request.Request(URL, method="GET")
+            with urllib.request.urlopen(req, timeout=1.0) as response:
+                if response.status == 200:
+                    return True
+        except Exception:
             time.sleep(0.3)
     return False
 

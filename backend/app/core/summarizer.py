@@ -39,7 +39,7 @@ class PodcastSummarizer:
 
 
 
-    def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None) -> str:
+    def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None, custom_prompt: str = None) -> str:
         """
         根据播客元数据、热门评论以及转录剧本，调用大模型生成报告（支持本地与在线 API 切换）
         """
@@ -49,16 +49,26 @@ class PodcastSummarizer:
 
 
 
-        # 3. 组装转录文本
+        # 3. 组装转录文本并自动识别是否有多个发言人
+        raw_speakers = set(seg.get("speaker") or "" for seg in transcript_segments)
+        raw_speakers = {s for s in raw_speakers if s and s != "UNKNOWN_SPEAKER" and s != "未知发言人"}
+        has_multiple_speakers = len(raw_speakers) > 1
+
         transcript_text_lines = []
         for seg in transcript_segments:
-            speaker_name = seg["speaker"]
-            if speaker_mappings and speaker_name in speaker_mappings:
-                speaker_name = speaker_mappings[speaker_name]
-            line = f"{seg['timestamp_str']} {speaker_name}: {seg['text']}"
+            text = seg.get("text", "").strip()
+            if not text:
+                continue
+            
+            if has_multiple_speakers:
+                speaker_name = seg.get("speaker") or "未知发言人"
+                if speaker_mappings and speaker_name in speaker_mappings:
+                    speaker_name = speaker_mappings[speaker_name]
+                line = f"{speaker_name}: {text}"
+            else:
+                line = text
+                
             transcript_text_lines.append(line)
-
-        full_transcript_text = "\n".join(transcript_text_lines)
 
         # 4. 组装评论内容
         comments_text_lines = []
@@ -71,12 +81,15 @@ class PodcastSummarizer:
         chunk_threshold = max_char_len  # 超过此长度则分段总结
 
         # 6. 动态加载 Prompt，支持前端实时编辑
-        prompt_dict = load_prompt()
-        user_prompt = prompt_dict.get("prompt", "")
-        if not user_prompt:
-            base_prompt = prompt_dict.get("base_prompt", "")
-            action_prompt = prompt_dict.get("action_prompt", "")
-            user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
+        if custom_prompt:
+            user_prompt = custom_prompt
+        else:
+            prompt_dict = load_prompt()
+            user_prompt = prompt_dict.get("prompt", "")
+            if not user_prompt:
+                base_prompt = prompt_dict.get("base_prompt", "")
+                action_prompt = prompt_dict.get("action_prompt", "")
+                user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
 
         # 6.5. 如果未开启或未识别出多个发言人，动态注入 Prompt 刚性约束
         unique_speakers = set(seg.get("speaker") for seg in transcript_segments if seg.get("speaker"))
@@ -111,19 +124,20 @@ class PodcastSummarizer:
 """
 
         try:
-            if len(full_transcript_text) > chunk_threshold:
+            if len(transcript_text_lines) > 0 and sum(len(l) for l in transcript_text_lines) > chunk_threshold:
                 # ========== 长播客分段总结模式 ==========
                 chunk_chars = max_char_len - 5000  # 留余量给 prompt 本身
                 chunks = self._split_transcript_into_chunks(transcript_text_lines, chunk_chars, overlap_lines=15)
                 total_chunks = len(chunks)
-                print(f"📄 [LOG] 转录文本较长 ({len(full_transcript_text)}字)，自动分为 {total_chunks} 段进行分段总结...")
+                print(f"📄 [LOG] 转录文本较长，自动分为 {total_chunks} 段进行分段总结...")
 
                 partial_summaries = []
                 for i, chunk_lines in enumerate(chunks):
                     chunk_text = "\n".join(chunk_lines)
+
                     chunk_data = f"""{meta_block}
 
-## 3. 播客对话转录文本 - 第 {i+1}/{total_chunks} 段（按时间戳与发言人排列）：
+## 3. 播客对话转录文本 - 第 {i+1}/{total_chunks} 段（按发言人排列）：
 ---
 {chunk_text}
 ---
@@ -133,11 +147,12 @@ class PodcastSummarizer:
 请针对以上第 {i+1}/{total_chunks} 段转录内容，生成一份**该段落的局部总结报告**。要求：
 1. 严格遵守上方的核心防伪守则。
 2. 按照标准报告结构输出，但仅覆盖本段中讨论的内容。
-3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。
-4. 在报告最末尾增加一行：`本段覆盖时间范围：{chunk_lines[0][:12] if chunk_lines else '?'} — {chunk_lines[-1][:12] if chunk_lines else '?'}`"""
-                    chunk_prompt = user_prompt.replace("{{PODCAST_DATA}}", chunk_data + chunk_suffix)
+3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。"""
+                    # 制作静态的 System Prompt，用于触发 Prefix Caching 缓存
+                    system_prompt = user_prompt.replace("{{PODCAST_DATA}}", "\n[请仔细阅读下一条消息中提供的转录文本，并根据本指令生成总结报告]\n")
+                    chunk_prompt_user = chunk_data + chunk_suffix
                     print(f"📝 [LOG] 正在总结第 {i+1}/{total_chunks} 段...")
-                    partial = call_llm(chunk_prompt, summary_mode=summary_mode, label="LLM局部总结", timeout=600.0, temperature=0.2)
+                    partial = call_llm(chunk_prompt_user, system_prompt=system_prompt, summary_mode=summary_mode, label="LLM局部总结", timeout=600.0, temperature=0.2)
                     partial_summaries.append(partial)
                     print(f"✅ [LOG] 第 {i+1}/{total_chunks} 段总结完成")
 
@@ -162,16 +177,18 @@ class PodcastSummarizer:
 
             else:
                 # ========== 普通单次总结模式 ==========
+                transcript_text = "\n".join(transcript_text_lines)
+
                 data_block = f"""{meta_block}
 
-## 3. 播客对话转录文本（按时间戳与发言人排列）：
+## 3. 播客对话转录文本：
 ---
-{full_transcript_text}
+{transcript_text}
 ---
 """
-                prompt = user_prompt.replace("{{PODCAST_DATA}}", data_block)
-                print(f"📝 [LOG] 转录文本长度正常 ({len(full_transcript_text)}字)，使用单次总结模式")
-                summary_md = call_llm(prompt, summary_mode=summary_mode, label="LLM全局总结", timeout=600.0, temperature=0.2)
+                system_prompt = user_prompt.replace("{{PODCAST_DATA}}", "\n[请仔细阅读下一条消息中提供的转录文本，并根据本指令生成总结报告]\n")
+                print(f"📝 [LOG] 转录文本长度正常，使用单次总结模式")
+                summary_md = call_llm(data_block, system_prompt=system_prompt, summary_mode=summary_mode, label="LLM全局总结", timeout=600.0, temperature=0.2)
                 print("🟢 [LOG] 大模型总结报告生成顺利完成！")
 
             return summary_md

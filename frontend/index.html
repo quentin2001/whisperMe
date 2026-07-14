@@ -1,12 +1,21 @@
 <!doctype html>
-<html lang="en" class="light">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>whisperMe - 本地播客声纹自动化处理中心</title>
-    
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('whisperme_theme_mode');
+          if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-background text-on-surface font-body-lg overflow-x-hidden antialiased selection:bg-primary-container selection:text-white">
     <div id="root"></div>

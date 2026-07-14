@@ -14,6 +14,12 @@ export const I18nProvider = ({ children }) => {
 
   const lang = configData?.language || (isDemo ? 'en' : 'zh');
 
+  useEffect(() => {
+    if (lang) {
+      localStorage.setItem("whisperme_language", lang);
+    }
+  }, [lang]);
+
   const setLang = (newLang) => {
     setConfigData(prev => ({ ...prev, language: newLang }));
   };

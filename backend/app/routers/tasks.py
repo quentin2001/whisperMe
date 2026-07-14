@@ -133,6 +133,18 @@ def sanitize_floats(obj):
             return 0.0
     return obj
 
+def _check_and_clear_missing_audio(task):
+    if not task: return task
+    audio_url = task.get("audio_url")
+    if audio_url:
+        import os
+        from app.config import SHORT_DOWNLOADS_DIR
+        filename = os.path.basename(audio_url)
+        local_path = os.path.join(SHORT_DOWNLOADS_DIR, filename)
+        if not os.path.exists(local_path):
+            task["audio_url"] = ""
+    return task
+
 # --- API Endpoints ---
 
 @router.get("")
@@ -140,6 +152,7 @@ def list_tasks():
     tasks = db.get_all_tasks()
     # 动态注入排队位置
     for t in tasks:
+        _check_and_clear_missing_audio(t)
         if t.get("status") == "pending":
             pos = queue_manager.get_queue_position(t.get("id"))
             t["queue_position"] = pos
@@ -183,6 +196,7 @@ def get_task_details(task_id: str):
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="未找到该任务")
+    task = _check_and_clear_missing_audio(task)
     # 动态注入排队位置
     if task.get("status") == "pending":
         pos = queue_manager.get_queue_position(task.get("id"))
@@ -621,8 +635,12 @@ def rename_speaker(task_id: str, req: RenameSpeakerRequest):
         
     return {"success": True, "speaker_mappings": mappings}
 
+
+class StartSummaryRequest(BaseModel):
+    prompt_text: str = None
+
 @router.post("/{task_id}/summary/start")
-def start_summary(task_id: str, background_tasks: BackgroundTasks):
+def start_summary(task_id: str, req: StartSummaryRequest, background_tasks: BackgroundTasks):
     """
     手动发起大模型深度总结，支持转录完成初次启动或后续重新生成
     """
@@ -633,6 +651,8 @@ def start_summary(task_id: str, background_tasks: BackgroundTasks):
     if task["status"] not in ["completed", "failed", "transcribed"]:
         raise HTTPException(status_code=400, detail="任务处于非就绪状态，无法启动总结")
 
+    custom_prompt = req.prompt_text if req else None
+
     def run_re_summarize():
         try:
             db.update_task_field(task_id, status="summarizing", progress=80.0)
@@ -640,7 +660,8 @@ def start_summary(task_id: str, background_tasks: BackgroundTasks):
                 task["metadata"], 
                 task["transcript"], 
                 speaker_mappings=task.get("speaker_mappings"),
-                summary_mode=task.get("summary_mode", "local")
+                summary_mode=task.get("summary_mode", "local"),
+                custom_prompt=custom_prompt
             )
             db.update_task_field(task_id, status="completed", summary=summary_report, progress=100.0)
         except Exception as ex:

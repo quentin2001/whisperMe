@@ -147,6 +147,15 @@ BUILTIN_TEMPLATES = {
 ## 9. 事实一致性与局限性声明
 Shownotes 中提到但转录中未展开的内容（若有则列出，若无则说明一致）。""",
     },
+    "custom": {
+        "name": "自定义/空白",
+        "name_en": "Custom / Blank",
+        "description": "完全空白的模板，由您自由书写提示词",
+        "description_en": "A completely blank template for you to write your own custom prompt",
+        "prompt": """{{PODCAST_DATA}}
+ 
+请根据以上播客转录内容，生成总结：""",
+    },
 }
 
 # 兼容旧格式：合并 base_prompt + action_prompt 为单个 prompt

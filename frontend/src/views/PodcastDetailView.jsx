@@ -997,7 +997,7 @@ export default function PodcastDetailView({
               placeholder={t("搜索转录文本...", "Search transcript...")}
               value={searchWord}
               onChange={(e) => setSearchWord(e.target.value)}
-              className="pl-9 pr-4 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg text-xs w-56 focus:outline-none focus:ring-1 focus:ring-[#f62440]"
+              className="pl-9 pr-4 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-primary)]/40 rounded-lg text-xs w-56 focus:outline-none focus:ring-1 focus:ring-[#f62440]"
             />
           </div>
 

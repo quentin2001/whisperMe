@@ -12,6 +12,7 @@ import { useConfigStore } from "./store/configStore.js";
 import { useTaskStore } from "./store/taskStore.js";
 import { useUIStore } from "./store/uiStore.js";
 import { useTranslation } from "./contexts/I18nContext.jsx";
+import { Loader2 } from "lucide-react";
 
 
 const BACKEND_URL = API_BASE;
@@ -194,15 +195,21 @@ export default function App() {
   };
 
   const fetchTaskDetail = async (id, isSilent = false) => {
+    console.log("[DEBUG] fetchTaskDetail triggered for task ID:", id, "isSilent:", isSilent);
+    if (!id) return;
     if (!isSilent) setDetailLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/tasks/${id}`);
+      console.log("[DEBUG] fetchTaskDetail response status:", res.status);
       if (res.status === 200) {
         const data = await res.json();
+        console.log("[DEBUG] fetchTaskDetail success, task title:", data.title);
         setActiveTask(data);
+      } else {
+        console.error("[DEBUG] fetchTaskDetail failed with status:", res.status);
       }
     } catch (e) {
-      console.error("获取任务详情失败:", e);
+      console.error("[DEBUG] fetchTaskDetail exception:", e);
     } finally {
       if (!isSilent) setDetailLoading(false);
     }
@@ -227,6 +234,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    console.log("[DEBUG] useEffect [activeTaskId] triggered. activeTaskId is:", activeTaskId);
     setIsAudioMissing(false);
     setCurrentTime(0);
     setDuration(0);
@@ -241,6 +249,7 @@ export default function App() {
       }, 3000);
       return () => clearInterval(detailInterval);
     } else {
+      console.log("[DEBUG] activeTaskId is null, setting activeTask to null");
       setActiveTask(null);
     }
   }, [activeTaskId]);
@@ -458,6 +467,10 @@ export default function App() {
 
       {/* Main split screens panel area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)] transition-colors duration-300" id="primary-content-workspace">
+        {(() => {
+          console.log("[DEBUG] Render main panel. activeTab:", activeTab, "activeTask:", activeTask);
+          return null;
+        })()}
         {activeTab === "detail" && activeTask ? (
           /* Active full screen transcript parser */
           <PodcastDetailView
@@ -479,6 +492,10 @@ export default function App() {
               setActiveTab(detailSourceTab === "workstation" ? "workstation" : "dashboard");
             }}
           />
+        ) : activeTab === "detail" && !activeTask ? (
+          <div className="flex-1 flex items-center justify-center bg-[var(--bg-primary)]">
+            <Loader2 className="w-8 h-8 text-[var(--accent-red)] animate-spin" />
+          </div>
         ) : (
           /* Tab contents switch */
           <>

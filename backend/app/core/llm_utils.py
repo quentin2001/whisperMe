@@ -46,7 +46,7 @@ def _execute_llm_call(api_url: str, payload: dict, headers: dict, timeout: float
         raise LLMError(f"LLM API error (code {status_code}): {detail_msg}")
 
 
-def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
+def call_llm(prompt: str, system_prompt: str = None, summary_mode: str = None, label: str = "LLM调用",
              temperature: float = 0.1, timeout: float = 120.0) -> str:
     """Call the configured LLM (local Ollama or online OpenAI-compatible API).
 
@@ -70,13 +70,25 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
         ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
         target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
         base_url = ollama_url.rstrip('/')
+        
+        # Auto-append /v1 for OpenAI compatibility (supports LM Studio, Ollama, vLLM, etc.)
+        if not base_url.endswith('/v1') and not base_url.endswith('/api'):
+            base_url += '/v1'
+            
         api_url = f"{base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         print(f"🤖 [LOG] {label}【本地模式】 - 接口: {api_url} | 模型: {target_model}")
 
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+    else:
+        messages.append({"role": "user", "content": prompt})
+
     payload = {
         "model": target_model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "stream": False,
         "temperature": temperature
     }
