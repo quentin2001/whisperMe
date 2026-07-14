@@ -51,7 +51,7 @@ if [ -d "venv" ]; then
             exit 1
         fi
         echo "[INFO] Recreating virtual environment..."
-        rm -rf venv
+        rm -rf venv || { echo "❌ Error: Failed to remove old virtual environment."; exit 1; }
     fi
 fi
 

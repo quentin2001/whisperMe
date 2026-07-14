@@ -29,7 +29,8 @@ def archive_unix_app(app_dir_unix, app_zip_unix):
                 arcname = os.path.relpath(file_path, app_dir_unix)
                 if file.endswith('.sh'):
                     zinfo = zipfile.ZipInfo.from_file(file_path, arcname)
-                    zinfo.external_attr = 0o755 << 16
+                    zinfo.create_system = 3  # Force UNIX system type
+                    zinfo.external_attr = 0o100755 << 16  # S_IFREG | 0o755
                     with open(file_path, 'rb') as f:
                         content = f.read()
                     # Ensure LF line endings in release package

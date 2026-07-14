@@ -34,7 +34,8 @@ def test_unix_sh_line_ending_conversion(tmp_path):
         # Check test_crlf.sh (should be converted to LF)
         assert "test_crlf.sh" in zf.namelist()
         info = zf.getinfo("test_crlf.sh")
-        assert info.external_attr == (0o755 << 16)
+        assert info.create_system == 3
+        assert info.external_attr == (0o100755 << 16)
         content = zf.read("test_crlf.sh")
         assert b"\r\n" not in content
         assert content == b"#!/bin/bash\necho 'hello'\n"
@@ -42,7 +43,8 @@ def test_unix_sh_line_ending_conversion(tmp_path):
         # Check test_lf.sh (should remain LF)
         assert "test_lf.sh" in zf.namelist()
         info = zf.getinfo("test_lf.sh")
-        assert info.external_attr == (0o755 << 16)
+        assert info.create_system == 3
+        assert info.external_attr == (0o100755 << 16)
         content = zf.read("test_lf.sh")
         assert b"\r\n" not in content
         assert content == b"#!/bin/bash\necho 'world'\n"
