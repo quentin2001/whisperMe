@@ -130,7 +130,10 @@ def main():
                     zinfo = zipfile.ZipInfo.from_file(file_path, arcname)
                     zinfo.external_attr = 0o755 << 16
                     with open(file_path, 'rb') as f:
-                        zf.writestr(zinfo, f.read())
+                        content = f.read()
+                    # Ensure LF line endings in release package
+                    content = content.replace(b'\r\n', b'\n')
+                    zf.writestr(zinfo, content)
                 else:
                     zf.write(file_path, arcname)
 
