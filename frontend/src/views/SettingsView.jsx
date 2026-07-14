@@ -80,6 +80,7 @@ export default function SettingsView({
   const [testingLlm, setTestingLlm] = useState(false);
 
   const [testLlmResult, setTestLlmResult] = useState(null);
+  const [testLlmMessage, setTestLlmMessage] = useState("");
   const [modelsRegistry, setModelsRegistry] = useState(null);
   const [showAsrRecs, setShowAsrRecs] = useState(false);
   const [showLlmRecs, setShowLlmRecs] = useState(false);
@@ -131,6 +132,7 @@ export default function SettingsView({
           setTestAsrMessage(data.message || t("测试成功", "Success"));
         } else {
           setTestLlmResult('success');
+          setTestLlmMessage(data.message || t("测试成功", "Success"));
         }
       } else {
         if (isAsr) {
@@ -138,6 +140,7 @@ export default function SettingsView({
           setTestAsrMessage(data.message || t("测试失败", "Failed"));
         } else {
           setTestLlmResult('error');
+          setTestLlmMessage(data.message || t("测试失败", "Failed"));
         }
       }
     } catch (e) {
@@ -145,7 +148,10 @@ export default function SettingsView({
         setTestAsrResult('error');
         setTestAsrMessage(e.message || "Network Error");
       }
-      else setTestLlmResult('error');
+      else {
+        setTestLlmResult('error');
+        setTestLlmMessage(e.message || "Network Error");
+      }
     } finally {
       if (isAsr) {
         setTestingAsr(false);
@@ -155,7 +161,10 @@ export default function SettingsView({
         }, 5000);
       } else {
         setTestingLlm(false);
-        setTimeout(() => setTestLlmResult(null), 3000);
+        setTimeout(() => {
+          setTestLlmResult(null);
+          setTestLlmMessage("");
+        }, 5000);
       }
     }
   };
@@ -477,20 +486,27 @@ export default function SettingsView({
                   <Cpu size={18} className="text-[var(--accent-red)]" />
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">{t("LLM 总结大模型配置", "LLM Summary Settings")}</h3>
                 </div>
-                <button onClick={() => testConnection("llm")} disabled={testingLlm} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
-                  ${testLlmResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
-                  : testLlmResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
-                  : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
-                `}>
-                  {testingLlm ? <Loader2 size={12} className="animate-spin" /> : 
-                   testLlmResult === 'success' ? <Check size={12} className="text-green-600" /> :
-                   testLlmResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
-                   <Activity size={12} className="text-[var(--accent-red)]" />}
-                  <span>{testingLlm ? t("测试中...", "Testing...") : 
-                         testLlmResult === 'success' ? t("测试成功", "Success") :
-                         testLlmResult === 'error' ? t("测试失败", "Failed") :
-                         t("连通性测试", "Test Connection")}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => testConnection("llm")} disabled={testingLlm} className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 border outline-none
+                    ${testLlmResult === 'success' ? 'bg-green-100/50 text-green-700 border-green-200'
+                    : testLlmResult === 'error' ? 'bg-red-100/50 text-red-700 border-red-200'
+                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border-[var(--border-primary)]/40'}
+                  `}>
+                    {testingLlm ? <Loader2 size={12} className="animate-spin" /> : 
+                     testLlmResult === 'success' ? <Check size={12} className="text-green-600" /> :
+                     testLlmResult === 'error' ? <AlertCircle size={12} className="text-red-600" /> :
+                     <Activity size={12} className="text-[var(--accent-red)]" />}
+                    <span>{testingLlm ? t("测试中...", "Testing...") : 
+                           testLlmResult === 'success' ? t("测试成功", "Success") :
+                           testLlmResult === 'error' ? t("测试失败", "Failed") :
+                           t("测试连通性", "Test Connection")}</span>
+                  </button>
+                  {testLlmMessage && (
+                    <span className={`text-[11px] ${testLlmResult === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                      {testLlmMessage}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
