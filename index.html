@@ -1,13 +1,22 @@
 <!doctype html>
-<html lang="en" class="light">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>whisperMe - 本地播客声纹自动化处理中心</title>
-    
-    <script type="module" crossorigin src="./assets/index-DTCf3cCN.js"></script>
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('whisperme_theme_mode');
+          if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CQ6LC13A.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-B_PtCV9E.css">
   </head>
   <body class="bg-background text-on-surface font-body-lg overflow-x-hidden antialiased selection:bg-primary-container selection:text-white">
