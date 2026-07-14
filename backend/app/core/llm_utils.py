@@ -70,9 +70,7 @@ def call_llm(prompt: str, summary_mode: str = None, label: str = "LLM调用",
         ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
         target_model = config.get("ollama_model", "qwen2.5:7b-instruct").strip()
         base_url = ollama_url.rstrip('/')
-        if '/v1' not in base_url and '11434' not in base_url: api_url = f"{base_url}/v1/chat/completions"
-        elif '11434' in base_url and '/v1' not in base_url: api_url = f"{base_url}/v1/chat/completions"
-        else: api_url = f"{base_url}/chat/completions"
+        api_url = f"{base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         print(f"🤖 [LOG] {label}【本地模式】 - 接口: {api_url} | 模型: {target_model}")
 
