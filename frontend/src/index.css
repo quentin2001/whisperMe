@@ -219,6 +219,19 @@
   animation: waveMotion 3s ease-in-out infinite;
 }
 
+
+/* Star shimmering animation for AI Agent Sparkles icon */
+@keyframes starShimmer {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.animate-star-shimmer {
+  animation: starShimmer 2.2s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: center;
+}
+
 /* Custom scrollbars that look premium and warm, expanding when hovered or active */
 ::-webkit-scrollbar {
   width: 12px;
