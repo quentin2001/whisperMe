@@ -665,7 +665,6 @@ export default function PodcastDetailView({
         method: "DELETE"
       });
       if (res.ok) {
-        await alert(t("模板已成功删除！", "Template deleted successfully!"), { variant: 'success' });
         await fetchTemplates();
         handleTemplateSelect("standard");
       } else {

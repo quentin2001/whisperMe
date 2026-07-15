@@ -340,7 +340,6 @@ export default function SettingsView({
           method: "DELETE"
         });
         if (res.ok) {
-          alert(t("模板已删除！", "Template deleted!"), { variant: "success" });
           await refreshTemplates("standard");
         } else {
           alert(t("删除模板失败", "Failed to delete template"), { variant: "warning" });
