@@ -783,9 +783,9 @@ export default function SettingsView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                 {/* Left Column - Template Sidebar List */}
-                <div className="md:col-span-1 border-r border-[var(--border-primary)]/10 pr-4 flex flex-col gap-3">
+                <div className="md:col-span-4 border-r border-[var(--border-primary)]/10 pr-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                       {t("模板列表", "Templates")}
@@ -825,28 +825,28 @@ export default function SettingsView({
                         <button
                           type="button"
                           onClick={() => handleTemplateSelect(tpl.id)}
-                          className={`flex-1 py-2.5 px-3 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5 min-w-0
+                           className={`flex-1 py-2.5 px-2.5 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5 min-w-0
                             ${selectedTemplate === tpl.id
                               ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
                               : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
                             }
                           `}
                         >
-                          <div className="flex items-center justify-between w-full min-w-0">
-                            <span className="text-xs font-bold truncate pr-1 flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
+                            <span className="text-xs font-bold truncate flex items-center gap-1.5 min-w-0">
                               <span className="truncate">{tpl.name}</span>
                               {tpl.is_default && (
-                                <span className="shrink-0 text-[8px] bg-[var(--accent-red)] text-white px-1 py-0.2 rounded font-extrabold tracking-wide uppercase scale-90">
+                                <span className="shrink-0 text-[8px] bg-[var(--accent-red)] text-white px-1 py-0.5 rounded font-extrabold tracking-wide uppercase leading-none">
                                   {t("默认", "Default")}
                                 </span>
                               )}
                             </span>
                             {tpl.is_builtin ? (
-                              <span className="shrink-0 text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 rounded scale-90 origin-right">
+                              <span className="shrink-0 text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 py-0.5 rounded font-semibold leading-none">
                                 {t("内置", "Built-in")}
                               </span>
                             ) : (
-                              <span className="shrink-0 text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 rounded scale-90 origin-right">
+                              <span className="shrink-0 text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 py-0.5 rounded font-semibold leading-none">
                                 {t("自定义", "Custom")}
                               </span>
                             )}
@@ -864,7 +864,7 @@ export default function SettingsView({
                 </div>
 
                 {/* Right Column - Editor */}
-                <div className="md:col-span-3 flex flex-col gap-4">
+                <div className="md:col-span-8 flex flex-col gap-4">
                   {/* Template Metadata Info / Inputs */}
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
