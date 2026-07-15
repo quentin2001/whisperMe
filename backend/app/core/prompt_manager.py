@@ -213,19 +213,70 @@ def save_prompt(data: dict) -> None:
 
 
 def get_templates() -> dict:
-    """返回内置模板字典（供前端选择）。"""
-    return {
-        tid: {
+    """返回所有模板字典（内置 + 自定义）。"""
+    data = load_prompt()
+    custom = data.get("custom_templates", {})
+    
+    templates = {}
+    for tid, t in BUILTIN_TEMPLATES.items():
+        templates[tid] = {
             "name": t["name"],
             "name_en": t["name_en"],
             "description": t["description"],
             "description_en": t["description_en"],
+            "is_builtin": True
         }
-        for tid, t in BUILTIN_TEMPLATES.items()
+    for tid, t in custom.items():
+        templates[tid] = {
+            "name": t.get("name", "Custom"),
+            "name_en": t.get("name_en", t.get("name", "Custom")),
+            "description": t.get("description", ""),
+            "description_en": t.get("description_en", t.get("description", "")),
+            "is_builtin": False
+        }
+    return templates
+
+
+def get_template_prompt(template_id: str) -> str | None:
+    """返回指定模板的完整 prompt 文本，不存在则返回 None。"""
+    if template_id in BUILTIN_TEMPLATES:
+        return BUILTIN_TEMPLATES[template_id]["prompt"]
+    data = load_prompt()
+    custom = data.get("custom_templates", {})
+    if template_id in custom:
+        return custom[template_id]["prompt"]
+    return None
+
+
+def save_custom_template(template_id: str, name: str, description: str, prompt: str) -> str:
+    """保存或创建自定义模板。"""
+    import time
+    if template_id in BUILTIN_TEMPLATES:
+        raise ValueError("Cannot overwrite builtin templates")
+    data = load_prompt()
+    if "custom_templates" not in data:
+        data["custom_templates"] = {}
+    
+    tid = template_id if template_id else f"custom_{int(time.time() * 1000)}"
+    data["custom_templates"][tid] = {
+        "id": tid,
+        "name": name,
+        "name_en": name,
+        "description": description,
+        "description_en": description,
+        "prompt": prompt
     }
+    save_prompt(data)
+    return tid
 
 
-def get_template_prompt(template_id: str) -> str:
-    """返回指定模板的完整 prompt 文本。"""
-    t = BUILTIN_TEMPLATES.get(template_id)
-    return t["prompt"] if t else ""
+def delete_custom_template(template_id: str) -> bool:
+    """删除指定的自定义模板。"""
+    if template_id in BUILTIN_TEMPLATES:
+        return False
+    data = load_prompt()
+    if "custom_templates" in data and template_id in data["custom_templates"]:
+        del data["custom_templates"][template_id]
+        save_prompt(data)
+        return True
+    return False

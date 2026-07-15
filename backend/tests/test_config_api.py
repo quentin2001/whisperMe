@@ -95,3 +95,94 @@ class TestPrompt:
         # 验证保存成功
         resp2 = client.get("/api/prompt")
         assert resp2.status_code == 200
+
+
+class TestCustomPromptTemplates:
+    """GET/POST/DELETE /api/prompt/template(s)"""
+
+    def test_custom_templates_lifecycle(self, client):
+        # 1. Get templates list initially
+        resp = client.get("/api/prompt/templates")
+        assert resp.status_code == 200
+        templates = resp.json()
+        assert "standard" in templates
+        assert templates["standard"]["is_builtin"] is True
+
+        # 2. Save a new custom template
+        custom_data = {
+            "name": "My Custom Template",
+            "description": "Custom prompt template description",
+            "prompt": "Custom prompt text with {{PODCAST_DATA}}."
+        }
+        resp = client.post("/api/prompt/template", json=custom_data)
+        assert resp.status_code == 200
+        res = resp.json()
+        assert res["status"] == "ok"
+        custom_id = res["id"]
+        assert custom_id.startswith("custom_")
+
+        # 3. Get templates list and confirm custom one is there
+        resp = client.get("/api/prompt/templates")
+        assert resp.status_code == 200
+        templates = resp.json()
+        assert custom_id in templates
+        assert templates[custom_id]["is_builtin"] is False
+        assert templates[custom_id]["name"] == "My Custom Template"
+
+        # 4. Get specific custom template prompt
+        resp = client.get(f"/api/prompt/template/{custom_id}")
+        assert resp.status_code == 200
+        res = resp.json()
+        assert res["id"] == custom_id
+        assert res["prompt"] == "Custom prompt text with {{PODCAST_DATA}}."
+
+        # 5. Update the custom template
+        update_data = {
+            "id": custom_id,
+            "name": "My Custom Template Updated",
+            "description": "Updated description",
+            "prompt": "Updated prompt text."
+        }
+        resp = client.post("/api/prompt/template", json=update_data)
+        assert resp.status_code == 200
+        assert resp.json()["id"] == custom_id
+
+        # 6. Verify the update
+        resp = client.get(f"/api/prompt/template/{custom_id}")
+        assert resp.status_code == 200
+        assert resp.json()["prompt"] == "Updated prompt text."
+
+        # 7. Delete the custom template
+        resp = client.delete(f"/api/prompt/template/{custom_id}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+        # 8. Verify deletion in list and single fetch
+        resp = client.get("/api/prompt/templates")
+        assert resp.status_code == 200
+        assert custom_id not in resp.json()
+
+        resp = client.get(f"/api/prompt/template/{custom_id}")
+        assert resp.status_code == 404
+
+    def test_builtin_protection(self, client):
+        # Cannot delete builtin
+        resp = client.delete("/api/prompt/template/standard")
+        assert resp.status_code == 404
+
+        # Cannot save custom template with builtin ID
+        resp = client.post("/api/prompt/template", json={
+            "id": "standard",
+            "name": "Hack Builtin",
+            "prompt": "Fake prompt"
+        })
+        assert resp.status_code == 400
+
+    def test_nonexistent_routes(self, client):
+        # Get nonexistent
+        resp = client.get("/api/prompt/template/nonexistent_id")
+        assert resp.status_code == 404
+
+        # Delete nonexistent
+        resp = client.delete("/api/prompt/template/nonexistent_id")
+        assert resp.status_code == 404
