@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Play, Pause, ChevronLeft, Search, CheckCircle2, RotateCcw,
+  Play, Pause, ChevronLeft, Search, CheckCircle2,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
   MessageSquare, History, Calendar, FileText, Users, Compass, Download,
   GitMerge, Trash2, AlertCircle, Save, Loader2, ChevronDown, Check

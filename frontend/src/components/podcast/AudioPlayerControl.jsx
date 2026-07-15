@@ -1,8 +1,164 @@
 import React from 'react';
-import { Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { usePlayerStore } from "../../store/playerStore.js";
 import { proxyImage } from "../../constants.js";
 import { useTranslation } from "../../contexts/I18nContext";
+
+export function RotateCcwWithNumber({ number, size = 20, className = "" }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`lucide lucide-rotate-ccw ${className}`}
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <text
+        x="12"
+        y="15.2"
+        textAnchor="middle"
+        fontSize="7.5"
+        fontWeight="800"
+        fill="currentColor"
+        stroke="none"
+        fontFamily="monospace"
+      >
+        {number}
+      </text>
+    </svg>
+  );
+}
+
+export function RotateCwWithNumber({ number, size = 20, className = "" }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`lucide lucide-rotate-cw ${className}`}
+    >
+      <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <text
+        x="12"
+        y="15.2"
+        textAnchor="middle"
+        fontSize="7.5"
+        fontWeight="800"
+        fill="currentColor"
+        stroke="none"
+        fontFamily="monospace"
+      >
+        {number}
+      </text>
+    </svg>
+  );
+}
+
+export function SpeedDropdown({ playbackRate, handleSpeedChange }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef(null);
+  const { t } = useTranslation();
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0];
+
+  const formatSpeed = (rate) => {
+    const labels = {
+      0.75: "0.75x",
+      1.0: "1.0x",
+      1.25: "1.25x",
+      1.5: "1.5x",
+      1.75: "1.75x",
+      2.0: "2.0x",
+      3.0: "3.0x"
+    };
+    return labels[rate] || `${rate.toFixed(1)}x`;
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[#f62440]/30 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none select-none"
+      >
+        <span>{formatSpeed(playbackRate)}</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        >
+          <path d="m18 15-6-6-6 6" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute bottom-full right-0 mb-2 z-50 w-24 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg shadow-lg py-1 flex flex-col animate-fade-in">
+          {speeds.map((speed) => (
+            <button
+              key={speed}
+              onClick={() => {
+                handleSpeedChange(speed);
+                setIsOpen(false);
+              }}
+              className="w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-[var(--bg-hover)] transition-all cursor-pointer border-0 bg-transparent flex items-center justify-between gap-2"
+              style={{
+                color: speed === playbackRate ? "var(--accent-red)" : "var(--text-primary)"
+              }}
+            >
+              <span>{formatSpeed(speed)}</span>
+              {speed === playbackRate && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export default function AudioPlayerControl({
   activeTask,
@@ -123,40 +279,44 @@ export default function AudioPlayerControl({
             </span>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => handleJump(-15)}
-              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              title="-15s"
             >
-              <RotateCcw size={15} />
-              <span className="text-[10px] font-mono font-bold">-15s</span>
+              <RotateCcwWithNumber number={15} size={16} />
+              <span className="hidden">-15s</span>
             </button>
             <button
               onClick={() => handleJump(-5)}
-              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              title="-5s"
             >
-              <RotateCcw size={15} />
-              <span className="text-[10px] font-mono font-bold">-5s</span>
+              <RotateCcwWithNumber number={5} size={16} />
+              <span className="hidden">-5s</span>
             </button>
             <button
               onClick={togglePlay}
-              className="w-10 h-10 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none shrink-0"
+              className="w-10 h-10 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none shrink-0 mx-2"
             >
               {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
             </button>
             <button
               onClick={() => handleJump(10)}
-              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              title="+10s"
             >
-              <RotateCw size={15} />
-              <span className="text-[10px] font-mono font-bold">+10s</span>
+              <RotateCwWithNumber number={10} size={16} />
+              <span className="hidden">+10s</span>
             </button>
             <button
               onClick={() => handleJump(30)}
-              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              title="+30s"
             >
-              <RotateCw size={15} />
-              <span className="text-[10px] font-mono font-bold">+30s</span>
+              <RotateCwWithNumber number={30} size={16} />
+              <span className="hidden">+30s</span>
             </button>
           </div>
         </div>
@@ -165,19 +325,11 @@ export default function AudioPlayerControl({
       <div className="w-1/4 flex items-center justify-end gap-3 font-semibold text-xs animate-fade-in">
         {activeTask.audio_url && (
           <>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span className="text-[var(--text-secondary)] text-[10px] whitespace-nowrap font-mono select-none">
-                {t("语速", "Speed")} {playbackRate.toFixed(1)}x
+                {t("语速", "Speed")}
               </span>
-              <input
-                type="range"
-                min="0.5"
-                max="3.0"
-                step="0.1"
-                value={playbackRate}
-                onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                className="w-20 accent-[#f62440] h-1 bg-[var(--bg-hover)] rounded-lg cursor-pointer"
-              />
+              <SpeedDropdown playbackRate={playbackRate} handleSpeedChange={handleSpeedChange} />
             </div>
 
             <div className="flex items-center gap-1.5">

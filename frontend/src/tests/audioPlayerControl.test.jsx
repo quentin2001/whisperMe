@@ -36,41 +36,25 @@ describe('AudioPlayerControl speed and jump controls', () => {
     handleRedownloadAudio: vi.fn(),
   };
 
-  it('renders a speed range input (slider) from 0.5 to 3.0 with step 0.1', () => {
+  it('renders a speed dropdown button showing the current speed', () => {
     renderWithI18n(<AudioPlayerControl {...defaultProps} />);
     
-    // Note: There are three sliders: the progress one, the volume one, and the speed one.
-    // Let's query inputs or find by type and min/max.
-    const inputs = screen.getAllByRole('slider');
-    
-    // Let's inspect each range input:
-    // Volume range: min 0, max 1, step 0.05
-    // Progress range: min 0, max 300
-    // Speed range: min 0.5, max 3.0, step 0.1
-    const speedInput = inputs.find(
-      (input) =>
-        input.getAttribute('min') === '0.5' &&
-        input.getAttribute('max') === '3.0' &&
-        input.getAttribute('step') === '0.1'
-    );
-
-    expect(speedInput).toBeDefined();
-    expect(parseFloat(speedInput.value)).toBe(1.0);
+    const dropdownButton = screen.getByText('1.0x');
+    expect(dropdownButton).toBeDefined();
   });
 
-  it('calls handleSpeedChange when speed range input changes', () => {
+  it('opens speed choices popover when clicked and calls handleSpeedChange on choice click', () => {
     const handleSpeedChange = vi.fn();
     renderWithI18n(<AudioPlayerControl {...defaultProps} handleSpeedChange={handleSpeedChange} />);
     
-    const inputs = screen.getAllByRole('slider');
-    const speedInput = inputs.find(
-      (input) =>
-        input.getAttribute('min') === '0.5' &&
-        input.getAttribute('max') === '3.0'
-    );
-
-    fireEvent.change(speedInput, { target: { value: '2.5' } });
-    expect(handleSpeedChange).toHaveBeenCalledWith(2.5);
+    const dropdownButton = screen.getByText('1.0x');
+    fireEvent.click(dropdownButton);
+    
+    const speedOption = screen.getByText('1.5x');
+    expect(speedOption).toBeDefined();
+    
+    fireEvent.click(speedOption);
+    expect(handleSpeedChange).toHaveBeenCalledWith(1.5);
   });
 
   it('renders four jump buttons with correct labels and icons', () => {
