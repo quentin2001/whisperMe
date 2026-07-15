@@ -62,12 +62,12 @@ describe('TranscriptList sentence rendering and highlighting', () => {
     const sentence1 = screen.getByText('Hello world.');
     const sentence2 = screen.getByText('Welcome to the show.');
     
-    expect(sentence1.className).toContain('bg-[var(--accent-red)]/20');
+    expect(sentence1.className).toContain('bg-[var(--accent-red)]/15');
     expect(sentence1.className).toContain('text-[var(--text-primary)]');
     expect(sentence1.className).toContain('font-bold');
     
     expect(sentence2.className).toContain('text-[var(--text-secondary)]');
-    expect(sentence2.className).not.toContain('bg-[var(--accent-red)]/20');
+    expect(sentence2.className).not.toContain('bg-[var(--accent-red)]/15');
 
     // Change current time to 8.0, making sentence 1 (start 5.0, diff 3.0 vs sentence 0 diff 8.0) active
     rerender(
@@ -79,7 +79,7 @@ describe('TranscriptList sentence rendering and highlighting', () => {
     const updatedSentence1 = screen.getByText('Hello world.');
     const updatedSentence2 = screen.getByText('Welcome to the show.');
 
-    expect(updatedSentence2.className).toContain('bg-[var(--accent-red)]/20');
+    expect(updatedSentence2.className).toContain('bg-[var(--accent-red)]/15');
     expect(updatedSentence2.className).toContain('font-bold');
     expect(updatedSentence1.className).toContain('text-[var(--text-secondary)]');
   });

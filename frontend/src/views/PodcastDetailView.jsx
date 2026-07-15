@@ -924,11 +924,30 @@ export default function PodcastDetailView({
         text: p.content || ""
       }];
     } else {
-      sentences = sentences.map(s => ({
+      const parsedList = sentences.map(s => ({
         start: s.start !== undefined ? s.start : (s.start_time !== undefined ? s.start_time : (p.start_time ?? 0)),
         end: s.end !== undefined ? s.end : (s.end_time !== undefined ? s.end_time : (p.end_time ?? 0)),
         text: s.text || s.content || ""
       }));
+
+      const merged = [];
+      let temp = null;
+      for (const s of parsedList) {
+        if (!temp) {
+          temp = { ...s };
+        } else {
+          temp.text += s.text;
+          temp.end = s.end;
+        }
+        const textVal = temp.text.trim();
+        const lastChar = textVal.charAt(textVal.length - 1);
+        const isTerminal = /[。？！\.?!;；]/.test(lastChar) || (temp.text.length > 55 && /[，,]/.test(lastChar));
+        if (isTerminal || s === parsedList[parsedList.length - 1]) {
+          merged.push(temp);
+          temp = null;
+        }
+      }
+      sentences = merged;
     }
 
     return {

@@ -13,7 +13,7 @@ export function RotateCcwWithNumber({ number, size = 20, className = "" }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={`lucide lucide-rotate-ccw ${className}`}
@@ -21,14 +21,14 @@ export function RotateCcwWithNumber({ number, size = 20, className = "" }) {
       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
       <path d="M3 3v5h5" />
       <text
-        x="12"
+        x="12.2"
         y="15.2"
         textAnchor="middle"
-        fontSize="7.5"
-        fontWeight="800"
+        fontSize="9.2"
+        fontWeight="900"
         fill="currentColor"
         stroke="none"
-        fontFamily="monospace"
+        fontFamily="Inter, system-ui, -apple-system, sans-serif"
       >
         {number}
       </text>
@@ -45,7 +45,7 @@ export function RotateCwWithNumber({ number, size = 20, className = "" }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={`lucide lucide-rotate-cw ${className}`}
@@ -53,14 +53,14 @@ export function RotateCwWithNumber({ number, size = 20, className = "" }) {
       <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
       <path d="M21 3v5h-5" />
       <text
-        x="12"
+        x="11.8"
         y="15.2"
         textAnchor="middle"
-        fontSize="7.5"
-        fontWeight="800"
+        fontSize="9.2"
+        fontWeight="900"
         fill="currentColor"
         stroke="none"
-        fontFamily="monospace"
+        fontFamily="Inter, system-ui, -apple-system, sans-serif"
       >
         {number}
       </text>
@@ -282,18 +282,18 @@ export default function AudioPlayerControl({
           <div className="flex items-center gap-3">
             <button
               onClick={() => handleJump(-15)}
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
               title="-15s"
             >
-              <RotateCcwWithNumber number={15} size={16} />
+              <RotateCcwWithNumber number={15} size={21} />
               <span className="sr-only">-15s</span>
             </button>
             <button
               onClick={() => handleJump(-5)}
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
               title="-5s"
             >
-              <RotateCcwWithNumber number={5} size={16} />
+              <RotateCcwWithNumber number={5} size={21} />
               <span className="sr-only">-5s</span>
             </button>
             <button
@@ -304,18 +304,18 @@ export default function AudioPlayerControl({
             </button>
             <button
               onClick={() => handleJump(10)}
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
               title="+10s"
             >
-              <RotateCwWithNumber number={10} size={16} />
+              <RotateCwWithNumber number={10} size={21} />
               <span className="sr-only">+10s</span>
             </button>
             <button
               onClick={() => handleJump(30)}
-              className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-primary)]/30 text-[#926e6d] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer bg-transparent outline-none"
               title="+30s"
             >
-              <RotateCwWithNumber number={30} size={16} />
+              <RotateCwWithNumber number={30} size={21} />
               <span className="sr-only">+30s</span>
             </button>
           </div>

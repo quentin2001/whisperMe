@@ -95,17 +95,17 @@ const TranscriptList = memo(function TranscriptList({
           .map((p) => {
             const isActive = p.id === activeParagraphId;
 
-            // Find closest sentence start time to currentTime within active paragraph
             let activeSentenceIndex = -1;
             if (isActive && p.sentences && p.sentences.length > 0) {
-              let minDiff = Infinity;
               for (let sIdx = 0; sIdx < p.sentences.length; sIdx++) {
-                const s = p.sentences[sIdx];
-                const diff = Math.abs(s.start - currentTime);
-                if (diff < minDiff) {
-                  minDiff = diff;
+                if (currentTime >= p.sentences[sIdx].start) {
                   activeSentenceIndex = sIdx;
+                } else {
+                  break;
                 }
+              }
+              if (activeSentenceIndex === -1) {
+                activeSentenceIndex = 0;
               }
             }
 
@@ -116,7 +116,7 @@ const TranscriptList = memo(function TranscriptList({
                 ref={isActive ? activeBubbleRef : null}
                 className={`p-4 rounded-lg cursor-pointer transition-all border border-l-4 ${
                   isActive 
-                    ? "bg-[var(--accent-red)]/10 border-transparent border-l-[#f62440]" 
+                    ? "bg-[var(--accent-red)]/[0.03] border-transparent border-l-[#f62440]" 
                     : "border-transparent border-l-transparent hover:bg-[var(--bg-card)]/40 hover:border-[var(--border-primary)]/20 hover:border-l-transparent"
                 }`}
               >
@@ -137,8 +137,8 @@ const TranscriptList = memo(function TranscriptList({
                           }}
                           className={`transition-all duration-150 cursor-pointer px-1 py-0.5 rounded mx-0.5 inline ${
                             isSentenceActive
-                              ? "bg-[var(--accent-red)]/20 text-[var(--text-primary)] font-bold"
-                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] font-medium"
+                              ? "bg-[var(--accent-red)]/15 text-[var(--text-primary)] font-bold"
+                              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-red)]/8 font-medium"
                           }`}
                         >
                           {s.text}
@@ -153,8 +153,8 @@ const TranscriptList = memo(function TranscriptList({
                       }}
                       className={`transition-all duration-150 cursor-pointer px-1 py-0.5 rounded mx-0.5 inline ${
                         isActive
-                          ? "bg-[var(--accent-red)]/20 text-[var(--text-primary)] font-bold"
-                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] font-medium"
+                          ? "bg-[var(--accent-red)]/15 text-[var(--text-primary)] font-bold"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-red)]/8 font-medium"
                       }`}
                     >
                       {p.text}
