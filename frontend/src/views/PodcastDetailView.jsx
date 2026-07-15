@@ -601,10 +601,14 @@ export default function PodcastDetailView({
       const res = await fetch(`${API_BASE}/api/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: customPrompt })
+        body: JSON.stringify({ 
+          prompt: customPrompt,
+          default_template_id: selectedTemplate
+        })
       });
       if (res.ok) {
         await alert(t("当前 Prompt 已成功保存为系统默认模板！", "Current prompt saved as default!"), { variant: 'success' });
+        fetchTemplates();
       } else {
         await alert(t("保存默认 Prompt 失败。", "Failed to save default prompt."));
       }
@@ -1425,7 +1429,10 @@ export default function PodcastDetailView({
                     <TemplateDropdown
                       value={selectedTemplate}
                       onChange={(val) => handleTemplateSelect(val)}
-                      options={promptTemplates.map(tpl => ({ value: tpl.id, label: tpl.name }))}
+                      options={promptTemplates.map(tpl => ({ 
+                        value: tpl.id, 
+                        label: tpl.is_default ? `${tpl.name} [${t("默认", "Default")}]` : tpl.name 
+                      }))}
                     />
                   </div>
                   {/* Action Buttons */}

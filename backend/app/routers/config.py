@@ -291,3 +291,12 @@ def delete_template(template_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Template not found or could not be deleted")
     return {"status": "ok"}
+
+class ReorderTemplatesRequest(BaseModel):
+    order: list[str]
+
+@router.post("/prompt/templates/reorder")
+def reorder_templates(req: ReorderTemplatesRequest):
+    from app.core.prompt_manager import save_template_order
+    save_template_order(req.order)
+    return {"status": "ok"}

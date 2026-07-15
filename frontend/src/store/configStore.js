@@ -35,7 +35,7 @@ export const useConfigStore = create((set) => ({
 
   setConfigData: (data) => set({ configData: data }),
   updateConfigData: (updates) => set((state) => ({ configData: { ...state.configData, ...updates } })),
-  setPromptData: (data) => set({ promptData: data }),
+  setPromptData: (data) => set((state) => ({ promptData: { ...state.promptData, ...data } })),
   setVersionInfo: (info) => set({ versionInfo: info }),
   setPerfData: (data) => set({ perfData: data }),
   setCheckingVersion: (checking) => set({ checkingVersion: checking }),

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, ChevronUp, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -384,9 +384,15 @@ export default function SettingsView({
   };
 
   const handleApplyAsSystemDefault = () => {
-    setPromptData({ prompt: editPrompt });
+    setPromptData({ 
+      prompt: editPrompt,
+      default_template_id: selectedTemplate
+    });
     setTimeout(() => {
       handleSavePrompt();
+      setTimeout(() => {
+        refreshTemplates(selectedTemplate);
+      }, 500);
     }, 50);
   };
 
@@ -396,6 +402,35 @@ export default function SettingsView({
     const data = await res.json();
     if (data.prompt) {
       setEditPrompt(data.prompt);
+    }
+    setTimeout(() => {
+      refreshTemplates("standard");
+    }, 500);
+  };
+
+  const handleMoveTemplate = async (index, direction) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= templates.length) return;
+    
+    const updated = [...templates];
+    const temp = updated[index];
+    updated[index] = updated[nextIndex];
+    updated[nextIndex] = temp;
+    
+    setTemplates(updated);
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/templates/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: updated.map(t => t.id) })
+      });
+      if (!res.ok) {
+        throw new Error("Failed to save template order");
+      }
+    } catch (e) {
+      console.error(e);
+      refreshTemplates(selectedTemplate);
     }
   };
 
@@ -753,36 +788,71 @@ export default function SettingsView({
                   </div>
 
                   <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto pr-1">
-                    {templates.map(tpl => (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        onClick={() => handleTemplateSelect(tpl.id)}
-                        className={`w-full py-2.5 px-3 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5
-                          ${selectedTemplate === tpl.id
-                            ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
-                            : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
-                          }
-                        `}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-xs font-bold truncate max-w-[70%]">{tpl.name}</span>
-                          {tpl.is_builtin ? (
-                            <span className="text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 rounded scale-90 origin-right">
-                              {t("内置", "Built-in")}
+                    {templates.map((tpl, index) => (
+                      <div key={tpl.id} className="relative group/item flex items-center gap-1 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handleTemplateSelect(tpl.id)}
+                          className={`flex-1 py-2.5 px-3 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5 min-w-0
+                            ${selectedTemplate === tpl.id
+                              ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
+                              : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
+                            }
+                          `}
+                        >
+                          <div className="flex items-center justify-between w-full min-w-0">
+                            <span className="text-xs font-bold truncate pr-1 flex items-center gap-1.5 min-w-0">
+                              <span className="truncate">{tpl.name}</span>
+                              {tpl.is_default && (
+                                <span className="shrink-0 text-[8px] bg-[var(--accent-red)] text-white px-1 py-0.2 rounded font-extrabold tracking-wide uppercase scale-90">
+                                  {t("默认", "Default")}
+                                </span>
+                              )}
                             </span>
-                          ) : (
-                            <span className="text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 rounded scale-90 origin-right">
-                              {t("自定义", "Custom")}
+                            {tpl.is_builtin ? (
+                              <span className="shrink-0 text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 rounded scale-90 origin-right">
+                                {t("内置", "Built-in")}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 rounded scale-90 origin-right">
+                                {t("自定义", "Custom")}
+                              </span>
+                            )}
+                          </div>
+                          {tpl.description && (
+                            <span className="text-[10px] text-[var(--text-muted)] truncate w-full font-medium">
+                              {tpl.description}
                             </span>
                           )}
+                        </button>
+
+                        <div className="hidden group-hover/item:flex flex-col gap-0.5 justify-center pl-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveTemplate(index, -1);
+                            }}
+                            className="p-0.5 text-[var(--text-muted)] hover:text-[var(--accent-red)] bg-transparent border-0 outline-none cursor-pointer disabled:opacity-30 disabled:hover:text-[var(--text-muted)] flex items-center justify-center"
+                            title={t("上移", "Move Up")}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === templates.length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveTemplate(index, 1);
+                            }}
+                            className="p-0.5 text-[var(--text-muted)] hover:text-[var(--accent-red)] bg-transparent border-0 outline-none cursor-pointer disabled:opacity-30 disabled:hover:text-[var(--text-muted)] flex items-center justify-center"
+                            title={t("下移", "Move Down")}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
                         </div>
-                        {tpl.description && (
-                          <span className="text-[10px] text-[var(--text-muted)] truncate w-full font-medium">
-                            {tpl.description}
-                          </span>
-                        )}
-                      </button>
+                      </div>
                     ))}
                   </div>
                   {loadingTemplate && <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t("正在载入模板内容...", "Loading template content...")}</span>}
@@ -908,13 +978,15 @@ export default function SettingsView({
                            t("应用为系统默认 Prompt", "Apply as System Default")}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={onResetPromptClick}
-                        className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
-                      >
-                        {t("恢复系统默认值", "Reset System Default")}
-                      </button>
+                      {templates.find(t => t.id === selectedTemplate)?.is_builtin && (
+                        <button
+                          type="button"
+                          onClick={onResetPromptClick}
+                          className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
+                        >
+                          {t("恢复系统默认值", "Reset System Default")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

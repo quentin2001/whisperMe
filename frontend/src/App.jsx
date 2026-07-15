@@ -174,10 +174,16 @@ export default function App() {
       fetch(`${BACKEND_URL}/api/prompt/template/standard`)
         .then(res => res.json())
         .then(data => {
-          setPromptData({ prompt: data.prompt || "" });
+          setPromptData({ 
+            prompt: data.prompt || "",
+            default_template_id: "standard"
+          });
         })
         .catch(() => {
-          setPromptData({ prompt: "" });
+          setPromptData({ 
+            prompt: "",
+            default_template_id: "standard"
+          });
         });
     }
   };

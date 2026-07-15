@@ -147,15 +147,6 @@ BUILTIN_TEMPLATES = {
 ## 9. 事实一致性与局限性声明
 Shownotes 中提到但转录中未展开的内容（若有则列出，若无则说明一致）。""",
     },
-    "custom": {
-        "name": "自定义/空白",
-        "name_en": "Custom / Blank",
-        "description": "完全空白的模板，由您自由书写提示词",
-        "description_en": "A completely blank template for you to write your own custom prompt",
-        "prompt": """{{PODCAST_DATA}}
- 
-请根据以上播客转录内容，生成总结：""",
-    },
 }
 
 # 兼容旧格式：合并 base_prompt + action_prompt 为单个 prompt
@@ -207,34 +198,65 @@ def load_prompt() -> dict:
 
 
 def save_prompt(data: dict) -> None:
-    """Save the prompt dictionary to the JSON file."""
+    """Save the prompt dictionary to the JSON file, merging with existing keys."""
+    existing = load_prompt()
+    if "custom_templates" not in data and "custom_templates" in existing:
+        data["custom_templates"] = existing["custom_templates"]
+    if "default_template_id" not in data and "default_template_id" in existing:
+        data["default_template_id"] = existing["default_template_id"]
+    if "template_order" not in data and "template_order" in existing:
+        data["template_order"] = existing["template_order"]
+        
     with open(PROMPT_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def save_template_order(order: list) -> None:
+    """保存模板的自定义顺序。"""
+    data = load_prompt()
+    data["template_order"] = order
+    save_prompt(data)
+
+
 def get_templates() -> dict:
-    """返回所有模板字典（内置 + 自定义）。"""
+    """返回所有模板字典（内置 + 自定义），并按照自定义顺序排序，附带默认标识。"""
     data = load_prompt()
     custom = data.get("custom_templates", {})
+    default_id = data.get("default_template_id", "standard")
+    order = data.get("template_order", [])
     
-    templates = {}
+    all_tpls = {}
     for tid, t in BUILTIN_TEMPLATES.items():
-        templates[tid] = {
+        all_tpls[tid] = {
             "name": t["name"],
             "name_en": t["name_en"],
             "description": t["description"],
             "description_en": t["description_en"],
-            "is_builtin": True
+            "is_builtin": True,
+            "is_default": tid == default_id
         }
     for tid, t in custom.items():
-        templates[tid] = {
+        all_tpls[tid] = {
             "name": t.get("name", "Custom"),
             "name_en": t.get("name_en", t.get("name", "Custom")),
             "description": t.get("description", ""),
             "description_en": t.get("description_en", t.get("description", "")),
-            "is_builtin": False
+            "is_builtin": False,
+            "is_default": tid == default_id
         }
-    return templates
+        
+    ordered_templates = {}
+    # 按照 order 排序构建
+    for tid in order:
+        if tid in all_tpls:
+            ordered_templates[tid] = all_tpls[tid]
+            
+    # 追加剩余未在 order 里的 templates
+    for tid, t in all_tpls.items():
+        if tid not in ordered_templates:
+            ordered_templates[tid] = t
+            
+    return ordered_templates
 
 
 def get_template_prompt(template_id: str) -> str | None:
