@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
+import { alert, confirm } from "../components/Dialog.jsx";
 
 function SettingsDropdown({ value, options, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -92,9 +93,18 @@ export default function SettingsView({
 
   const [testLlmResult, setTestLlmResult] = useState(null);
   const [testLlmMessage, setTestLlmMessage] = useState("");
-  const [modelsRegistry, setModelsRegistry] = useState(null);
-  const [showAsrRecs, setShowAsrRecs] = useState(false);
-  const [showLlmRecs, setShowLlmRecs] = useState(false);
+
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editPrompt, setEditPrompt] = useState("");
+  const [isNewTemplate, setIsNewTemplate] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
+  
+  const [showSaveAsModal, setShowSaveAsModal] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("");
+  const [saveAsDesc, setSaveAsDesc] = useState("");
+  
+  const [infoModal, setInfoModal] = useState({ isOpen: false, type: "" });
 
   const testConnection = async (type) => {
     const isAsr = type === "asr";
@@ -199,7 +209,6 @@ export default function SettingsView({
   const [selectedTemplate, setSelectedTemplate] = useState("standard");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
-
   useEffect(() => {
     fetch(`${API_BASE}/api/prompt/templates`)
       .then(r => r.json())
@@ -207,6 +216,11 @@ export default function SettingsView({
         if (data && typeof data === "object") {
           const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
           setTemplates(list);
+          const standardTpl = list.find(t => t.id === "standard");
+          if (standardTpl) {
+            setEditName(standardTpl.name || "");
+            setEditDesc(standardTpl.description || "");
+          }
         }
       })
       .catch(() => {});
@@ -218,32 +232,171 @@ export default function SettingsView({
       .then(data => {
         if (data.prompt) {
           setPromptData({ prompt: data.prompt });
+          setEditPrompt(data.prompt);
         }
       })
       .catch(() => {})
       .finally(() => setLoadingTemplate(false));
   }, []);
 
-  useEffect(() => {
-    fetch(`${API_BASE}/api/models/registry`)
-      .then(r => r.json())
-      .then(d => setModelsRegistry(d))
-      .catch(() => {});
-  }, []);
+  const refreshTemplates = async (selectId = null) => {
+    try {
+      const r = await fetch(`${API_BASE}/api/prompt/templates`);
+      const data = await r.json();
+      if (data && typeof data === "object") {
+        const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
+        setTemplates(list);
+        
+        if (selectId) {
+          const savedTpl = list.find(t => t.id === selectId);
+          if (savedTpl) {
+            setSelectedTemplate(selectId);
+            setEditName(savedTpl.name || "");
+            setEditDesc(savedTpl.description || "");
+            setIsNewTemplate(false);
+            
+            setLoadingTemplate(true);
+            const promptRes = await fetch(`${API_BASE}/api/prompt/template/${selectId}`);
+            const promptDataJson = await promptRes.json();
+            if (promptDataJson.prompt !== undefined) {
+              setEditPrompt(promptDataJson.prompt);
+            }
+            setLoadingTemplate(false);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to refresh templates:", e);
+    }
+  };
 
   const handleTemplateSelect = (templateId) => {
     if (!templateId) return;
     setSelectedTemplate(templateId);
+    setIsNewTemplate(false);
+    const tpl = templates.find(t => t.id === templateId);
+    if (tpl) {
+      setEditName(tpl.name || "");
+      setEditDesc(tpl.description || "");
+    }
     setLoadingTemplate(true);
     fetch(`${API_BASE}/api/prompt/template/${templateId}`)
       .then(r => r.json())
       .then(data => {
-        if (data.prompt) {
-          setPromptData({ prompt: data.prompt });
+        if (data.prompt !== undefined) {
+          setEditPrompt(data.prompt);
         }
       })
       .catch(() => {})
       .finally(() => setLoadingTemplate(false));
+  };
+
+  const handleSaveCustomTemplate = async () => {
+    if (!editName.trim()) {
+      alert(t("请输入模板名称", "Please enter template name"), { variant: "warning" });
+      return;
+    }
+    
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: isNewTemplate ? "" : selectedTemplate,
+          name: editName,
+          description: editDesc,
+          prompt: editPrompt
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "ok") {
+        setSaveStatus("saved");
+        alert(t("模板保存成功！", "Template saved successfully!"), { variant: "success" });
+        await refreshTemplates(data.id);
+      } else {
+        setSaveStatus("error");
+        alert(data.detail || t("保存模板失败", "Failed to save template"), { variant: "warning" });
+      }
+    } catch (e) {
+      setSaveStatus("error");
+      alert(e.message || t("网络错误", "Network error"), { variant: "warning" });
+    } finally {
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  };
+
+  const handleDeleteCustomTemplate = async () => {
+    if (isNewTemplate) {
+      handleTemplateSelect("standard");
+      return;
+    }
+    const tpl = templates.find(t => t.id === selectedTemplate);
+    if (!tpl || tpl.is_builtin) return;
+
+    if (await confirm(t(`确定要删除自定义模板“${tpl.name}”吗？`, `Are you sure you want to delete the custom template "${tpl.name}"?`))) {
+      try {
+        const res = await fetch(`${API_BASE}/api/prompt/template/${selectedTemplate}`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          alert(t("模板已删除！", "Template deleted!"), { variant: "success" });
+          await refreshTemplates("standard");
+        } else {
+          alert(t("删除模板失败", "Failed to delete template"), { variant: "warning" });
+        }
+      } catch (e) {
+        alert(e.message || t("网络错误", "Network error"), { variant: "warning" });
+      }
+    }
+  };
+
+  const handleSaveAsNewTemplate = async () => {
+    if (!saveAsName.trim()) {
+      alert(t("请输入模板名称", "Please enter template name"), { variant: "warning" });
+      return;
+    }
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "",
+          name: saveAsName,
+          description: saveAsDesc,
+          prompt: editPrompt
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "ok") {
+        setShowSaveAsModal(false);
+        setSaveAsName("");
+        setSaveAsDesc("");
+        alert(t("另存为新模板成功！", "Saved as new template successfully!"), { variant: "success" });
+        await refreshTemplates(data.id);
+      } else {
+        alert(data.detail || t("保存模板失败", "Failed to save template"), { variant: "warning" });
+      }
+    } catch (e) {
+      alert(e.message || t("网络错误", "Network error"), { variant: "warning" });
+    }
+  };
+
+  const handleApplyAsSystemDefault = () => {
+    setPromptData({ prompt: editPrompt });
+    setTimeout(() => {
+      handleSavePrompt();
+    }, 50);
+  };
+
+  const onResetPromptClick = async () => {
+    await handleResetPrompt();
+    const res = await fetch(`${API_BASE}/api/prompt/template/standard`);
+    const data = await res.json();
+    if (data.prompt) {
+      setEditPrompt(data.prompt);
+    }
   };
 
   const handleSelectLocalModelPath = async () => {
@@ -393,9 +546,19 @@ export default function SettingsView({
               {configData.asr_mode === "local" && (
                 <>
                   <div className="flex flex-col gap-2 animate-fade-in">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      {t("本地 ASR 模型文件夹路径", "Local ASR Model Path")}
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        {t("本地 ASR 模型文件夹路径", "Local ASR Model Path")}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setInfoModal({ isOpen: true, type: "asr" })}
+                        className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors p-0.5 border-0 bg-transparent outline-none cursor-pointer flex items-center justify-center animate-fade-in"
+                        title={t("获取配置 AI Agent 提示词", "Get AI Agent setup prompt")}
+                      >
+                        <HelpCircle size={14} />
+                      </button>
+                    </div>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -414,57 +577,8 @@ export default function SettingsView({
                       </button>
                     </div>
                     <span className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
-                      {t("指定本地ASR模型目录例如：E:/whisperMe/models/funasr", "Specify the local ASR model directory, e.g., E:/whisperMe/models/funasr")}
+                      {t("指定本地ASR模型目录例如：E:/Projects/whisperMe/models/funasr", "Specify the local ASR model directory, e.g., E:/Projects/whisperMe/models/funasr")}
                     </span>
-                  </div>
-
-                  {/* Toggle button for ASR Recommendations */}
-                  <div className="border-t border-[var(--border-primary)]/10 pt-3 mt-1 flex flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowAsrRecs(!showAsrRecs)}
-                      className="w-full py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 rounded-lg text-xs font-bold text-[var(--text-secondary)] flex items-center justify-center gap-2 transition-all cursor-pointer outline-none select-none"
-                    >
-                      <span>{showAsrRecs ? t("收起 ASR 语音模型推荐", "Hide Recommended ASR Models") : t("查看推荐本地 ASR 语音模型", "View Recommended Local ASR Models")}</span>
-                      <span className={`transform transition-transform duration-200 ${showAsrRecs ? "rotate-180" : ""}`}>▼</span>
-                    </button>
-
-                    {showAsrRecs && (
-                      <div className="flex flex-col gap-2.5 animate-fade-in mt-1 select-text border-t border-[var(--border-primary)]/10 pt-3">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
-                          <span>{t("推荐本地 ASR 语音模型", "Recommended Local ASR Models")}</span>
-                        </h4>
-                        {modelsRegistry ? (
-                          <div className="flex flex-col gap-2">
-                            {modelsRegistry.asr?.map((model) => (
-                              <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2.5 hover:border-[var(--accent-red)]/35 transition-colors">
-                                <div>
-                                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
-                                    <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
-                                  </div>
-                                  <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium leading-relaxed">{model.description}</p>
-                                </div>
-                                <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
-                                  <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
-                                  {model.url && (
-                                    <a href={model.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[var(--accent-red)] hover:underline flex items-center gap-1">
-                                      <Download size={10} />
-                                      <span>{t("下载", "Download")}</span>
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-xs text-[var(--text-muted)] font-semibold flex items-center gap-2 py-1 justify-center">
-                            <Loader2 className="animate-spin" size={12} />
-                            <span>{t("正在获取本地 ASR 模型推荐...", "Fetching ASR recommendations...")}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </>
               )}
@@ -555,7 +669,17 @@ export default function SettingsView({
                     </div>
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模型 ID", "Model ID")}</label>
+                          <button
+                            type="button"
+                            onClick={() => setInfoModal({ isOpen: true, type: "llm" })}
+                            className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors p-0.5 border-0 bg-transparent outline-none cursor-pointer flex items-center justify-center animate-fade-in"
+                            title={t("获取配置 AI Agent 提示词", "Get AI Agent setup prompt")}
+                          >
+                            <HelpCircle size={14} />
+                          </button>
+                        </div>
                         <p className="text-[10px] text-[var(--text-muted)] opacity-85 italic">
                           {t("* Ollama 模式下模型 ID 须与本地已拉取名称（如 qwen2.5:7b-instruct）完全匹配；LM Studio 多模型加载下也须匹配具体加载的 ID", "* For Ollama, Model ID must match the downloaded name exactly. For LM Studio, it must match the loaded model ID.")}
                         </p>
@@ -563,65 +687,6 @@ export default function SettingsView({
                       <input type="text" value={configData.ollama_model || ""} onChange={(e) => handleConfigChange("ollama_model", e.target.value)}
                         className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.ollama_model)}`}
                         placeholder="qwen2.5:7b-instruct" />
-                    </div>
-
-                    {/* Toggle button for LLM Recommendations */}
-                    <div className="border-t border-[var(--border-primary)]/10 pt-3 mt-1 flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowLlmRecs(!showLlmRecs)}
-                        className="w-full py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 rounded-lg text-xs font-bold text-[var(--text-secondary)] flex items-center justify-center gap-2 transition-all cursor-pointer outline-none select-none"
-                      >
-                        <span>{showLlmRecs ? t("收起 Ollama 模型推荐", "Hide Ollama Recommendations") : t("查看推荐本地 Ollama 模型", "View Recommended Ollama Models")}</span>
-                        <span className={`transform transition-transform duration-200 ${showLlmRecs ? "rotate-180" : ""}`}>▼</span>
-                      </button>
-
-                      {showLlmRecs && (
-                        <div className="flex flex-col gap-2.5 animate-fade-in mt-1 select-text border-t border-[var(--border-primary)]/10 pt-3">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-1">
-                            <span>{t("推荐本地 Ollama 模型", "Recommended Local Ollama Models")}</span>
-                          </h4>
-                          <div className="text-[10px] font-semibold text-[var(--text-muted)] leading-relaxed mb-1">
-                            💡 {t("需要在本地运行以下拉取命令：", "Please run the pull command below in your local terminal:")}
-                          </div>
-                          {modelsRegistry ? (
-                            <div className="flex flex-col gap-2">
-                              {modelsRegistry.llm?.map((model) => (
-                                <div key={model.id} className="p-3 bg-[var(--bg-secondary)]/30 border border-[var(--border-primary)]/30 rounded-lg flex flex-col justify-between gap-2 hover:border-[var(--accent-red)]/35 transition-colors">
-                                  <div>
-                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <span className="font-bold text-xs text-[var(--text-primary)]">{model.name}</span>
-                                      <span className="text-[10px] bg-[var(--border-primary)]/50 text-[var(--text-muted)] px-1.5 py-0.5 rounded font-mono font-bold">{model.size}</span>
-                                    </div>
-                                    <p className="text-[10px] text-[var(--text-muted)] mt-1.5 font-medium leading-relaxed">{model.description}</p>
-                                  </div>
-                                  <div className="flex items-center justify-between border-t border-[var(--border-primary)]/15 pt-2 flex-wrap gap-2">
-                                    <span className="text-[10px] text-[var(--text-tertiary)] font-bold">✨ {model.recommended_for}</span>
-                                    {model.command && (
-                                      <button 
-                                        type="button"
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(model.command);
-                                          alert(t("复制成功！请在您的 Terminal/PowerShell 中运行该命令安装 Ollama 模型。", "Copied! Please run this command in your Terminal/PowerShell to install the Ollama model."), { variant: "success" });
-                                        }}
-                                        className="text-[10px] font-bold text-[var(--accent-red)] bg-transparent border-0 outline-none hover:underline flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <Check size={10} />
-                                        <span>{t("复制命令", "Copy Command")}</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-[var(--text-muted)] font-semibold flex items-center gap-2 py-1 justify-center">
-                              <Loader2 className="animate-spin" size={12} />
-                              <span>{t("正在获取本地 LLM 模型推荐...", "Fetching LLM recommendations...")}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </>
@@ -664,68 +729,195 @@ export default function SettingsView({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {t("选择模板载入并编辑", "Select Template to Load & Edit")}
-                </label>
-                <div className="flex gap-2">
-                  {templates.map(tpl => (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Left Column - Template Sidebar List */}
+                <div className="md:col-span-1 border-r border-[var(--border-primary)]/10 pr-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {t("模板列表", "Templates")}
+                    </span>
                     <button
-                      key={tpl.id}
                       type="button"
-                      onClick={() => handleTemplateSelect(tpl.id)}
-                      className={`flex-1 py-2 px-3 border rounded-lg text-xs font-bold transition-all cursor-pointer outline-none select-none
-                        ${selectedTemplate === tpl.id
-                          ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/20 text-[var(--accent-red)] font-extrabold'
-                          : 'border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
-                        }
-                      `}
+                      onClick={() => {
+                        setSelectedTemplate("");
+                        setEditName(t("新建自定义模板", "New Custom Template"));
+                        setEditDesc("");
+                        setEditPrompt("{{PODCAST_DATA}}\n\n");
+                        setIsNewTemplate(true);
+                      }}
+                      className="p-1 text-[var(--accent-red)] hover:bg-[var(--bg-hover)] rounded transition-colors flex items-center justify-center border-0 bg-transparent cursor-pointer outline-none"
+                      title={t("新建模板", "New Template")}
                     >
-                      {tpl.name}
+                      <Plus size={16} />
                     </button>
-                  ))}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto pr-1">
+                    {templates.map(tpl => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => handleTemplateSelect(tpl.id)}
+                        className={`w-full py-2.5 px-3 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5
+                          ${selectedTemplate === tpl.id
+                            ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
+                            : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold truncate max-w-[70%]">{tpl.name}</span>
+                          {tpl.is_builtin ? (
+                            <span className="text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 rounded scale-90 origin-right">
+                              {t("内置", "Built-in")}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 rounded scale-90 origin-right">
+                              {t("自定义", "Custom")}
+                            </span>
+                          )}
+                        </div>
+                        {tpl.description && (
+                          <span className="text-[10px] text-[var(--text-muted)] truncate w-full font-medium">
+                            {tpl.description}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {loadingTemplate && <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t("正在载入模板内容...", "Loading template content...")}</span>}
                 </div>
-                {loadingTemplate && <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t("正在载入模板内容...", "Loading template content...")}</span>}
-              </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {t("当前 Prompt 内容", "Current Prompt Content")}
-                </label>
-                <textarea
-                  value={promptData.prompt || ""}
-                  onChange={(e) => setPromptData({ prompt: e.target.value })}
-                  rows={15}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-none select-text"
-                  placeholder={t("Prompt 内容...", "Prompt content...")}
-                />
-                <span className="text-[10px] text-[var(--text-muted)] leading-relaxed font-semibold">
-                  {t("提示：在此处编辑后，点击下方“保存 Prompt 为系统默认”会更新系统全局运行 AI 总结时使用的默认 Prompt。", "Note: After editing here, clicking 'Save Prompt as System Default' will update the system's global default prompt used for summaries.")}
-                </span>
-              </div>
+                {/* Right Column - Editor */}
+                <div className="md:col-span-3 flex flex-col gap-4">
+                  {/* Template Metadata Info / Inputs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        {t("模板名称", "Template Name")}
+                      </label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        disabled={!isNewTemplate && templates.find(t => t.id === selectedTemplate)?.is_builtin}
+                        className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] disabled:opacity-60"
+                        placeholder={t("请输入模板名称", "Enter template name")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        {t("描述", "Description")}
+                      </label>
+                      <input
+                        type="text"
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        disabled={!isNewTemplate && templates.find(t => t.id === selectedTemplate)?.is_builtin}
+                        className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] disabled:opacity-60"
+                        placeholder={t("请输入模板描述", "Enter template description")}
+                      />
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3 mt-1">
-                <button
-                  type="button"
-                  onClick={handleSavePrompt}
-                  disabled={promptSaveStatus === "saving"}
-                  className="flex-1 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 text-[var(--text-secondary)] py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer outline-none"
-                >
-                  <Save size={13} className="text-[var(--accent-red)]" />
-                  <span>
-                    {promptSaveStatus === "saving" ? t("保存中...", "Saving...") :
-                     promptSaveStatus === "saved" ? t("保存成功", "Saved Successfully") :
-                     promptSaveStatus === "error" ? t("保存失败", "Failed to Save") :
-                     t("保存 Prompt 为系统默认", "Save Prompt as System Default")}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetPrompt}
-                  className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
-                >
-                  {t("恢复默认值", "Reset to Default")}
-                </button>
+                  {/* Prompt Content Area */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center justify-between">
+                      <span>{t("Prompt 内容", "Prompt Content")}</span>
+                      {templates.find(t => t.id === selectedTemplate)?.is_builtin && !isNewTemplate && (
+                        <span className="text-[10px] text-[var(--text-muted)] italic font-semibold normal-case">
+                          {t("* 内置模板内容无法直接修改，保存修改需另存为新模板", "* Built-in template prompt is read-only. Save as new template to edit.")}
+                        </span>
+                      )}
+                    </label>
+                    <textarea
+                      value={editPrompt}
+                      onChange={(e) => setEditPrompt(e.target.value)}
+                      rows={12}
+                      className="w-full bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-3 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] resize-none select-text leading-relaxed font-medium"
+                      placeholder={t("Prompt 内容...", "Prompt content...")}
+                    />
+                    <span className="text-[10px] text-[var(--text-muted)] leading-relaxed font-semibold">
+                      {t("提示：使用 {{PODCAST_DATA}} 占位符作为播客转录内容的插入点。编辑后可保存自定义模板，或将其应用为系统全局总结所使用的默认 Prompt。", "Tip: Use {{PODCAST_DATA}} as the insertion point for podcast transcript. You can save it as a custom template, or apply it as the system's global default summary prompt.")}
+                    </span>
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-primary)]/10">
+                    <div className="flex items-center gap-2">
+                      {(isNewTemplate || !(templates.find(t => t.id === selectedTemplate)?.is_builtin)) ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomTemplate}
+                            disabled={saveStatus === "saving"}
+                            className="bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border-0 outline-none"
+                          >
+                            <Save size={13} />
+                            <span>
+                              {saveStatus === "saving" ? t("保存中...", "Saving...") : t("保存模板", "Save Template")}
+                            </span>
+                          </button>
+                          {!isNewTemplate && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteCustomTemplate}
+                              className="border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer bg-transparent outline-none"
+                            >
+                              <Trash2 size={13} />
+                              <span>{t("删除模板", "Delete")}</span>
+                            </button>
+                          )}
+                          {isNewTemplate && (
+                            <button
+                              type="button"
+                              onClick={() => handleTemplateSelect("standard")}
+                              className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
+                            >
+                              {t("取消", "Cancel")}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSaveAsName(`${editName} (${t("副本", "Copy")})`);
+                            setSaveAsDesc(editDesc);
+                            setShowSaveAsModal(true);
+                          }}
+                          className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 text-[var(--text-secondary)] px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer outline-none"
+                        >
+                          <Save size={13} className="text-[var(--accent-red)]" />
+                          <span>{t("另存为新模板", "Save as New Template")}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleApplyAsSystemDefault}
+                        disabled={promptSaveStatus === "saving"}
+                        className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]/30 text-[var(--text-secondary)] px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer outline-none"
+                      >
+                        <Check size={13} className="text-[var(--accent-red)]" />
+                        <span>
+                          {promptSaveStatus === "saving" ? t("保存中...", "Saving...") :
+                           promptSaveStatus === "saved" ? t("应用成功", "Applied Successfully") :
+                           t("应用为系统默认 Prompt", "Apply as System Default")}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onResetPromptClick}
+                        className="px-4 py-2 border border-[var(--border-primary)]/30 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-bold transition-all cursor-pointer outline-none bg-transparent"
+                      >
+                        {t("恢复系统默认值", "Reset System Default")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -894,6 +1086,140 @@ export default function SettingsView({
 
         </div>
       </div>
+
+      {/* Save As Modal */}
+      {showSaveAsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[200] p-6 animate-fade-in">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/50 rounded-xl max-w-sm w-full relative flex flex-col shadow-2xl transition-colors duration-300 p-6 gap-4 text-left font-sans">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-primary)]/20">
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                {t("另存为新自定义模板", "Save as New Custom Template")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowSaveAsModal(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors border-0 bg-transparent cursor-pointer p-0.5 outline-none flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t("新模板名称", "New Template Name")}
+                </label>
+                <input
+                  type="text"
+                  value={saveAsName}
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]"
+                  placeholder={t("请输入模板名称", "Enter template name")}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t("描述", "Description")}
+                </label>
+                <input
+                  type="text"
+                  value={saveAsDesc}
+                  onChange={(e) => setSaveAsDesc(e.target.value)}
+                  className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)]"
+                  placeholder={t("请输入模板描述", "Enter template description")}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSaveAsNewTemplate}
+                className="px-4 py-2 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer border-0 outline-none"
+              >
+                {t("保存", "Save")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSaveAsModal(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer bg-transparent outline-none"
+              >
+                {t("取消", "Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Tooltip Prompt Modal */}
+      {infoModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[200] p-6 animate-fade-in">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/50 rounded-xl max-w-lg w-full relative flex flex-col shadow-2xl transition-colors duration-300 p-6 gap-4 text-left font-sans">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-primary)]/20">
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                {infoModal.type === "asr"
+                  ? t("配置本地 ASR 的 AI Agent 提示词", "AI Agent Setup Prompt for Local ASR")
+                  : t("配置本地 LLM 的 AI Agent 提示词", "AI Agent Setup Prompt for Local LLM")
+                }
+              </h3>
+              <button
+                type="button"
+                onClick={() => setInfoModal({ isOpen: false, type: "" })}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors border-0 bg-transparent cursor-pointer p-0.5 outline-none flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed font-semibold">
+              {t(
+                "您可以复制以下提示词并直接发给您的 AI 编程助手（如 Cursor, Claude, GPT），让其帮您准备/拉取所需的本地模型文件：",
+                "Copy the prompt below and send it to your AI assistant (e.g. Cursor, Claude, GPT) to automatically prepare/pull the local model files:"
+              )}
+            </p>
+
+            <div className="bg-[var(--bg-secondary)]/60 border border-[var(--border-primary)]/30 rounded-lg p-3 relative">
+              <pre className="text-xs font-mono text-[var(--text-primary)] whitespace-pre-wrap select-all font-semibold leading-relaxed max-h-60 overflow-y-auto">
+                {infoModal.type === "asr"
+                  ? `I am setting up whisperMe and need to configure a local ASR engine (FunASR) in the following absolute folder path:
+E:/Projects/whisperMe/models/funasr
+
+Please help me download and install the FunASR models into this directory, and ensure that all required files (such as model.pb, config.yaml) are present, so the backend can load them correctly without external internet queries.`
+                  : `I am setting up whisperMe and want to configure a local LLM summary model using Ollama.
+The Ollama URL is: http://localhost:11434
+The Ollama model ID is: qwen2.5:7b-instruct
+
+Please help me pull this model locally and verify that the Ollama service is running on my machine. Also, give me the terminal pull commands.`
+                }
+              </pre>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = infoModal.type === "asr"
+                    ? `I am setting up whisperMe and need to configure a local ASR engine (FunASR) in the following absolute folder path:\nE:/Projects/whisperMe/models/funasr\n\nPlease help me download and install the FunASR models into this directory, and ensure that all required files (such as model.pb, config.yaml) are present, so the backend can load them correctly without external internet queries.`
+                    : `I am setting up whisperMe and want to configure a local LLM summary model using Ollama.\nThe Ollama URL is: http://localhost:11434\nThe Ollama model ID is: qwen2.5:7b-instruct\n\nPlease help me pull this model locally and verify that the Ollama service is running on my machine. Also, give me the terminal pull commands.`;
+                  navigator.clipboard.writeText(text);
+                  alert(t("提示词已复制到剪贴板！", "Prompt copied to clipboard!"), { variant: "success" });
+                }}
+                className="px-4 py-2 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer border-0 flex items-center gap-1.5 outline-none"
+              >
+                <Copy size={13} />
+                <span>{t("复制提示词", "Copy Prompt")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInfoModal({ isOpen: false, type: "" })}
+                className="px-4 py-2 text-xs font-semibold rounded-lg border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer bg-transparent outline-none"
+              >
+                {t("关闭", "Close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
