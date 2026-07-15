@@ -172,8 +172,21 @@ def background_auto_cleanup_loop():
 
 # --- App 启动生命周期管理 ---
 
+def setup_terminal_logging():
+    import logging
+    loggers = ["uvicorn", "uvicorn.error", "uvicorn.access"]
+    for name in loggers:
+        l = logging.getLogger(name)
+        l.propagate = False
+        for h in list(l.handlers):
+            l.removeHandler(h)
+        from app.core.logger import console_handler
+        l.addHandler(console_handler)
+
 @app.on_event("startup")
 def startup_event():
+    setup_terminal_logging()
+    
     # 0. 依赖检查
     from app.core.ffmpeg import get_ffmpeg_info, get_install_hint
     from app.config import FFMPEG_PATH

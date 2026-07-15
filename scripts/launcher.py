@@ -108,10 +108,12 @@ def main():
         "  \033[38;2;138;35;135m   \\_/\\_/ |_| |_|_|___/ .__/ \\___|_|          |_|  |_|\\___| \033[0m",
         "  \033[38;2;138;35;135m                      | |                                   \033[0m",
         "  \033[38;2;138;35;135m                      |_|                                   \033[0m",
-        "  ",
-        "  \033[3m\033[38;2;138;35;135m         A I   P o d c a s t   W o r k s p a c e     \033[0m"
+        "                                                                    ",
+        "  \033[3m\033[38;2;138;35;135m         A I   P o d c a s t   W o r k s p a c e     \033[0m",
+        "======================================================================"
     ]
-    print("\n" + "\n".join(logo) + "\n")
+    if not args.foreground:
+        print("\n".join(logo))
 
     # 检查端口是否已被占用
     if check_port_in_use(PORT):
@@ -146,15 +148,30 @@ def main():
         "--port", str(PORT),
     ]
 
-    print(f"  ⏳ 正在启动服务...")
-
     if args.foreground:
+        import atexit
+        def restore_terminal():
+            sys.stdout.write("\033[r\033[0m")
+            sys.stdout.flush()
+        atexit.register(restore_terminal)
+
+        # 清屏并设置分裂终端：锁定前11行显示 Logo，12行以下滚动日志
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.write("\n".join(logo) + "\n")
+        # 设置滚动区域：12行到屏幕末尾
+        sys.stdout.write("\033[12;r")
+        # 将光标定位在第12行第1列
+        sys.stdout.write("\033[12;1H")
+        sys.stdout.flush()
+
+        print(f"  ⏳ 正在启动服务...")
         server = subprocess.Popen(
             cmd,
             cwd=BACKEND_DIR,
             env=env,
         )
     else:
+        print(f"  ⏳ 正在启动服务...")
         with open(log_file, "a", encoding="utf-8") as log:
             if sys.platform == "win32":
                 server = subprocess.Popen(
@@ -197,6 +214,9 @@ def main():
             server.wait()
         except KeyboardInterrupt:
             server.terminate()
+            # 恢复终端滚动区域和属性
+            sys.stdout.write("\033[r\033[0m")
+            sys.stdout.flush()
             print("\n  🛑 服务已优雅退出。")
         sys.exit(0)
     else:

@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -11,6 +12,15 @@ COLOR_INFO = "\033[32m"     # 绿色
 COLOR_WARNING = "\033[33m"  # 黄色
 COLOR_ERROR = "\033[31m"    # 红色
 COLOR_CRITICAL = "\033[35m" # 紫色
+
+class NoiseLogFilter(logging.Filter):
+    def filter(self, record):
+        if record.name == "uvicorn.access" and len(record.args) >= 3:
+            path = record.args[2]
+            # Silence polling endpoints and static resources
+            if any(p in path for p in ["/api/tasks", "hf-token-status", "/api/models/registry", "static"]) or path.endswith((".js", ".css", ".png", ".ico")):
+                return False
+        return True
 
 class ColoredFormatter(logging.Formatter):
     """自定义带彩色的日志格式器"""
@@ -32,7 +42,8 @@ class ColoredFormatter(logging.Formatter):
             color = COLOR_RESET
             
         # 复制 record 以免影响文件日志输出
-        msg = logging.Formatter.format(self, record)
+        record_copy = copy.copy(record)
+        msg = logging.Formatter.format(self, record_copy)
         # 用彩色包裹级别名称和时间
         return f"{color}{msg}{COLOR_RESET}"
 
@@ -45,9 +56,17 @@ LOG_FILE_PATH = LOG_DIR / "backend.log"
 logger = logging.getLogger("whisperMe")
 logger.setLevel(logging.INFO)
 
-# 避免重复添加 Handler
-if not logger.handlers:
-    # 1. 控制台彩色输出 Handler
+# Create or reuse handlers
+console_handler = None
+file_handler = None
+
+for h in logger.handlers:
+    if isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler):
+        console_handler = h
+    elif isinstance(h, RotatingFileHandler):
+        file_handler = h
+
+if console_handler is None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_formatter = ColoredFormatter(
@@ -57,7 +76,11 @@ if not logger.handlers:
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
-    # 2. 物理文件滚动日志 Handler (每天/超过10MB自动滚动，保留5个)
+# Add NoiseLogFilter to console_handler
+if not any(isinstance(f, NoiseLogFilter) for f in console_handler.filters):
+    console_handler.addFilter(NoiseLogFilter())
+
+if file_handler is None:
     file_handler = RotatingFileHandler(
         filename=str(LOG_FILE_PATH),
         maxBytes=10 * 1024 * 1024,  # 10MB
