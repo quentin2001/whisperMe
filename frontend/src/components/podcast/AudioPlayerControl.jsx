@@ -102,7 +102,7 @@ export function SpeedDropdown({ playbackRate, handleSpeedChange }) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[#f62440]/30 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none select-none"
+        className="px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:border-[var(--accent-red)]/30 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none select-none"
       >
         <span>{formatSpeed(playbackRate)}</span>
         <svg
@@ -268,7 +268,7 @@ export default function AudioPlayerControl({
                 max={Math.max(1, duration || 0)}
                 value={currentTime || 0}
                 onChange={handleProgressChange}
-                className="w-full accent-[#f62440] h-1.5 bg-[var(--bg-hover)] rounded-lg cursor-pointer appearance-none"
+                className="w-full accent-[var(--accent-red)] h-1.5 bg-[var(--bg-hover)] rounded-lg cursor-pointer appearance-none"
                 style={{
                   background: `linear-gradient(to right, var(--accent-red) ${(currentTime / Math.max(1, duration || 1)) * 100}%, var(--bg-hover) ${(currentTime / Math.max(1, duration || 1)) * 100}%)`
                 }}
@@ -286,7 +286,7 @@ export default function AudioPlayerControl({
               title="-15s"
             >
               <RotateCcwWithNumber number={15} size={16} />
-              <span className="hidden">-15s</span>
+              <span className="sr-only">-15s</span>
             </button>
             <button
               onClick={() => handleJump(-5)}
@@ -294,7 +294,7 @@ export default function AudioPlayerControl({
               title="-5s"
             >
               <RotateCcwWithNumber number={5} size={16} />
-              <span className="hidden">-5s</span>
+              <span className="sr-only">-5s</span>
             </button>
             <button
               onClick={togglePlay}
@@ -308,7 +308,7 @@ export default function AudioPlayerControl({
               title="+10s"
             >
               <RotateCwWithNumber number={10} size={16} />
-              <span className="hidden">+10s</span>
+              <span className="sr-only">+10s</span>
             </button>
             <button
               onClick={() => handleJump(30)}
@@ -316,7 +316,7 @@ export default function AudioPlayerControl({
               title="+30s"
             >
               <RotateCwWithNumber number={30} size={16} />
-              <span className="hidden">+30s</span>
+              <span className="sr-only">+30s</span>
             </button>
           </div>
         </div>
@@ -346,7 +346,7 @@ export default function AudioPlayerControl({
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeInput}
-                className="w-20 accent-[#f62440] h-1 bg-[var(--bg-hover)] rounded-lg cursor-pointer"
+                className="w-20 accent-[var(--accent-red)] h-1 bg-[var(--bg-hover)] rounded-lg cursor-pointer"
               />
             </div>
           </>
