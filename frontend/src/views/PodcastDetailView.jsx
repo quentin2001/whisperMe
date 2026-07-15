@@ -533,21 +533,39 @@ export default function PodcastDetailView({
   const [customPrompt, setCustomPrompt] = useState("");
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [savingDefaultPrompt, setSavingDefaultPrompt] = useState(false);
+  
+  // Custom template management states
+  const [showSaveAsNewDialog, setShowSaveAsNewDialog] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDesc, setNewTemplateDesc] = useState("");
+  const [isSavingCustomTemplate, setIsSavingCustomTemplate] = useState(false);
+  const [isDeletingCustomTemplate, setIsDeletingCustomTemplate] = useState(false);
+
+  const selectedTemplateObj = promptTemplates.find(tpl => tpl.id === selectedTemplate);
+  const isCustom = selectedTemplateObj ? !selectedTemplateObj.is_builtin : false;
+
+  const fetchTemplates = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/prompt/templates`);
+      const data = await r.json();
+      if (data && typeof data === "object") {
+        const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
+        setPromptTemplates(list);
+        return list;
+      }
+    } catch (e) {
+      console.error("Failed to fetch templates:", e);
+    }
+    return [];
+  };
 
   useEffect(() => {
     if (showPromptModal) {
       setSelectedTemplate("standard");
       setLoadingTemplate(true);
+      
       // 1. Fetch templates
-      fetch(`${API_BASE}/api/prompt/templates`)
-        .then(r => r.json())
-        .then(data => {
-          if (data && typeof data === "object") {
-            const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
-            setPromptTemplates(list);
-          }
-        })
-        .catch(() => {});
+      fetchTemplates();
 
       // 2. Fetch standard template prompt
       fetch(`${API_BASE}/api/prompt/template/standard`)
@@ -595,6 +613,101 @@ export default function PodcastDetailView({
       await alert(t("保存出错：", "Save error: ") + e.message);
     } finally {
       setSavingDefaultPrompt(false);
+    }
+  };
+
+  const handleSaveCustomTemplateEdits = async () => {
+    if (!selectedTemplateObj || selectedTemplateObj.is_builtin) return;
+    
+    setIsSavingCustomTemplate(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedTemplate,
+          name: selectedTemplateObj.name,
+          description: selectedTemplateObj.description || "",
+          prompt: customPrompt
+        })
+      });
+      if (res.ok) {
+        await alert(t("模版修改已成功保存！", "Template edits saved successfully!"), { variant: 'success' });
+        await fetchTemplates();
+      } else {
+        const data = await res.json();
+        await alert(t("保存模板失败：", "Failed to save template: ") + (data.detail || ""));
+      }
+    } catch (e) {
+      console.error(e);
+      await alert(t("保存出错：", "Save error: ") + e.message);
+    } finally {
+      setIsSavingCustomTemplate(false);
+    }
+  };
+
+  const handleDeleteCustomTemplate = async () => {
+    if (!selectedTemplateObj || selectedTemplateObj.is_builtin) return;
+    
+    const confirmed = await confirm(
+      t(`确定删除模板 "${selectedTemplateObj.name}" 吗？此操作无法撤销。`, `Are you sure you want to delete template "${selectedTemplateObj.name}"? This action cannot be undone.`),
+      { variant: 'warning' }
+    );
+    if (!confirmed) return;
+    
+    setIsDeletingCustomTemplate(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/template/${selectedTemplate}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        await alert(t("模板已成功删除！", "Template deleted successfully!"), { variant: 'success' });
+        await fetchTemplates();
+        handleTemplateSelect("standard");
+      } else {
+        const data = await res.json();
+        await alert(t("删除模板失败：", "Failed to delete template: ") + (data.detail || ""));
+      }
+    } catch (e) {
+      console.error(e);
+      await alert(t("删除出错：", "Delete error: ") + e.message);
+    } finally {
+      setIsDeletingCustomTemplate(false);
+    }
+  };
+
+  const handleSaveNewCustomTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    
+    setIsSavingCustomTemplate(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/prompt/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "",
+          name: newTemplateName.trim(),
+          description: newTemplateDesc.trim(),
+          prompt: customPrompt
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await alert(t("新模板已成功保存！", "New template saved successfully!"), { variant: 'success' });
+        setShowSaveAsNewDialog(false);
+        await fetchTemplates();
+        if (data.id) {
+          setSelectedTemplate(data.id);
+        }
+      } else {
+        const data = await res.json();
+        await alert(t("新建模板失败：", "Failed to create template: ") + (data.detail || ""));
+      }
+    } catch (e) {
+      console.error(e);
+      await alert(t("新建出错：", "Create error: ") + e.message);
+    } finally {
+      setIsSavingCustomTemplate(false);
     }
   };
 
@@ -1307,11 +1420,52 @@ export default function PodcastDetailView({
             <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("选择总结模板", "Select Summary Template")}</label>
-                <TemplateDropdown
-                  value={selectedTemplate}
-                  onChange={(val) => handleTemplateSelect(val)}
-                  options={promptTemplates.map(tpl => ({ value: tpl.id, label: tpl.name }))}
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-[200px]">
+                    <TemplateDropdown
+                      value={selectedTemplate}
+                      onChange={(val) => handleTemplateSelect(val)}
+                      options={promptTemplates.map(tpl => ({ value: tpl.id, label: tpl.name }))}
+                    />
+                  </div>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isCustom && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleSaveCustomTemplateEdits}
+                          disabled={isSavingCustomTemplate}
+                          className="px-2.5 py-2 rounded-lg text-xs font-bold border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 cursor-pointer bg-transparent outline-none flex items-center gap-1 transition-colors"
+                        >
+                          {isSavingCustomTemplate ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                          <span>{t("保存修改", "Save Edits")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteCustomTemplate}
+                          disabled={isDeletingCustomTemplate}
+                          className="px-2.5 py-2 rounded-lg text-xs font-bold border border-[var(--border-primary)]/40 text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 hover:border-[var(--accent-red)]/40 disabled:opacity-50 cursor-pointer bg-transparent outline-none flex items-center gap-1 transition-colors"
+                        >
+                          {isDeletingCustomTemplate ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                          <span>{t("删除", "Delete")}</span>
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTemplateName("");
+                        setNewTemplateDesc("");
+                        setShowSaveAsNewDialog(true);
+                      }}
+                      className="px-2.5 py-2 rounded-lg text-xs font-bold border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] cursor-pointer bg-transparent outline-none flex items-center gap-1 transition-colors"
+                    >
+                      <Sparkles size={13} />
+                      <span>{t("另存为新模板", "Save as New")}</span>
+                    </button>
+                  </div>
+                </div>
                 {loadingTemplate && <div className="text-[10px] text-[var(--text-muted)] animate-pulse mt-0.5">{t("正在载入模版...", "Loading template...")}</div>}
               </div>
 
@@ -1359,6 +1513,64 @@ export default function PodcastDetailView({
                   <span>{t("确认并启动总结", "Confirm & Generate")}</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save as New Custom Template Dialog */}
+      {showSaveAsNewDialog && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[60] p-4 font-sans animate-fade-in select-none">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)]/40 rounded-2xl w-full max-w-[400px] shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]/20">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("另存为新模板", "Save as New Template")}</h3>
+              <button
+                onClick={() => setShowSaveAsNewDialog(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-transparent border-0 outline-none cursor-pointer text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+            {/* Body */}
+            <div className="p-4 flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模板名称", "Template Name")}</label>
+                <input
+                  type="text"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  className="w-full bg-[var(--bg-input)]/40 hover:bg-[var(--bg-input)]/80 border border-[var(--border-primary)]/40 rounded-lg p-2 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] transition-colors"
+                  placeholder={t("请输入模板名称", "Enter template name")}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("模板描述", "Description")}</label>
+                <textarea
+                  value={newTemplateDesc}
+                  onChange={(e) => setNewTemplateDesc(e.target.value)}
+                  rows={3}
+                  className="w-full bg-[var(--bg-input)]/40 hover:bg-[var(--bg-input)]/80 border border-[var(--border-primary)]/40 rounded-lg p-2 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] transition-colors resize-none"
+                  placeholder={t("请输入模板描述", "Enter template description")}
+                />
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="p-4 border-t border-[var(--border-primary)]/20 flex justify-end gap-2 bg-[var(--bg-hover)]/30">
+              <button
+                onClick={() => setShowSaveAsNewDialog(false)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold border border-[var(--border-primary)]/40 text-[var(--text-secondary)] hover:bg-[var(--bg-card)] cursor-pointer bg-transparent outline-none"
+              >
+                {t("取消", "Cancel")}
+              </button>
+              <button
+                onClick={handleSaveNewCustomTemplate}
+                disabled={!newTemplateName.trim() || isSavingCustomTemplate}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white cursor-pointer border-0 outline-none disabled:opacity-50 flex items-center gap-1"
+              >
+                {isSavingCustomTemplate && <Loader2 size={12} className="animate-spin" />}
+                <span>{t("保存", "Save")}</span>
+              </button>
             </div>
           </div>
         </div>
