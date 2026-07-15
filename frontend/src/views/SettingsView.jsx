@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, ChevronUp, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, GripVertical, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -407,15 +407,35 @@ export default function SettingsView({
     }, 500);
   };
 
-  const handleMoveTemplate = async (index, direction) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= templates.length) return;
+  const dragItem = useRef();
+  const dragOverItem = useRef();
+
+  const handleDragStart = (e, index) => {
+    dragItem.current = index;
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnter = (e, index) => {
+    dragOverItem.current = index;
+  };
+
+  const handleDragEnd = async () => {
+    const index = dragItem.current;
+    const overIndex = dragOverItem.current;
+    
+    if (index === null || index === undefined || overIndex === null || overIndex === undefined || index === overIndex) {
+      dragItem.current = null;
+      dragOverItem.current = null;
+      return;
+    }
     
     const updated = [...templates];
-    const temp = updated[index];
-    updated[index] = updated[nextIndex];
-    updated[nextIndex] = temp;
+    const draggedItemContent = updated[index];
+    updated.splice(index, 1);
+    updated.splice(overIndex, 0, draggedItemContent);
     
+    dragItem.current = null;
+    dragOverItem.current = null;
     setTemplates(updated);
     
     try {
@@ -788,7 +808,20 @@ export default function SettingsView({
 
                   <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto pr-1">
                     {templates.map((tpl, index) => (
-                      <div key={tpl.id} className="relative group/item flex items-center gap-1 w-full">
+                      <div
+                        key={tpl.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => e.preventDefault()}
+                        className="group/item flex items-center gap-1 w-full cursor-grab active:cursor-grabbing hover:bg-[var(--bg-hover)]/30 rounded-lg p-0.5"
+                      >
+                        {/* Drag Handle */}
+                        <div className="text-[var(--text-muted)] opacity-30 group-hover/item:opacity-100 p-1 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing transition-opacity">
+                          <GripVertical size={14} />
+                        </div>
+
                         <button
                           type="button"
                           onClick={() => handleTemplateSelect(tpl.id)}
@@ -824,33 +857,6 @@ export default function SettingsView({
                             </span>
                           )}
                         </button>
-
-                        <div className="hidden group-hover/item:flex flex-col gap-0.5 justify-center pl-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={index === 0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMoveTemplate(index, -1);
-                            }}
-                            className="p-0.5 text-[var(--text-muted)] hover:text-[var(--accent-red)] bg-transparent border-0 outline-none cursor-pointer disabled:opacity-30 disabled:hover:text-[var(--text-muted)] flex items-center justify-center"
-                            title={t("上移", "Move Up")}
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={index === templates.length - 1}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMoveTemplate(index, 1);
-                            }}
-                            className="p-0.5 text-[var(--text-muted)] hover:text-[var(--accent-red)] bg-transparent border-0 outline-none cursor-pointer disabled:opacity-30 disabled:hover:text-[var(--text-muted)] flex items-center justify-center"
-                            title={t("下移", "Move Down")}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                        </div>
                       </div>
                     ))}
                   </div>
