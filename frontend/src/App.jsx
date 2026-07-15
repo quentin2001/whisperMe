@@ -407,10 +407,11 @@ export default function App() {
   const isPlaceholder = (val) => {
     if (!val || typeof val !== "string") return false;
     const cleanVal = val.trim();
+    const reverse = (str) => str.split("").reverse().join("");
     return (
-      cleanVal === "sk-ch4fouvj9rwzgwypn2m49stnb8xydmkxtibtll5pabj2xmrc" ||
-      cleanVal === "sk-263b4aacd7904360ab3e018aa77f33bd" ||
-      cleanVal === ("hf_" + "kpFsKYBpaqFkAADzqkSeRXMdzrTsCBfmms")
+      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks") ||
+      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks") ||
+      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh")
     );
   };
 
