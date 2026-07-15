@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, GripVertical, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, HelpCircle, Plus, Copy, X } from "lucide-react";
+import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, GripVertical, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, Sparkles, Plus, Copy, X } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
 import { useTranslation } from "../contexts/I18nContext";
@@ -623,7 +623,7 @@ export default function SettingsView({
                         className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors p-0.5 border-0 bg-transparent outline-none cursor-pointer flex items-center justify-center animate-fade-in"
                         title={t("获取配置 AI Agent 提示词", "Get AI Agent setup prompt")}
                       >
-                        <HelpCircle size={14} />
+                        <Sparkles size={14} />
                       </button>
                     </div>
                     <div className="flex gap-2">
@@ -744,7 +744,7 @@ export default function SettingsView({
                             className="text-[var(--text-muted)] hover:text-[var(--accent-red)] transition-colors p-0.5 border-0 bg-transparent outline-none cursor-pointer flex items-center justify-center animate-fade-in"
                             title={t("获取配置 AI Agent 提示词", "Get AI Agent setup prompt")}
                           >
-                            <HelpCircle size={14} />
+                            <Sparkles size={14} />
                           </button>
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] opacity-85 italic">
