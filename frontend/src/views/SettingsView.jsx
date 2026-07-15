@@ -100,6 +100,7 @@ export default function SettingsView({
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
   const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
   
   const [showSaveAsModal, setShowSaveAsModal] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
@@ -411,45 +412,46 @@ export default function SettingsView({
   const startDrag = (e, index) => {
     e.preventDefault();
     setDraggingIndex(index);
+    setDragOffset(0);
+    
+    const draggedElement = e.currentTarget.parentElement;
+    const itemHeight = draggedElement ? draggedElement.offsetHeight + 6 : 56;
     
     const startY = e.clientY;
     const initialList = [...templates];
-    let currentIndex = index;
+    let currentHoverIndex = index;
     
     const handleMouseMove = (moveEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      const itemHeight = 56; // estimated list item height including margin
+      setDragOffset(deltaY);
+      
       const offset = Math.round(deltaY / itemHeight);
-      let newIndex = index + offset;
-      
-      newIndex = Math.max(0, Math.min(newIndex, initialList.length - 1));
-      
-      if (newIndex !== currentIndex) {
-        const updated = [...initialList];
-        const item = updated[index];
-        updated.splice(index, 1);
-        updated.splice(newIndex, 0, item);
-        setTemplates(updated);
-        currentIndex = newIndex;
-      }
+      let newHoverIndex = index + offset;
+      newHoverIndex = Math.max(0, Math.min(newHoverIndex, initialList.length - 1));
+      currentHoverIndex = newHoverIndex;
     };
     
     const handleMouseUp = async () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
-      setDraggingIndex(null);
       
-      const finalIndex = currentIndex;
-      const finalList = [...initialList];
-      const item = finalList[index];
-      finalList.splice(index, 1);
-      finalList.splice(finalIndex, 0, item);
+      const finalHoverIndex = currentHoverIndex;
+      setDraggingIndex(null);
+      setDragOffset(0);
+      
+      if (finalHoverIndex === index) return;
+      
+      const updated = [...initialList];
+      const item = updated[index];
+      updated.splice(index, 1);
+      updated.splice(finalHoverIndex, 0, item);
+      setTemplates(updated);
       
       try {
         const res = await fetch(`${API_BASE}/api/prompt/templates/reorder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: finalList.map(t => t.id) })
+          body: JSON.stringify({ order: updated.map(t => t.id) })
         });
         if (!res.ok) {
           throw new Error("Failed to save template order");
@@ -818,18 +820,46 @@ export default function SettingsView({
                   </div>
 
                   <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto pr-1">
-                    {templates.map((tpl, index) => {
-                      const isDragging = draggingIndex === index;
+                    {templates.map((tpl, k) => {
+                      const isDragging = draggingIndex === k;
+                      let itemStyle = {};
+                      if (draggingIndex !== null) {
+                        const itemHeight = 54; // estimated item height
+                        const offset = Math.round(dragOffset / itemHeight);
+                        let hoverIndex = draggingIndex + offset;
+                        hoverIndex = Math.max(0, Math.min(hoverIndex, templates.length - 1));
+                        
+                        if (isDragging) {
+                          itemStyle = {
+                            transform: `translateY(${dragOffset}px)`,
+                            zIndex: 50,
+                            position: 'relative',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15)',
+                            backgroundColor: 'var(--bg-hover)',
+                            borderColor: 'var(--accent-red)'
+                          };
+                        } else {
+                          if (hoverIndex > draggingIndex && k > draggingIndex && k <= hoverIndex) {
+                            itemStyle = { transform: `translateY(-${itemHeight}px)`, transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+                          } else if (hoverIndex < draggingIndex && k < draggingIndex && k >= hoverIndex) {
+                            itemStyle = { transform: `translateY(${itemHeight}px)`, transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+                          } else {
+                            itemStyle = { transform: 'none', transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+                          }
+                        }
+                      }
+
                       return (
                         <div
                           key={tpl.id}
-                          className={`group/item flex items-center gap-1 w-full rounded-lg p-0.5 transition-all
-                            ${isDragging ? 'shadow-md scale-[1.02] border border-[var(--accent-red)]/30 bg-[var(--bg-hover)] opacity-75' : 'border border-transparent'}
+                          style={itemStyle}
+                          className={`group/item flex items-center gap-1 w-full rounded-lg p-0.5
+                            ${isDragging ? 'shadow-md border border-[var(--accent-red)]/30 bg-[var(--bg-hover)] opacity-95' : 'border border-transparent'}
                           `}
                         >
                           {/* Drag Handle */}
                           <div
-                            onMouseDown={(e) => startDrag(e, index)}
+                            onMouseDown={(e) => startDrag(e, k)}
                             className="text-[var(--text-muted)] opacity-30 group-hover/item:opacity-100 p-1 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing transition-opacity select-none"
                             title={t("拖拽排序", "Drag to reorder")}
                           >
