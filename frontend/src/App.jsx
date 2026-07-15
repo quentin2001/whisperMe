@@ -260,6 +260,10 @@ export default function App() {
 
   const handleCreateTask = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isConfigInvalid()) {
+      await alert(t("当前配置无效，包含未设置项或占位符，请先在设置中配置正确的 API Key 或模型路径！", "Current configuration is invalid (contains unset items or placeholders). Please configure the correct API Key or model path in settings first!"));
+      return;
+    }
     const trimmedUrl = newUrl.trim();
     if (!trimmedUrl || loading) return;
 
@@ -293,6 +297,11 @@ export default function App() {
   };
 
   const handleLocalFileUpload = async (e) => {
+    if (isConfigInvalid()) {
+      await alert(t("当前配置无效，包含未设置项或占位符，请先在设置中配置正确的 API Key 或模型路径！", "Current configuration is invalid (contains unset items or placeholders). Please configure the correct API Key or model path in settings first!"));
+      if (e.target) e.target.value = "";
+      return;
+    }
     const file = e.target.files[0];
     if (!file || uploading) return;
     setUploading(true);
@@ -395,28 +404,46 @@ export default function App() {
     setLogs(updatedLogs);
   };
 
+  const isPlaceholder = (val) => {
+    if (!val || typeof val !== "string") return false;
+    const cleanVal = val.trim();
+    return (
+      cleanVal === "sk-ch4fouvj9rwzgwypn2m49stnb8xydmkxtibtll5pabj2xmrc" ||
+      cleanVal === "sk-263b4aacd7904360ab3e018aa77f33bd" ||
+      cleanVal === ("hf_" + "kpFsKYBpaqFkAADzqkSeRXMdzrTsCBfmms")
+    );
+  };
+
   const isConfigInvalid = () => {
     if (!configData) return true;
     // FFmpeg is auto-detected, no need to validate on frontend
 
     if (configData.asr_mode === "local") {
-      if (!configData.local_whisper_model_path) return true;
+      if (!configData.local_whisper_model_path || isPlaceholder(configData.local_whisper_model_path)) return true;
     } else if (configData.asr_mode === "online") {
       const provider = configData.online_asr_provider || "mimo";
       if (provider === "custom") {
-        if (!configData.custom_asr_endpoint) return true;
+        if (!configData.custom_asr_endpoint || isPlaceholder(configData.custom_asr_endpoint)) return true;
       } else if (provider === "funasr") {
-        if (!configData.online_base_url) return true;
+        if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) return true;
       } else {
         // mimo / openai
-        if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return true;
+        if (
+          !configData.online_base_url || isPlaceholder(configData.online_base_url) ||
+          !configData.online_model || isPlaceholder(configData.online_model) ||
+          !configData.online_api_key || isPlaceholder(configData.online_api_key)
+        ) return true;
       }
     }
     
     if (configData.summary_mode === "local") {
-      if (!configData.ollama_url || !configData.ollama_model) return true;
+      if (!configData.ollama_url || isPlaceholder(configData.ollama_url) || !configData.ollama_model || isPlaceholder(configData.ollama_model)) return true;
     } else if (configData.summary_mode === "online") {
-      if (!configData.online_summary_base_url || !configData.online_summary_model || !configData.online_summary_api_key) return true;
+      if (
+        !configData.online_summary_base_url || isPlaceholder(configData.online_summary_base_url) ||
+        !configData.online_summary_model || isPlaceholder(configData.online_summary_model) ||
+        !configData.online_summary_api_key || isPlaceholder(configData.online_summary_api_key)
+      ) return true;
     }
     return false;
   };

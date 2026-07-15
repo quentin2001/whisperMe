@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX } from "lucide-react";
 import { usePlayerStore } from "../../store/playerStore.js";
 import { proxyImage } from "../../constants.js";
 import { useTranslation } from "../../contexts/I18nContext";
@@ -12,9 +12,8 @@ export default function AudioPlayerControl({
   duration,
   playbackRate,
   handleProgressChange,
-  handleStepBack,
-  handleStepForward,
-  handleSpeedToggle,
+  handleJump,
+  handleSpeedChange,
   isMuted,
   volume,
   handleVolumeInput,
@@ -126,22 +125,38 @@ export default function AudioPlayerControl({
 
           <div className="flex items-center gap-5">
             <button
-              onClick={handleStepBack}
-              className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              onClick={() => handleJump(-15)}
+              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
             >
-              <SkipBack size={15} />
+              <RotateCcw size={15} />
+              <span className="text-[10px] font-mono font-bold">-15s</span>
+            </button>
+            <button
+              onClick={() => handleJump(-5)}
+              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+            >
+              <RotateCcw size={15} />
+              <span className="text-[10px] font-mono font-bold">-5s</span>
             </button>
             <button
               onClick={togglePlay}
-              className="w-10 h-10 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none"
+              className="w-10 h-10 bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white flex items-center justify-center rounded-full shadow-md active:scale-95 transition-all text-sm cursor-pointer border-0 outline-none shrink-0"
             >
               {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
             </button>
             <button
-              onClick={handleStepForward}
-              className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+              onClick={() => handleJump(10)}
+              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
             >
-              <SkipForward size={15} />
+              <RotateCw size={15} />
+              <span className="text-[10px] font-mono font-bold">+10s</span>
+            </button>
+            <button
+              onClick={() => handleJump(30)}
+              className="flex items-center gap-1 p-1.5 hover:bg-[var(--bg-hover)] rounded text-[#926e6d] hover:text-[var(--text-primary)] transition-all cursor-pointer border-0 outline-none bg-transparent"
+            >
+              <RotateCw size={15} />
+              <span className="text-[10px] font-mono font-bold">+30s</span>
             </button>
           </div>
         </div>
@@ -150,12 +165,20 @@ export default function AudioPlayerControl({
       <div className="w-1/4 flex items-center justify-end gap-3 font-semibold text-xs animate-fade-in">
         {activeTask.audio_url && (
           <>
-            <button
-              onClick={handleSpeedToggle}
-              className="px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-md border border-[var(--border-primary)]/30 active:scale-98 transition-all cursor-pointer border-0 outline-none"
-            >
-              {t("语速", "Speed")} {playbackRate.toFixed(1)}x
-            </button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--text-secondary)] text-[10px] whitespace-nowrap font-mono select-none">
+                {t("语速", "Speed")} {playbackRate.toFixed(1)}x
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="3.0"
+                step="0.1"
+                value={playbackRate}
+                onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+                className="w-20 accent-[#f62440] h-1 bg-[var(--bg-hover)] rounded-lg cursor-pointer"
+              />
+            </div>
 
             <div className="flex items-center gap-1.5">
               <button

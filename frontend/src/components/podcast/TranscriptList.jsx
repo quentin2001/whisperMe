@@ -12,6 +12,17 @@ const TranscriptList = memo(function TranscriptList({
   jumpToTimeSeconds
 }) {
   const { t } = useTranslation();
+
+  // Find the active paragraph ID using closest-previous-start logic:
+  // Segment starts at or before currentTime (and ends before next segment starts).
+  let activeParagraphId = null;
+  for (let i = paragraphs.length - 1; i >= 0; i--) {
+    if (paragraphs[i].start_time <= currentTime) {
+      activeParagraphId = paragraphs[i].id;
+      break;
+    }
+  }
+
   return (
     <>
       {/* Ingest Stepper Progress Header */}
@@ -83,24 +94,28 @@ const TranscriptList = memo(function TranscriptList({
         {paragraphs
           .filter(p => p.text.toLowerCase().includes(searchWord.toLowerCase()))
           .map((p) => {
-            const isCurrentlyPlayingThis = currentTime >= p.start_time && currentTime <= p.end_time;
+            const isActive = p.id === activeParagraphId;
 
             return (
               <div 
                 key={p.id}
                 onClick={() => jumpToTimeSeconds(p.start_time)}
-                ref={isCurrentlyPlayingThis ? activeBubbleRef : null}
-                className={`p-4 rounded-lg cursor-pointer transition-all border ${
-                  isCurrentlyPlayingThis 
-                    ? "bg-[var(--bg-card)] border-[#f62440] ring-1 ring-[#f62440]/10 shadow-xs" 
-                    : "border-transparent hover:bg-[var(--bg-card)]/40 hover:border-[var(--border-primary)]/20"
+                ref={isActive ? activeBubbleRef : null}
+                className={`p-4 rounded-lg cursor-pointer transition-all border border-l-4 ${
+                  isActive 
+                    ? "bg-[var(--accent-red)]/10 border-transparent border-l-[#f62440]" 
+                    : "border-transparent border-l-transparent hover:bg-[var(--bg-card)]/40 hover:border-[var(--border-primary)]/20 hover:border-l-transparent"
                 }`}
               >
                 <p className="font-mono text-xs text-[var(--accent-red)] font-bold mb-1.5 hover:underline">
                   {p.timeStart} — {p.timeEnd}
                 </p>
                 {/* Speaker indicator hidden as requested */}
-                <p className="text-[var(--text-primary)] text-[15px] leading-relaxed select-text font-medium">
+                <p className={`text-[15px] leading-relaxed select-text transition-colors duration-200 ${
+                  isActive 
+                    ? "text-[var(--text-primary)] font-bold" 
+                    : "text-[var(--text-secondary)] font-medium"
+                }`}>
                   {p.text}
                 </p>
               </div>

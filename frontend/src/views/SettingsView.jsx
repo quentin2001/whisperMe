@@ -293,8 +293,19 @@ export default function SettingsView({
       .catch(() => setFfmpegStatus({ available: false }));
   }, [configData?.ffmpeg_path]);
 
+  const isPlaceholder = (val) => {
+    if (!val || typeof val !== "string") return false;
+    const cleanVal = val.trim();
+    return (
+      cleanVal === "sk-ch4fouvj9rwzgwypn2m49stnb8xydmkxtibtll5pabj2xmrc" ||
+      cleanVal === "sk-263b4aacd7904360ab3e018aa77f33bd" ||
+      cleanVal === ("hf_" + "kpFsKYBpaqFkAADzqkSeRXMdzrTsCBfmms")
+    );
+  };
+
   const getHighlightClass = (val) => {
-    return isFlashing && (!val || String(val).trim() === "") ? "highlight-flash" : "";
+    const isInvalid = !val || String(val).trim() === "" || isPlaceholder(val);
+    return isFlashing && isInvalid ? "highlight-flash" : "";
   };
 
   return (

@@ -811,6 +811,11 @@ export default function PodcastDetailView({
     if (audioPlayerRef.current.paused) {
       audioPlayerRef.current.play().catch(err => console.log("播放被浏览器拦截:", err));
     }
+    setIsUserScrolling(false);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
+    }
   };
 
   const jumpToTimeMMSS = (mmss) => {
@@ -818,21 +823,15 @@ export default function PodcastDetailView({
     jumpToTimeSeconds(targetedSec);
   };
 
-  const handleStepBack = () => {
+  const handleJump = (delta) => {
     if (!audioPlayerRef.current) return;
-    audioPlayerRef.current.currentTime = Math.max(0, audioPlayerRef.current.currentTime - 10);
+    audioPlayerRef.current.currentTime = Math.max(0, Math.min(duration, audioPlayerRef.current.currentTime + delta));
   };
 
-  const handleStepForward = () => {
+  const handleSpeedChange = (rate) => {
     if (!audioPlayerRef.current) return;
-    audioPlayerRef.current.currentTime = Math.min(duration, audioPlayerRef.current.currentTime + 10);
-  };
-
-  const handleSpeedToggle = () => {
-    if (!audioPlayerRef.current) return;
-    const nextRate = playbackRate === 1.0 ? 1.5 : playbackRate === 1.5 ? 2.0 : 1.0;
-    audioPlayerRef.current.playbackRate = nextRate;
-    setPlaybackRate(nextRate);
+    audioPlayerRef.current.playbackRate = rate;
+    setPlaybackRate(rate);
   };
 
   const handleVolumeInput = (e) => {
@@ -1217,9 +1216,8 @@ export default function PodcastDetailView({
         duration={duration}
         playbackRate={playbackRate}
         handleProgressChange={handleProgressChange}
-        handleStepBack={handleStepBack}
-        handleStepForward={handleStepForward}
-        handleSpeedToggle={handleSpeedToggle}
+        handleJump={handleJump}
+        handleSpeedChange={handleSpeedChange}
         isMuted={isMuted}
         volume={volume}
         handleVolumeInput={handleVolumeInput}
