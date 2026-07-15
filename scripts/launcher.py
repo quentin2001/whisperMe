@@ -151,7 +151,7 @@ def main():
     if args.foreground:
         import atexit
         def restore_terminal():
-            sys.stdout.write("\033[r\033[0m")
+            sys.stdout.write("\033[r\033[0m\033[999;1H\n")
             sys.stdout.flush()
         atexit.register(restore_terminal)
 
@@ -214,10 +214,9 @@ def main():
             server.wait()
         except KeyboardInterrupt:
             server.terminate()
-            # 恢复终端滚动区域和属性
-            sys.stdout.write("\033[r\033[0m")
+            sys.stdout.write("\033[r\033[0m\033[999;1H\n")
             sys.stdout.flush()
-            print("\n  🛑 服务已优雅退出。")
+            print("  🛑 服务已优雅退出。")
         sys.exit(0)
     else:
         # 启动器自身退出，服务器继续在后台运行

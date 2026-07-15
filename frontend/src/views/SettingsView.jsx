@@ -878,12 +878,12 @@ export default function SettingsView({
                       <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                         {t("描述", "Description")}
                       </label>
-                      <input
-                        type="text"
+                      <textarea
                         value={editDesc}
                         onChange={(e) => setEditDesc(e.target.value)}
                         disabled={!isNewTemplate && templates.find(t => t.id === selectedTemplate)?.is_builtin}
-                        className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] disabled:opacity-60"
+                        rows={2}
+                        className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] disabled:opacity-60 resize-none leading-normal"
                         placeholder={t("请输入模板描述", "Enter template description")}
                       />
                     </div>
