@@ -854,7 +854,7 @@ export default function SettingsView({
                           key={tpl.id}
                           style={itemStyle}
                           className={`group/item flex items-center gap-1 w-full rounded-lg p-0.5
-                            ${isDragging ? 'shadow-md border border-[var(--accent-red)]/30 bg-[var(--bg-hover)] opacity-95' : 'border border-transparent'}
+                            ${isDragging ? 'shadow-lg opacity-95' : ''}
                           `}
                         >
                           {/* Drag Handle */}
