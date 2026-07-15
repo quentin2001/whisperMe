@@ -860,7 +860,7 @@ export default function SettingsView({
                 {/* Right Column - Editor */}
                 <div className="md:col-span-3 flex flex-col gap-4">
                   {/* Template Metadata Info / Inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                         {t("模板名称", "Template Name")}
