@@ -99,6 +99,7 @@ export default function SettingsView({
   const [editPrompt, setEditPrompt] = useState("");
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // 'idle' | 'saving' | 'saved' | 'error'
+  const [draggingIndex, setDraggingIndex] = useState(null);
   
   const [showSaveAsModal, setShowSaveAsModal] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
@@ -407,50 +408,60 @@ export default function SettingsView({
     }, 500);
   };
 
-  const dragItem = useRef();
-  const dragOverItem = useRef();
-
-  const handleDragStart = (e, index) => {
-    dragItem.current = index;
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragEnter = (e, index) => {
-    dragOverItem.current = index;
-  };
-
-  const handleDragEnd = async () => {
-    const index = dragItem.current;
-    const overIndex = dragOverItem.current;
+  const startDrag = (e, index) => {
+    e.preventDefault();
+    setDraggingIndex(index);
     
-    if (index === null || index === undefined || overIndex === null || overIndex === undefined || index === overIndex) {
-      dragItem.current = null;
-      dragOverItem.current = null;
-      return;
-    }
+    const startY = e.clientY;
+    const initialList = [...templates];
+    let currentIndex = index;
     
-    const updated = [...templates];
-    const draggedItemContent = updated[index];
-    updated.splice(index, 1);
-    updated.splice(overIndex, 0, draggedItemContent);
-    
-    dragItem.current = null;
-    dragOverItem.current = null;
-    setTemplates(updated);
-    
-    try {
-      const res = await fetch(`${API_BASE}/api/prompt/templates/reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: updated.map(t => t.id) })
-      });
-      if (!res.ok) {
-        throw new Error("Failed to save template order");
+    const handleMouseMove = (moveEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const itemHeight = 56; // estimated list item height including margin
+      const offset = Math.round(deltaY / itemHeight);
+      let newIndex = index + offset;
+      
+      newIndex = Math.max(0, Math.min(newIndex, initialList.length - 1));
+      
+      if (newIndex !== currentIndex) {
+        const updated = [...initialList];
+        const item = updated[index];
+        updated.splice(index, 1);
+        updated.splice(newIndex, 0, item);
+        setTemplates(updated);
+        currentIndex = newIndex;
       }
-    } catch (e) {
-      console.error(e);
-      refreshTemplates(selectedTemplate);
-    }
+    };
+    
+    const handleMouseUp = async () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      setDraggingIndex(null);
+      
+      const finalIndex = currentIndex;
+      const finalList = [...initialList];
+      const item = finalList[index];
+      finalList.splice(index, 1);
+      finalList.splice(finalIndex, 0, item);
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/prompt/templates/reorder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order: finalList.map(t => t.id) })
+        });
+        if (!res.ok) {
+          throw new Error("Failed to save template order");
+        }
+      } catch (err) {
+        console.error(err);
+        refreshTemplates(selectedTemplate);
+      }
+    };
+    
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
   };
 
   const handleSelectLocalModelPath = async () => {
@@ -807,58 +818,62 @@ export default function SettingsView({
                   </div>
 
                   <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto pr-1">
-                    {templates.map((tpl, index) => (
-                      <div
-                        key={tpl.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnter={(e) => handleDragEnter(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
-                        className="group/item flex items-center gap-1 w-full cursor-grab active:cursor-grabbing hover:bg-[var(--bg-hover)]/30 rounded-lg p-0.5"
-                      >
-                        {/* Drag Handle */}
-                        <div className="text-[var(--text-muted)] opacity-30 group-hover/item:opacity-100 p-1 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing transition-opacity">
-                          <GripVertical size={14} />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleTemplateSelect(tpl.id)}
-                           className={`flex-1 py-2.5 px-2.5 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5 min-w-0
-                            ${selectedTemplate === tpl.id
-                              ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
-                              : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
-                            }
+                    {templates.map((tpl, index) => {
+                      const isDragging = draggingIndex === index;
+                      return (
+                        <div
+                          key={tpl.id}
+                          className={`group/item flex items-center gap-1 w-full rounded-lg p-0.5 transition-all
+                            ${isDragging ? 'shadow-md scale-[1.02] border border-[var(--accent-red)]/30 bg-[var(--bg-hover)] opacity-75' : 'border border-transparent'}
                           `}
                         >
-                          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
-                            <span className="text-xs font-bold truncate flex items-center gap-1.5 min-w-0">
-                              <span className="truncate">{tpl.name}</span>
-                              {tpl.is_default && (
-                                <span className="shrink-0 text-[8px] bg-[var(--accent-red)] text-white px-1 py-0.5 rounded font-extrabold tracking-wide uppercase leading-none">
-                                  {t("默认", "Default")}
+                          {/* Drag Handle */}
+                          <div
+                            onMouseDown={(e) => startDrag(e, index)}
+                            className="text-[var(--text-muted)] opacity-30 group-hover/item:opacity-100 p-1 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing transition-opacity select-none"
+                            title={t("拖拽排序", "Drag to reorder")}
+                          >
+                            <GripVertical size={14} />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleTemplateSelect(tpl.id)}
+                            className={`flex-1 py-2.5 px-2.5 border rounded-lg text-left transition-all cursor-pointer outline-none select-none flex flex-col gap-0.5 min-w-0
+                              ${selectedTemplate === tpl.id
+                                ? 'border-[var(--accent-red)] bg-[var(--accent-red-light)]/10 text-[var(--text-primary)] font-bold'
+                                : 'border-[var(--border-primary)]/20 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] bg-transparent'
+                              }
+                            `}
+                          >
+                            <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
+                              <span className="text-xs font-bold truncate flex items-center gap-1.5 min-w-0">
+                                <span className="truncate">{tpl.name}</span>
+                                {tpl.is_default && (
+                                  <span className="shrink-0 text-[8px] bg-[var(--accent-red)] text-white px-1 py-0.5 rounded font-extrabold tracking-wide uppercase leading-none">
+                                    {t("默认", "Default")}
+                                  </span>
+                                )}
+                              </span>
+                              {tpl.is_builtin ? (
+                                <span className="shrink-0 text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 py-0.5 rounded font-semibold leading-none">
+                                  {t("内置", "Built-in")}
+                                </span>
+                              ) : (
+                                <span className="shrink-0 text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 py-0.5 rounded font-semibold leading-none">
+                                  {t("自定义", "Custom")}
                                 </span>
                               )}
-                            </span>
-                            {tpl.is_builtin ? (
-                              <span className="shrink-0 text-[9px] bg-[var(--border-primary)]/40 text-[var(--text-muted)] px-1 py-0.5 rounded font-semibold leading-none">
-                                {t("内置", "Built-in")}
-                              </span>
-                            ) : (
-                              <span className="shrink-0 text-[9px] bg-red-100/60 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-1 py-0.5 rounded font-semibold leading-none">
-                                {t("自定义", "Custom")}
+                            </div>
+                            {tpl.description && (
+                              <span className="text-[10px] text-[var(--text-muted)] truncate w-full font-medium">
+                                {tpl.description}
                               </span>
                             )}
-                          </div>
-                          {tpl.description && (
-                            <span className="text-[10px] text-[var(--text-muted)] truncate w-full font-medium">
-                              {tpl.description}
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    ))}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                   {loadingTemplate && <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t("正在载入模板内容...", "Loading template content...")}</span>}
                 </div>
