@@ -1,5 +1,4 @@
-import React, { memo } from 'react';
-import { AlertCircle } from "lucide-react";
+import { memo } from 'react';
 
 import { useTranslation } from "../../contexts/I18nContext";
 
@@ -96,6 +95,20 @@ const TranscriptList = memo(function TranscriptList({
           .map((p) => {
             const isActive = p.id === activeParagraphId;
 
+            // Find closest sentence start time to currentTime within active paragraph
+            let activeSentenceIndex = -1;
+            if (isActive && p.sentences && p.sentences.length > 0) {
+              let minDiff = Infinity;
+              for (let sIdx = 0; sIdx < p.sentences.length; sIdx++) {
+                const s = p.sentences[sIdx];
+                const diff = Math.abs(s.start - currentTime);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  activeSentenceIndex = sIdx;
+                }
+              }
+            }
+
             return (
               <div 
                 key={p.id}
@@ -111,12 +124,42 @@ const TranscriptList = memo(function TranscriptList({
                   {p.timeStart} — {p.timeEnd}
                 </p>
                 {/* Speaker indicator hidden as requested */}
-                <p className={`text-[15px] leading-relaxed select-text transition-colors duration-200 ${
-                  isActive 
-                    ? "text-[var(--text-primary)] font-bold" 
-                    : "text-[var(--text-secondary)] font-medium"
-                }`}>
-                  {p.text}
+                <p className="text-[15px] leading-relaxed select-text transition-colors duration-200">
+                  {p.sentences && p.sentences.length > 0 ? (
+                    p.sentences.map((s, sIdx) => {
+                      const isSentenceActive = isActive && sIdx === activeSentenceIndex;
+                      return (
+                        <span
+                          key={sIdx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            jumpToTimeSeconds(s.start);
+                          }}
+                          className={`transition-all duration-150 cursor-pointer px-1 py-0.5 rounded mx-0.5 inline ${
+                            isSentenceActive
+                              ? "bg-[var(--accent-red)]/20 text-[var(--text-primary)] font-bold"
+                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] font-medium"
+                          }`}
+                        >
+                          {s.text}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        jumpToTimeSeconds(p.start_time);
+                      }}
+                      className={`transition-all duration-150 cursor-pointer px-1 py-0.5 rounded mx-0.5 inline ${
+                        isActive
+                          ? "bg-[var(--accent-red)]/20 text-[var(--text-primary)] font-bold"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] font-medium"
+                      }`}
+                    >
+                      {p.text}
+                    </span>
+                  )}
                 </p>
               </div>
             );

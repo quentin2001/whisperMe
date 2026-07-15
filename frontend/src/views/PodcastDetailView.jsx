@@ -903,6 +903,34 @@ export default function PodcastDetailView({
   const paragraphs = (activeTask.paragraphs || []).map((p, idx) => {
     const rawSpeaker = p.speaker || `Speaker ${idx + 1}`;
     const displaySpeaker = activeTask.speaker_mappings?.[rawSpeaker] || rawSpeaker;
+
+    let sentences = [];
+    if (p.sentences) {
+      if (Array.isArray(p.sentences)) {
+        sentences = p.sentences;
+      } else if (typeof p.sentences === "string") {
+        try {
+          sentences = JSON.parse(p.sentences);
+        } catch (e) {
+          console.error("Failed to parse sentences JSON:", e);
+        }
+      }
+    }
+
+    if (!Array.isArray(sentences) || sentences.length === 0) {
+      sentences = [{
+        start: p.start_time ?? 0,
+        end: p.end_time ?? 0,
+        text: p.content || ""
+      }];
+    } else {
+      sentences = sentences.map(s => ({
+        start: s.start !== undefined ? s.start : (s.start_time !== undefined ? s.start_time : (p.start_time ?? 0)),
+        end: s.end !== undefined ? s.end : (s.end_time !== undefined ? s.end_time : (p.end_time ?? 0)),
+        text: s.text || s.content || ""
+      }));
+    }
+
     return {
       id: p.id || `p-${idx}`,
       speaker: displaySpeaker,
@@ -910,7 +938,8 @@ export default function PodcastDetailView({
       timeEnd: formatTime(p.end_time),
       text: p.content || "",
       start_time: p.start_time,
-      end_time: p.end_time
+      end_time: p.end_time,
+      sentences: sentences
     };
   });
 
