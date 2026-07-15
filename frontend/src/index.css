@@ -243,6 +243,13 @@
   border-width: 2px;
 }
 
+/* Override textarea cursor behavior on scrollbar elements */
+textarea::-webkit-scrollbar,
+textarea::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-thumb {
+  cursor: default;
+}
+
 /* Fix textarea scrollbar clipping rounded corners */
 textarea::-webkit-scrollbar-track {
   margin-top: 8px;

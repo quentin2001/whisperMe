@@ -814,7 +814,7 @@ export default function SettingsView({
                         onDragStart={(e) => handleDragStart(e, index)}
                         onDragEnter={(e) => handleDragEnter(e, index)}
                         onDragEnd={handleDragEnd}
-                        onDragOver={(e) => e.preventDefault()}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
                         className="group/item flex items-center gap-1 w-full cursor-grab active:cursor-grabbing hover:bg-[var(--bg-hover)]/30 rounded-lg p-0.5"
                       >
                         {/* Drag Handle */}
