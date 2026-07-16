@@ -1034,7 +1034,7 @@ Please help me complete the following tasks:
                             <button
                               type="button"
                               onClick={handleDeleteCustomTemplate}
-                              className="border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer bg-transparent outline-none"
+                              className="flex items-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer bg-transparent outline-none whitespace-nowrap"
                             >
                               <Trash2 size={13} />
                               <span>{t("删除模板", "Delete")}</span>
