@@ -5,6 +5,9 @@ release/
 frontend/dist/
 ffmpeg/
 .whisperMe.pid
+whisperMe.lnk
+whisperMe.app/
+
 
 # 1. Credentials & Configuration (🛡️ CRITICAL - DO NOT SECURELY UN-IGNORE)
 config.json

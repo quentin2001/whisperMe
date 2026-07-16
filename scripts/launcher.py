@@ -13,6 +13,98 @@ import argparse
 import subprocess
 import webbrowser
 import urllib.request
+import shutil
+
+
+def create_windows_shortcut(root_dir):
+    shortcut_path = os.path.join(root_dir, "whisperMe.lnk")
+    icon_path = os.path.join(root_dir, "assets", "logo.ico")
+    
+    ps_script = f"""
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
+    $Shortcut.TargetPath = "cmd.exe"
+    $Shortcut.Arguments = "/c if exist venv\\\\Scripts\\\\python.exe (venv\\\\Scripts\\\\python.exe scripts\\\\launcher.py --foreground) else (python scripts\\\\launcher.py --foreground)"
+    $Shortcut.WorkingDirectory = "{root_dir}"
+    $Shortcut.IconLocation = "{icon_path}"
+    $Shortcut.Description = "Launch whisperMe AI Podcast Workspace"
+    $Shortcut.Save()
+    """
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+def create_mac_app_bundle(root_dir):
+    app_dir = os.path.join(root_dir, "whisperMe.app")
+    contents_dir = os.path.join(app_dir, "Contents")
+    macos_dir = os.path.join(contents_dir, "MacOS")
+    resources_dir = os.path.join(contents_dir, "Resources")
+    
+    try:
+        os.makedirs(macos_dir, exist_ok=True)
+        os.makedirs(resources_dir, exist_ok=True)
+        
+        # Write Info.plist
+        info_plist_path = os.path.join(contents_dir, "Info.plist")
+        info_plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>whisperMe</string>
+    <key>CFBundleIconFile</key>
+    <string>logo.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.quentin.whisperme</string>
+    <key>CFBundleName</key>
+    <string>whisperMe</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.2</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.10.0</string>
+</dict>
+</plist>
+"""
+        with open(info_plist_path, "w", encoding="utf-8") as f:
+            f.write(info_plist_content)
+            
+        # Write whisperMe launcher script
+        launcher_script_path = os.path.join(macos_dir, "whisperMe")
+        launcher_script_content = f"""#!/bin/bash
+APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$APP_DIR"
+if [ -f "venv/bin/python" ]; then
+    PYTHON_BIN="venv/bin/python"
+else
+    PYTHON_BIN="python3"
+fi
+osascript -e "tell application \\"Terminal\\" to do script \\"cd '$APP_DIR' && $PYTHON_BIN scripts/launcher.py --foreground\\""
+"""
+        with open(launcher_script_path, "w", encoding="utf-8") as f:
+            f.write(launcher_script_content)
+            
+        os.chmod(launcher_script_path, 0o755)
+            
+        # Copy logo.icns
+        src_icns = os.path.join(root_dir, "assets", "logo.icns")
+        dest_icns = os.path.join(resources_dir, "logo.icns")
+        if os.path.exists(src_icns):
+            shutil.copyfile(src_icns, dest_icns)
+            
+        subprocess.run(["touch", app_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+def auto_generate_shortcuts(root_dir):
+    if sys.platform == "win32":
+        create_windows_shortcut(root_dir)
+    elif sys.platform == "darwin":
+        create_mac_app_bundle(root_dir)
 
 # PyInstaller 打包后 __file__ 指向临时目录，需要用 exe 所在目录
 if getattr(sys, 'frozen', False):
@@ -90,6 +182,9 @@ def wait_for_server(timeout=30):
 
 
 def main():
+    # Automatically generate native shortcuts with product logo on startup
+    auto_generate_shortcuts(ROOT_DIR)
+
     # 启用 Windows 10 ANSI 支持
     if sys.platform == "win32":
         os.system("")
