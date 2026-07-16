@@ -107,6 +107,8 @@ export default function SettingsView({
   const [saveAsDesc, setSaveAsDesc] = useState("");
   
   const [infoModal, setInfoModal] = useState({ isOpen: false, type: "" });
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeStatus, setUpgradeStatus] = useState("");
 
   const testConnection = async (type) => {
     const isAsr = type === "asr";
@@ -579,6 +581,38 @@ Please help me complete the following tasks:
      "llm_mode": "local"
 4. **Connection Verification**:
    - Run a quick cURL or python query to the API endpoint to verify that the local LLM responds correctly and can successfully summarize text.`;
+  const handleSystemUpgrade = async () => {
+    if (upgrading) return;
+    
+    if (!window.confirm(t(
+      "您确定要执行一键升级吗？升级完成后服务会自动关闭并重启。",
+      "Are you sure you want to perform one-click upgrade? The service will automatically close and restart upon completion."
+    ))) {
+      return;
+    }
+    
+    setUpgrading(true);
+    setUpgradeStatus(t("正在升级中，这可能需要几十秒，请勿关闭本窗口...", "Upgrading in progress, this might take a few dozen seconds. Please do not close this window..."));
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/system/upgrade`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        setUpgradeStatus(t("升级成功！正在尝试重启服务器，请稍候...", "Upgrade successful! Attempting to restart server, please wait..."));
+        
+        setTimeout(() => {
+          window.location.reload();
+        }, 6000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.detail || "Upgrade failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(t("升级失败: ", "Upgrade failed: ") + err.message);
+      setUpgrading(false);
+    }
   };
 
   return (
@@ -603,14 +637,24 @@ Please help me complete the following tasks:
                 {t("您当前正在使用", "You are running")} <span className="font-mono font-bold">v{versionInfo.current_version}</span>。
                 {versionInfo.release_notes ? `${t("更新内容：", "What's new: ")} ${versionInfo.release_notes}` : t("推荐您立即升级以获得最新特性和 Bug 修复。", "We recommend upgrading to enjoy new features and bug fixes.")}
               </p>
-              <a
-                href={versionInfo.release_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-[var(--accent-red)] hover:underline"
-              >
-                {t("前往 GitHub 下载与升级 ↗", "Upgrade on GitHub ↗")}
-              </a>
+              <div className="flex items-center gap-4 mt-3">
+                <button
+                  type="button"
+                  onClick={handleSystemUpgrade}
+                  className="bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border-0 outline-none flex items-center gap-1.5"
+                >
+                  <RefreshCw size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
+                  <span>{t("一键自动升级 (推荐)", "One-Click Upgrade (Rec.)")}</span>
+                </button>
+                <a
+                  href={versionInfo.release_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:underline"
+                >
+                  {t("手动下载 ↗", "Manual Download ↗")}
+                </a>
+              </div>
             </div>
           </div>
         )}
@@ -1218,19 +1262,22 @@ Please help me complete the following tasks:
             </div>
 
             {/* GitHub Repo & Version Info */}
-            <a
-              href={versionInfo?.has_update ? versionInfo.release_url : "https://github.com/quentin2001/whisperMe"}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'none' }}
-              className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs hover:border-[var(--accent-red)]/55 hover:shadow-xs transition-all flex items-center justify-between group cursor-pointer"
+            {/* GitHub Repo & Version Info */}
+            <div
+              className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs flex items-center justify-between group transition-colors duration-300"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[var(--bg-hover)]/65 flex items-center justify-center text-[var(--text-primary)] group-hover:scale-105 transition-all">
+                <a
+                  href="https://github.com/quentin2001/whisperMe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-full bg-[var(--bg-hover)]/65 flex items-center justify-center text-[var(--text-primary)] hover:scale-105 transition-all cursor-pointer border-0 outline-none"
+                  title={t("访问 GitHub 仓库", "Visit GitHub Repository")}
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-                </div>
+                </a>
                 <div>
-                  <h4 className="font-bold text-sm text-[var(--text-primary)] font-display group-hover:text-[var(--accent-red)] transition-all">{t("GitHub 仓库", "GitHub Repository")}</h4>
+                  <h4 className="font-bold text-sm text-[var(--text-primary)] font-display">{t("GitHub 仓库", "GitHub Repository")}</h4>
                   <p className="text-[11px] text-[var(--text-muted)] font-semibold mt-0.5">quentin2001/whisperMe</p>
                 </div>
               </div>
@@ -1245,17 +1292,28 @@ Please help me complete the following tasks:
                     : `v${versionInfo?.current_version || "1.0.0"}`
                   }
                 </span>
-                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCheckVersion(true); }}
-                  className="text-[10px] text-[var(--accent-red)] hover:underline bg-transparent border-0 cursor-pointer font-bold mt-1 flex items-center gap-1 select-none outline-none"
-                  disabled={checkingVersion}>
-                  {checkingVersion ? (
-                    <><Loader2 size={10} className="animate-spin text-[var(--accent-red)]" /><span>{t("检查中...", "Checking...")}</span></>
-                  ) : (
-                    <span>{t("检查更新", "Check Updates")}</span>
+                <div className="flex items-center gap-2 mt-1">
+                  {versionInfo?.has_update && (
+                    <button
+                      type="button"
+                      onClick={handleSystemUpgrade}
+                      className="text-[10px] text-green-600 hover:text-green-700 hover:underline bg-transparent border-0 cursor-pointer font-extrabold flex items-center gap-1 select-none outline-none"
+                    >
+                      {t("一键升级", "Upgrade Now")}
+                    </button>
                   )}
-                </button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCheckVersion(true); }}
+                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:underline bg-transparent border-0 cursor-pointer font-bold flex items-center gap-1 select-none outline-none"
+                    disabled={checkingVersion}>
+                    {checkingVersion ? (
+                      <><Loader2 size={10} className="animate-spin text-[var(--text-muted)]" /><span>{t("检查中...", "Checking...")}</span></>
+                    ) : (
+                      <span>{t("检查更新", "Check Updates")}</span>
+                    )}
+                  </button>
+                </div>
               </div>
-            </a>
+            </div>
           </div>
 
         </div>
@@ -1382,6 +1440,24 @@ Please help me complete the following tasks:
           </div>
         </div>
       )}
+
+      {upgrading && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center z-[999] p-6 text-center">
+          <div className="flex flex-col items-center gap-5 max-w-md">
+            <Loader2 size={48} className="animate-spin text-[var(--accent-red)]" />
+            <h3 className="text-lg font-bold text-white font-display">
+              {t("正在进行系统自动升级", "System Self-Upgrading in Progress")}
+            </h3>
+            <p className="text-sm text-[var(--text-muted)] font-medium leading-relaxed">
+              {upgradeStatus}
+            </p>
+            <div className="w-48 h-1.5 bg-[var(--border-primary)]/20 rounded-full overflow-hidden relative">
+              <div className="absolute top-0 left-0 h-full bg-[var(--accent-red)] rounded-full animate-loading-bar"></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
 }

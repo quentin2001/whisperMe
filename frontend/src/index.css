@@ -232,6 +232,20 @@
   transform-origin: center;
 }
 
+/* Auto-upgrade sliding loading bar animation */
+@keyframes loadingBar {
+  0% { left: -30%; width: 30%; }
+  50% { left: 30%; width: 40%; }
+  100% { left: 100%; width: 30%; }
+}
+
+.animate-loading-bar {
+  animation: loadingBar 1.5s infinite ease-in-out;
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
 /* Custom scrollbars that look premium and warm, expanding when hovered or active */
 ::-webkit-scrollbar {
   width: 12px;

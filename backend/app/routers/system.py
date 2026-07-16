@@ -359,6 +359,117 @@ def check_software_version(force: bool = False):
         "release_notes": VERSION_CHECK_CACHE["release_notes"]
     }
 
+@router.post("/system/upgrade")
+def system_upgrade():
+    """一键静默升级服务并自动重启"""
+    from app.config import PROJECT_DIR
+    import signal
+    
+    git_dir = PROJECT_DIR / ".git"
+    is_git = git_dir.is_dir()
+    
+    try:
+        if is_git:
+            print("[Auto Update] Git repository detected. Pulling changes...")
+            pull_res = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=str(PROJECT_DIR),
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if pull_res.returncode != 0:
+                raise Exception(f"Git pull failed: {pull_res.stderr}")
+            print(f"[Auto Update] Git pull successful:\n{pull_res.stdout}")
+            
+            requirements_txt = PROJECT_DIR / "backend" / "requirements.txt"
+            if requirements_txt.is_file():
+                if sys.platform == "win32":
+                    pip_exe = PROJECT_DIR / "venv" / "Scripts" / "pip.exe"
+                else:
+                    pip_exe = PROJECT_DIR / "venv" / "bin" / "pip"
+                
+                if pip_exe.is_file():
+                    print("[Auto Update] Updating Python dependencies...")
+                    subprocess.run(
+                        [str(pip_exe), "install", "-r", str(requirements_txt)],
+                        cwd=str(PROJECT_DIR),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=60
+                    )
+        else:
+            print("[Auto Update] Packaged distribution detected. Fetching latest release...")
+            url = "https://api.github.com/repos/quentin2001/whisperMe/releases/latest"
+            req = urllib.request.Request(url, headers={"User-Agent": "whisperMe-Updater-FastAPI"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    zipball_url = data.get("zipball_url")
+                    if not zipball_url:
+                        raise Exception("No zipball URL found in release data.")
+                    
+                    import tempfile
+                    import zipfile
+                    temp_dir = tempfile.gettempdir()
+                    zip_path = os.path.join(temp_dir, "whisperMe_update.zip")
+                    
+                    print(f"[Auto Update] Downloading update package from: {zipball_url}")
+                    urllib.request.urlretrieve(zipball_url, zip_path)
+                    
+                    extract_dir = os.path.join(temp_dir, "whisperMe_extracted")
+                    if os.path.exists(extract_dir):
+                        shutil.rmtree(extract_dir)
+                    os.makedirs(extract_dir, exist_ok=True)
+                    
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(extract_dir)
+                    
+                    subdirs = os.listdir(extract_dir)
+                    if subdirs:
+                        update_source = os.path.join(extract_dir, subdirs[0])
+                        print(f"[Auto Update] Overwriting files from source: {update_source}")
+                        
+                        ignored_patterns = ["config.json", "prompt.json", "data", "downloads", "logs", ".git", ".whisperMe.pid"]
+                        for item in os.listdir(update_source):
+                            if item in ignored_patterns:
+                                continue
+                            s = os.path.join(update_source, item)
+                            d = os.path.join(str(PROJECT_DIR), item)
+                            if os.path.isdir(s):
+                                if os.path.exists(d):
+                                    shutil.rmtree(d)
+                                shutil.copytree(s, d)
+                            else:
+                                shutil.copy2(s, d)
+                                
+                    shutil.rmtree(extract_dir)
+                    os.remove(zip_path)
+    except Exception as e:
+        print(f"[Auto Update] Upgrade failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upgrade failed: {str(e)}")
+
+    def restart_server():
+        time.sleep(1.0)
+        try:
+            if sys.platform == "win32":
+                cmd = f'ping 127.0.0.1 -n 3 > nul && cd /d "{PROJECT_DIR}" && start.bat'
+                subprocess.Popen(cmd, shell=True, creationflags=0x08000000)
+            elif sys.platform == "darwin":
+                cmd = f'sleep 2 && osascript -e \'tell application "Terminal" to do script "cd \\"{PROJECT_DIR}\\" && ./whisperMe.app/Contents/MacOS/whisperMe"\' & scale=0'
+                subprocess.Popen(cmd, shell=True)
+            else:
+                cmd = f'sleep 2 && cd "{PROJECT_DIR}" && python3 scripts/launcher.py &'
+                subprocess.Popen(cmd, shell=True)
+        except Exception as e:
+            print(f"[Auto Update] Failed to restart server: {e}")
+            
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=restart_server, daemon=True).start()
+    
+    return {"status": "success", "message": "Upgrade completed successfully. Restarting server..."}
+
 
 @router.get("/proxy/image")
 def proxy_image(url: str):
