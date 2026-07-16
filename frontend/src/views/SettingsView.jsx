@@ -581,6 +581,8 @@ Please help me complete the following tasks:
      "llm_mode": "local"
 4. **Connection Verification**:
    - Run a quick cURL or python query to the API endpoint to verify that the local LLM responds correctly and can successfully summarize text.`;
+  };
+
   const handleSystemUpgrade = async () => {
     if (upgrading) return;
     
@@ -1459,5 +1461,4 @@ Please help me complete the following tasks:
       )}
     </div>
   );
-}
 }

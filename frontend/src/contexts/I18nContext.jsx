@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect } from 'react';
-import { useConfigStore } from '../store/configStore';
+import { useConfigStore } from '../store/configStore.js';
 
 const I18nContext = createContext();
 
