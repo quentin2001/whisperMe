@@ -102,7 +102,7 @@ def main():
     
     print("Installing backend dependencies...")
     req_file = os.path.join(base_dir, 'backend', 'requirements.txt')
-    run_cmd([sys.executable, '-m', 'pip', 'install', '-r', req_file, '-t', site_packages])
+    run_cmd([sys.executable, '-m', 'pip', 'install', '-r', req_file, '-t', site_packages, '--extra-index-url', 'https://download.pytorch.org/whl/cpu'])
     
     # Prune dependencies
     print("Pruning dependencies...")
