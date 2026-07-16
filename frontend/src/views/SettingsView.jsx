@@ -529,6 +529,58 @@ export default function SettingsView({
     return isFlashing && isInvalid ? "highlight-flash" : "";
   };
 
+  const getAsrAgentPrompt = () => {
+    const asrPath = configData.local_whisper_model_path || "E:/Projects/whisperMe/models/funasr";
+    return `You are an expert AI Coding Assistant. I am setting up the "whisperMe" project and need to configure a local ASR engine (FunASR/faster-whisper) in my workspace.
+
+Please help me complete the following tasks:
+1. **Detect System Hardware**:
+   - Check my operating system (Windows, macOS, or Linux) and check if an NVIDIA GPU is available (CUDA support).
+   - If this is a macOS machine, check for Apple Silicon M-series chip support (Metal/MPS).
+   - If neither is available, fall back to CPU optimization.
+2. **Recommending & Downloading Models**:
+   - We prefer using FunASR (e.g., paraformer-large) or faster-whisper (e.g., large-v3).
+   - Do not artificially restrict my choices based on fixed VRAM/RAM checks; let's allow downloading the models and verifying if they load successfully on my hardware.
+   - Download the ASR model files and place them in the following target directory (this is my active configuration path):
+     ${asrPath}
+   - Verify that all necessary model weights (e.g., model.pb, config.yaml, or whisper model.bin files) are completely downloaded and placed in the correct subfolder structure so the backend can load them fully offline.
+3. **Configure Project Settings**:
+   - Locate my project's config file at:
+     e:/Projects/whisperMe/data/config.json
+   - Update "local_whisper_model_path" in the "config.json" file to:
+     "${asrPath}"
+   - Set "asr_mode" to "local".
+4. **Verification**:
+   - Run a quick python verification check to ensure that the ASR dependencies can locate and load the ASR model from the configured path successfully.`;
+  };
+
+  const getLlmAgentPrompt = () => {
+    const llmUrl = configData.ollama_url || "http://localhost:11434";
+    const llmModel = configData.ollama_model || "qwen2.5:7b-instruct";
+    return `You are an expert AI Coding Assistant. I am setting up the "whisperMe" project and want to configure a local LLM summary model.
+
+Please help me complete the following tasks:
+1. **Hardware Inspection & Model Selection**:
+   - Analyze my system specs (CPU, GPU, RAM, VRAM).
+   - Determine which model size is appropriate for this machine (e.g. 1.5B, 7B, 14B, or larger) of Qwen 2.5 (e.g., qwen2.5:7b-instruct, qwen2.5:14b-instruct) or other suitable open-source model series. Do not enforce rigid limits; allow testing what model runs best.
+   - I can use either Ollama or LMStudio (or other OpenAI-compatible local API servers).
+2. **Setup Local Service & Pull Model**:
+   - Verify that the local LLM service is running. Currently, it is configured at:
+     ${llmUrl}
+   - If using Ollama, help me pull the model:
+     \`ollama pull ${llmModel}\` (or the recommended model ID).
+   - If using LMStudio, guide me to download and load the GGUF model within the LMStudio interface.
+3. **Configure Project Settings**:
+   - Locate my project's config file at:
+     e:/Projects/whisperMe/data/config.json
+   - Update the configuration values:
+     "ollama_url": "${llmUrl}"
+     "ollama_model": "${llmModel}" (or the selected model ID)
+     "llm_mode": "local"
+4. **Connection Verification**:
+   - Run a quick cURL or python query to the API endpoint to verify that the local LLM responds correctly and can successfully summarize text.`;
+  };
+
   return (
     <div id="settings-view-section" className="flex-1 overflow-y-auto w-full">
       <div className="max-w-[1280px] mx-auto p-10 font-sans w-full">
@@ -1302,17 +1354,7 @@ export default function SettingsView({
 
             <div className="bg-[var(--bg-secondary)]/60 border border-[var(--border-primary)]/30 rounded-lg p-3 relative">
               <pre className="text-xs font-mono text-[var(--text-primary)] whitespace-pre-wrap select-all font-semibold leading-relaxed max-h-60 overflow-y-auto">
-                {infoModal.type === "asr"
-                  ? `I am setting up whisperMe and need to configure a local ASR engine (FunASR) in the following absolute folder path:
-E:/Projects/whisperMe/models/funasr
-
-Please help me download and install the FunASR models into this directory, and ensure that all required files (such as model.pb, config.yaml) are present, so the backend can load them correctly without external internet queries.`
-                  : `I am setting up whisperMe and want to configure a local LLM summary model using Ollama.
-The Ollama URL is: http://localhost:11434
-The Ollama model ID is: qwen2.5:7b-instruct
-
-Please help me pull this model locally and verify that the Ollama service is running on my machine. Also, give me the terminal pull commands.`
-                }
+                {infoModal.type === "asr" ? getAsrAgentPrompt() : getLlmAgentPrompt()}
               </pre>
             </div>
 
@@ -1320,9 +1362,7 @@ Please help me pull this model locally and verify that the Ollama service is run
               <button
                 type="button"
                 onClick={() => {
-                  const text = infoModal.type === "asr"
-                    ? `I am setting up whisperMe and need to configure a local ASR engine (FunASR) in the following absolute folder path:\nE:/Projects/whisperMe/models/funasr\n\nPlease help me download and install the FunASR models into this directory, and ensure that all required files (such as model.pb, config.yaml) are present, so the backend can load them correctly without external internet queries.`
-                    : `I am setting up whisperMe and want to configure a local LLM summary model using Ollama.\nThe Ollama URL is: http://localhost:11434\nThe Ollama model ID is: qwen2.5:7b-instruct\n\nPlease help me pull this model locally and verify that the Ollama service is running on my machine. Also, give me the terminal pull commands.`;
+                  const text = infoModal.type === "asr" ? getAsrAgentPrompt() : getLlmAgentPrompt();
                   navigator.clipboard.writeText(text);
                   alert(t("提示词已复制到剪贴板！", "Prompt copied to clipboard!"), { variant: "success" });
                 }}
