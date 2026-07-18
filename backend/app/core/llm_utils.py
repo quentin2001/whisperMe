@@ -47,12 +47,15 @@ def _execute_llm_call(api_url: str, payload: dict, headers: dict, timeout: float
 
 
 def call_llm(prompt: str, system_prompt: str = None, summary_mode: str = None, label: str = "LLM调用",
-             temperature: float = 0.1, timeout: float = 120.0) -> str:
+             temperature: float = 0.1, timeout: float = 120.0, max_tokens: int = None) -> str:
     """Call the configured LLM (local Ollama or online OpenAI-compatible API).
 
     Implements a two-tier network fallback strategy:
     1. Try with system proxy (trust_env=True)
     2. Fallback to direct connection using DoH DNS bypass (trust_env=False)
+
+    Args:
+        max_tokens: Maximum output tokens. Defaults to 2048 for local, 8192 for online.
     """
     if not summary_mode:
         summary_mode = config.get("summary_mode", "local")
@@ -86,11 +89,22 @@ def call_llm(prompt: str, system_prompt: str = None, summary_mode: str = None, l
     else:
         messages.append({"role": "user", "content": prompt})
 
+    # 估算输入大小（方便调试性能问题）
+    total_input_chars = sum(len(m["content"]) for m in messages)
+    print(f"📊 [LOG] {label} 输入统计 - 消息数: {len(messages)} | 总字符数: {total_input_chars} | 估算 tokens: ~{total_input_chars // 2}")
+
+    # 设置 max_tokens 上限，防止无限生成
+    if max_tokens is None:
+        effective_max_tokens = 2048 if summary_mode != "online" else 8192
+    else:
+        effective_max_tokens = max_tokens
+
     payload = {
         "model": target_model,
         "messages": messages,
         "stream": False,
-        "temperature": temperature
+        "temperature": temperature,
+        "max_tokens": effective_max_tokens
     }
 
     if summary_mode != "online":

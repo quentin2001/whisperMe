@@ -1,9 +1,24 @@
+import re
 import json
 import httpx
 from app.config import config
-from app.core.prompt_manager import load_prompt
+from app.core.prompt_manager import load_prompt, get_template_prompt, BUILTIN_TEMPLATES
 from app.core.network import doh_dns_bypass
 from app.core.llm_utils import call_llm
+from app.core import logger
+
+print = logger.info
+
+# 中文语气词/口头禅去噪正则（播客口语转录中的高频噪声）
+_FILLER_PATTERN = re.compile(
+    r'^[\s]*(嗯+|啊+|呃+|额+|哦+|唉+|哎+|诶+|对对对|是是是|好好好|'
+    r'对的对的|没错没错|就是就是|然后然后)[\s。，、！？.,!?]*$'
+)
+_FILLER_INLINE_PATTERN = re.compile(
+    r'(?:^|(?<=[。，、！？.,!?\s]))'
+    r'(?:嗯+|啊+|呃+|额+|哦+|就是说|那个|然后嘛|对吧|你知道吗|怎么说呢)'
+    r'(?=[。，、！？.,!?\s]|$)'
+)
 
 class PodcastSummarizer:
     def __init__(self):
@@ -37,7 +52,52 @@ class PodcastSummarizer:
 
         return chunks
 
+    def _denoise_transcript_lines(self, lines: list[str]) -> list[str]:
+        """
+        对转录文本行进行去噪处理，减少送入 LLM 的 token 数量：
+        1. 删除纯语气词/口头禅行（如 "嗯"、"对对对"）
+        2. 清理行内语气词填充（如 "嗯，就是说，那个"）
+        3. 合并连续的极短行（<5 字符）
+        """
+        if not lines:
+            return lines
 
+        denoised = []
+        for line in lines:
+            # 保留说话人标签：提取 "SpeakerName: text" 格式
+            speaker_prefix = ""
+            text_part = line
+            if ": " in line:
+                parts = line.split(": ", 1)
+                if len(parts[0]) < 30:  # 合理的说话人名长度
+                    speaker_prefix = parts[0] + ": "
+                    text_part = parts[1]
+
+            # 跳过纯语气词行
+            if _FILLER_PATTERN.match(text_part.strip()):
+                continue
+
+            # 清理行内语气词
+            cleaned = _FILLER_INLINE_PATTERN.sub('', text_part).strip()
+            # 清理连续标点
+            cleaned = re.sub(r'[，、]{2,}', '，', cleaned)
+            cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+            # 清理首尾残留标点
+            cleaned = cleaned.strip('，、。！？,. ')
+
+            if not cleaned or len(cleaned) < 2:
+                continue
+
+            denoised.append(speaker_prefix + cleaned if speaker_prefix else cleaned)
+
+        original_len = sum(len(l) for l in lines)
+        denoised_len = sum(len(l) for l in denoised)
+        reduction = original_len - denoised_len
+        if reduction > 0:
+            pct = (reduction / original_len * 100) if original_len > 0 else 0
+            print(f"🧹 [LOG] 转录文本去噪完成：{len(lines)} 行 → {len(denoised)} 行，字符数 {original_len} → {denoised_len}（减少 {reduction} 字符，{pct:.1f}%）")
+
+        return denoised
 
     def summarize(self, metadata: dict, transcript_segments: list[dict], speaker_mappings: dict = None, summary_mode: str = None, custom_prompt: str = None) -> str:
         """
@@ -70,6 +130,9 @@ class PodcastSummarizer:
                 
             transcript_text_lines.append(line)
 
+        # 3.5. 转录文本去噪（减少送入 LLM 的 token 数量）
+        transcript_text_lines = self._denoise_transcript_lines(transcript_text_lines)
+
         # 4. 组装评论内容
         comments_text_lines = []
         for idx, c in enumerate(metadata.get("comments", [])):
@@ -77,19 +140,41 @@ class PodcastSummarizer:
         full_comments_text = "\n".join(comments_text_lines) if comments_text_lines else "暂无评论数据"
 
         # 5. 长文本分段策略
-        max_char_len = 80000 if summary_mode == "online" else 45000
+        # qwen2.5-7b-instruct-1m 等长上下文模型支持远超 45K chars，统一提高到 80K 减少不必要的分段
+        max_char_len = 80000
         chunk_threshold = max_char_len  # 超过此长度则分段总结
+
+        total_transcript_chars = sum(len(l) for l in transcript_text_lines)
+        print(f"📊 [LOG] 总结输入统计 - 模式: {summary_mode} | 转录行数: {len(transcript_text_lines)} | 转录字符数: {total_transcript_chars} | 分段阈值: {chunk_threshold}")
 
         # 6. 动态加载 Prompt，支持前端实时编辑
         if custom_prompt:
             user_prompt = custom_prompt
+            print(f"📝 [LOG] 使用前端传入的自定义 Prompt（{len(custom_prompt)} 字符）")
         else:
+            # 6.1. 优先使用 default_template_id 对应的模板（尊重用户在设置中选择的默认模板）
             prompt_dict = load_prompt()
-            user_prompt = prompt_dict.get("prompt", "")
-            if not user_prompt:
-                base_prompt = prompt_dict.get("base_prompt", "")
-                action_prompt = prompt_dict.get("action_prompt", "")
-                user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
+            default_template_id = prompt_dict.get("default_template_id", "standard")
+
+            # 6.2. 本地模式自适应：如果用户未设置过默认模板（仍为 standard），自动切换到精简速览
+            #      本地 7B 模型更擅长遵循简短指令，且输出更快
+            if summary_mode != "online" and default_template_id == "standard":
+                effective_template_id = "concise"
+                print(f"⚡ [LOG] 本地模式自动优化：使用精简速览模板（concise）以加速生成。如需完整分析请在前端手动选择模板。")
+            else:
+                effective_template_id = default_template_id
+                print(f"📋 [LOG] 使用默认模板: {effective_template_id}")
+
+            # 6.3. 按模板 ID 加载 prompt 内容
+            template_prompt = get_template_prompt(effective_template_id)
+            if template_prompt:
+                user_prompt = template_prompt
+            else:
+                user_prompt = prompt_dict.get("prompt", "")
+                if not user_prompt:
+                    base_prompt = prompt_dict.get("base_prompt", "")
+                    action_prompt = prompt_dict.get("action_prompt", "")
+                    user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
 
         # 6.5. 如果未开启或未识别出多个发言人，动态注入 Prompt 刚性约束
         unique_speakers = set(seg.get("speaker") for seg in transcript_segments if seg.get("speaker"))
