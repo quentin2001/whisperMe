@@ -448,8 +448,11 @@ export default function App() {
         }
       } else {
         // mimo / openai 强校验这三个核心在线字段
-        if (!configData.online_api_key || isPlaceholder(configData.online_api_key)) {
+        if (!configData.online_api_key) {
           return t("您启用了在线转录，但未在设置中配置 ASR API 密钥 (API Key)！", "Online ASR is active, but the ASR API Key is missing in settings!");
+        }
+        if (isPlaceholder(configData.online_api_key)) {
+          return t("当前 ASR API 密钥为系统默认的测试 Key（已被拉黑），请替换为您申请的私有 Key！", "The ASR API Key is the default test key (blocked). Please replace it with your own private API Key!");
         }
         if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) {
           return t("您启用了在线转录，但未在设置中配置 ASR 接口地址 (Base URL)！", "Online ASR is active, but the ASR Base URL is missing in settings!");
@@ -466,8 +469,11 @@ export default function App() {
         return t("您启用了本地总结，但设置中 Ollama 服务地址或模型名称未正确配置！", "Local Summary is active, but the Ollama URL or model name is invalid in settings!");
       }
     } else if (configData.summary_mode === "online") {
-      if (!configData.online_summary_api_key || isPlaceholder(configData.online_summary_api_key)) {
+      if (!configData.online_summary_api_key) {
         return t("您启用了在线总结，但设置中大模型总结的 API 密钥 (API Key) 未配置！", "Online Summary is active, but the LLM API Key is missing in settings!");
+      }
+      if (isPlaceholder(configData.online_summary_api_key)) {
+        return t("当前大模型总结的 API 密钥为系统默认的测试 Key（已被拉黑），请替换为您申请的私有 Key！", "The LLM API Key is the default test key (blocked). Please replace it with your own private API Key!");
       }
       if (!configData.online_summary_base_url || isPlaceholder(configData.online_summary_base_url)) {
         return t("您启用了在线总结，但设置中大模型总结的接口地址 (Base URL) 未配置！", "Online Summary is active, but the LLM Base URL is missing in settings!");

@@ -517,12 +517,17 @@ export default function SettingsView({
 
   const isPlaceholder = (val) => {
     if (!val || typeof val !== "string") return false;
-    const cleanVal = val.trim();
+    const cleanVal = val.trim().toLowerCase();
     const reverse = (str) => str.split("").reverse().join("");
     return (
-      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks") ||
-      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks") ||
-      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh")
+      cleanVal === "" ||
+      cleanVal.includes("your_api_key") ||
+      cleanVal.includes("your_base_url") ||
+      cleanVal.includes("your_model") ||
+      cleanVal.includes("placeholder") ||
+      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks").toLowerCase() ||
+      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks").toLowerCase() ||
+      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh").toLowerCase()
     );
   };
 
@@ -773,7 +778,12 @@ Please help me complete the following tasks:
                     <input type="password" value={configData.online_api_key || ""} onChange={(e) => handleConfigChange("online_api_key", e.target.value)}
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在 ASR 服务商申请的 API 密钥", "Enter the API key from your ASR service provider")}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在 ASR 服务商申请 of API 密钥", "Enter the API key from your ASR service provider")}</span>
+                    {isPlaceholder(configData.online_api_key) && (
+                      <span className="text-xs text-[var(--accent-red)] font-bold mt-0.5 flex items-center gap-1 animate-pulse">
+                        ⚠️ {t("检测到当前为系统默认测试 Key（已被拉黑限制），请配置您自己申请的私有 Key", "Default test key detected (blocked). Please configure your own private API Key.")}
+                      </span>
+                    )}
                   </div>
 
                 </>
@@ -879,6 +889,11 @@ Please help me complete the following tasks:
                       className={`bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg p-2.5 text-sm font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-red)] ${getHighlightClass(configData.online_summary_api_key)}`}
                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
                     <span className="text-xs text-[var(--text-muted)] font-medium">{t("输入您在大模型服务商申请的 API 密钥", "Enter the API key you requested from your LLM service provider")}</span>
+                    {isPlaceholder(configData.online_summary_api_key) && (
+                      <span className="text-xs text-[var(--accent-red)] font-bold mt-0.5 flex items-center gap-1 animate-pulse">
+                        ⚠️ {t("检测到当前为系统默认测试 Key（已被拉黑限制），请配置您自己申请的私有 Key", "Default test key detected (blocked). Please configure your own private API Key.")}
+                      </span>
+                    )}
                   </div>
 
                 </>
