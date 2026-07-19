@@ -518,15 +518,12 @@ export default function SettingsView({
   const isPlaceholder = (val) => {
     if (!val || typeof val !== "string") return false;
     const cleanVal = val.trim().toLowerCase();
-    const reverse = (str) => str.split("").reverse().join("");
     return (
       cleanVal === "" ||
       cleanVal.includes("your_api_key") ||
       cleanVal.includes("your_base_url") ||
       cleanVal.includes("your_model") ||
-      cleanVal.includes("placeholder") ||
-      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks").toLowerCase() ||
-      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh").toLowerCase()
+      cleanVal.includes("placeholder")
     );
   };
 
