@@ -422,7 +422,6 @@ export default function App() {
       cleanVal.includes("your_base_url") ||
       cleanVal.includes("your_model") ||
       cleanVal.includes("placeholder") ||
-      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks").toLowerCase() ||
       cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks").toLowerCase() ||
       cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh").toLowerCase()
     );
