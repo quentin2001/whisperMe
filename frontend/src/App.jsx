@@ -435,11 +435,8 @@ export default function App() {
         if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) return true;
       } else {
         // mimo / openai
-        if (
-          !configData.online_base_url || isPlaceholder(configData.online_base_url) ||
-          !configData.online_model || isPlaceholder(configData.online_model) ||
-          !configData.online_api_key || isPlaceholder(configData.online_api_key)
-        ) return true;
+        // online_base_url 和 online_model 留空时后端会自动 fallback 至官方默认值，故前端仅强力校验 API Key
+        if (!configData.online_api_key || isPlaceholder(configData.online_api_key)) return true;
       }
     }
     

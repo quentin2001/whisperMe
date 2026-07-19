@@ -285,7 +285,8 @@ export default function LibraryView({
       } else if (provider === "funasr") {
         if (!configData.online_base_url) return false;
       } else {
-        if (!configData.online_base_url || !configData.online_model || !configData.online_api_key) return false;
+        // mimo / openai 仅校验 API Key，防止空 base_url/model 时被误杀
+        if (!configData.online_api_key) return false;
       }
     } else {
       if (!configData.local_whisper_model_path) {
