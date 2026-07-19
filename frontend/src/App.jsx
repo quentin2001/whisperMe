@@ -266,8 +266,9 @@ export default function App() {
 
   const handleCreateTask = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (isConfigInvalid()) {
-      await alert(t("当前配置无效，包含未设置项或占位符，请先在设置中配置正确的 API Key 或模型路径！", "Current configuration is invalid (contains unset items or placeholders). Please configure the correct API Key or model path in settings first!"));
+    const errorMsg = getConfigValidationMessage();
+    if (errorMsg) {
+      await alert(errorMsg);
       return;
     }
     const trimmedUrl = newUrl.trim();
@@ -303,8 +304,9 @@ export default function App() {
   };
 
   const handleLocalFileUpload = async (e) => {
-    if (isConfigInvalid()) {
-      await alert(t("当前配置无效，包含未设置项或占位符，请先在设置中配置正确的 API Key 或模型路径！", "Current configuration is invalid (contains unset items or placeholders). Please configure the correct API Key or model path in settings first!"));
+    const errorMsg = getConfigValidationMessage();
+    if (errorMsg) {
+      await alert(errorMsg);
       if (e.target) e.target.value = "";
       return;
     }
@@ -412,45 +414,76 @@ export default function App() {
 
   const isPlaceholder = (val) => {
     if (!val || typeof val !== "string") return false;
-    const cleanVal = val.trim();
+    const cleanVal = val.trim().toLowerCase();
     const reverse = (str) => str.split("").reverse().join("");
     return (
-      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks") ||
-      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks") ||
-      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh")
+      cleanVal === "" ||
+      cleanVal.includes("your_api_key") ||
+      cleanVal.includes("your_base_url") ||
+      cleanVal.includes("your_model") ||
+      cleanVal.includes("placeholder") ||
+      cleanVal === reverse("crmx2jbap5lltbitxkmdyx8bnts94m2npywgzwr9jvuof4hc-ks").toLowerCase() ||
+      cleanVal === reverse("db33f77aa810e3ba0634097dcaa4b362-ks").toLowerCase() ||
+      cleanVal === reverse("smmfBCsTrzdMXReSkqzDAAkFqapBYKsFpk_fh").toLowerCase()
     );
   };
 
-  const isConfigInvalid = () => {
-    if (!configData) return true;
-    // FFmpeg is auto-detected, no need to validate on frontend
-
+  const getConfigValidationMessage = () => {
+    if (!configData) return t("无法读取系统配置数据！", "Failed to load system config!");
+    
+    // ASR 校验
     if (configData.asr_mode === "local") {
-      if (!configData.local_whisper_model_path || isPlaceholder(configData.local_whisper_model_path)) return true;
+      if (!configData.local_whisper_model_path || isPlaceholder(configData.local_whisper_model_path)) {
+        return t("您启用了本地转录，但未在系统设置中配置正确的本地 Whisper 模型路径！", "Local ASR is active, but the Whisper model path is missing or invalid in settings!");
+      }
     } else if (configData.asr_mode === "online") {
       const provider = configData.online_asr_provider || "mimo";
       if (provider === "custom") {
-        if (!configData.custom_asr_endpoint || isPlaceholder(configData.custom_asr_endpoint)) return true;
+        if (!configData.custom_asr_endpoint || isPlaceholder(configData.custom_asr_endpoint)) {
+          return t("您启用了自定义在线转录，但未配置自定义接口地址 (Endpoint)！", "Custom ASR is active, but the Endpoint URL is missing in settings!");
+        }
       } else if (provider === "funasr") {
-        if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) return true;
+        if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) {
+          return t("您启用了在线 FunASR，但未在设置中配置 API 地址 (Base URL)！", "FunASR is active, but the ASR Base URL is missing in settings!");
+        }
       } else {
-        // mimo / openai
-        // online_base_url 和 online_model 留空时后端会自动 fallback 至官方默认值，故前端仅强力校验 API Key
-        if (!configData.online_api_key || isPlaceholder(configData.online_api_key)) return true;
+        // mimo / openai 强校验这三个核心在线字段
+        if (!configData.online_api_key || isPlaceholder(configData.online_api_key)) {
+          return t("您启用了在线转录，但未在设置中配置 ASR API 密钥 (API Key)！", "Online ASR is active, but the ASR API Key is missing in settings!");
+        }
+        if (!configData.online_base_url || isPlaceholder(configData.online_base_url)) {
+          return t("您启用了在线转录，但未在设置中配置 ASR 接口地址 (Base URL)！", "Online ASR is active, but the ASR Base URL is missing in settings!");
+        }
+        if (!configData.online_model || isPlaceholder(configData.online_model)) {
+          return t("您启用了在线转录，但未在设置中配置 ASR 模型名称 (Model ID)！", "Online ASR is active, but the ASR Model ID is missing in settings!");
+        }
       }
     }
-    
+
+    // Summary 校验
     if (configData.summary_mode === "local") {
-      if (!configData.ollama_url || isPlaceholder(configData.ollama_url) || !configData.ollama_model || isPlaceholder(configData.ollama_model)) return true;
+      if (!configData.ollama_url || isPlaceholder(configData.ollama_url) || !configData.ollama_model || isPlaceholder(configData.ollama_model)) {
+        return t("您启用了本地总结，但设置中 Ollama 服务地址或模型名称未正确配置！", "Local Summary is active, but the Ollama URL or model name is invalid in settings!");
+      }
     } else if (configData.summary_mode === "online") {
-      if (
-        !configData.online_summary_base_url || isPlaceholder(configData.online_summary_base_url) ||
-        !configData.online_summary_model || isPlaceholder(configData.online_summary_model) ||
-        !configData.online_summary_api_key || isPlaceholder(configData.online_summary_api_key)
-      ) return true;
+      if (!configData.online_summary_api_key || isPlaceholder(configData.online_summary_api_key)) {
+        return t("您启用了在线总结，但设置中大模型总结的 API 密钥 (API Key) 未配置！", "Online Summary is active, but the LLM API Key is missing in settings!");
+      }
+      if (!configData.online_summary_base_url || isPlaceholder(configData.online_summary_base_url)) {
+        return t("您启用了在线总结，但设置中大模型总结的接口地址 (Base URL) 未配置！", "Online Summary is active, but the LLM Base URL is missing in settings!");
+      }
+      if (!configData.online_summary_model || isPlaceholder(configData.online_summary_model)) {
+        return t("您启用了在线总结，但设置中大模型总结的模型名称 (Model ID) 未配置！", "Online Summary is active, but the LLM Model ID is missing in settings!");
+      }
     }
-    return false;
+
+    return null;
   };
+
+  const isConfigInvalid = () => {
+    return getConfigValidationMessage() !== null;
+  };
+
 
   const handleResetData = async () => {
     localStorage.removeItem("whisperme_logs");
