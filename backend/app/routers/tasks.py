@@ -289,13 +289,13 @@ def get_task_transcript(task_id: str, format: str = "text"):
 @router.post("/{task_id}/qa")
 def ask_podcast(task_id: str, req: QARequest):
     """向播客提问，基于转录文本用 LLM 回答"""
-    from app.core.llm_utils import call_llm
+    from app.core.llm_utils import call_llm, LLMError
 
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="未找到该任务")
-    if task.get("status") != "completed":
-        raise HTTPException(status_code=400, detail="任务尚未完成，无法进行问答")
+    if task.get("status") not in ("completed", "transcribed"):
+        raise HTTPException(status_code=400, detail="任务尚未转录完成，无法进行问答")
 
     # Load existing Q&A history from database
     qa_history = task.get("qa_history") or []
@@ -345,22 +345,23 @@ def ask_podcast(task_id: str, req: QARequest):
 转录文本:
 {transcript_text}{history_context}"""
 
-    # Call LLM — use chunking if transcript is too long
-    max_chars = 45000 if config.get("summary_mode", "local") == "local" else 80000
+    # Call LLM — use smaller chunking threshold for local mode to prevent timeouts
+    max_chars = 18000 if config.get("summary_mode", "local") == "local" else 80000
 
-    if len(transcript_text) <= max_chars:
-        # Short transcript: single call
-        full_prompt = system_context + f"\n\n用户问题: {req.question}"
-        answer = call_llm(full_prompt, label="播客问答")
-    else:
-        # Long transcript: chunk and merge
-        summarizer_obj = PodcastSummarizer()
-        chunks = summarizer_obj._split_transcript_into_chunks(lines, max_chars, overlap_lines=15)
+    try:
+        if len(transcript_text) <= max_chars:
+            # Short transcript: single call
+            full_prompt = system_context + f"\n\n用户问题: {req.question}"
+            answer = call_llm(full_prompt, label="播客问答")
+        else:
+            # Long transcript: chunk and merge
+            summarizer_obj = PodcastSummarizer()
+            chunks = summarizer_obj._split_transcript_into_chunks(lines, max_chars, overlap_lines=15)
 
-        chunk_answers = []
-        for i, chunk in enumerate(chunks):
-            chunk_text = "\n".join(chunk)
-            chunk_prompt = f"""你是一个播客内容分析助手。以下是播客转录文本的第{i+1}/{len(chunks)}部分。
+            chunk_answers = []
+            for i, chunk in enumerate(chunks):
+                chunk_text = "\n".join(chunk)
+                chunk_prompt = f"""你是一个播客内容分析助手。以下是播客转录文本的第{i+1}/{len(chunks)}部分。
 请根据此部分回答用户的问题。如果此部分没有相关信息，请回答"此部分无相关信息"。
 
 播客: {title}（{podcast_name}）
@@ -369,19 +370,32 @@ def ask_podcast(task_id: str, req: QARequest):
 {chunk_text}
 
 用户问题: {req.question}"""
-            chunk_answer = call_llm(chunk_prompt, label=f"播客问答-分段{i+1}")
-            chunk_answers.append(chunk_answer)
+                chunk_answer = call_llm(chunk_prompt, label=f"播客问答-分段{i+1}")
+                if chunk_answer and "此部分无相关信息" not in chunk_answer and "无相关信息" not in chunk_answer:
+                    chunk_answers.append(chunk_answer)
 
-        # Merge answers
-        merge_prompt = f"""你是一个播客内容分析助手。以下是对同一个播客问题在不同段落中的回答，请综合这些回答给出一个完整、连贯的最终答案。
-如果所有段落都没有相关信息，请明确说明转录文本中没有相关内容。
+            if not chunk_answers:
+                answer = "播客转录文本中未找到与您提问相关的内容。"
+            elif len(chunk_answers) == 1:
+                answer = chunk_answers[0]
+            else:
+                # Merge answers
+                merge_prompt = f"""你是一个播客内容分析助手。以下是对同一个播客问题在不同段落中的回答，请综合这些回答给出一个完整、连贯的最终答案。
 
 播客: {title}（{podcast_name}）
 用户问题: {req.question}
 
 各段落回答:
 {chr(10).join(f"【段落{i+1}】{a}" for i, a in enumerate(chunk_answers))}"""
-        answer = call_llm(merge_prompt, label="播客问答-合并")
+                answer = call_llm(merge_prompt, label="播客问答-合并")
+
+    except LLMError as e:
+        print(f"❌ [LOG ERROR] 播客问答 LLM 调用失败: {e}")
+        status_code = 504 if "timed out" in str(e).lower() else 500
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except Exception as e:
+        print(f"❌ [LOG ERROR] 播客问答未捕获异常: {e}")
+        raise HTTPException(status_code=500, detail=f"问答服务处理失败: {str(e)}")
 
     # Save Q&A to history
     qa_history.append({"role": "user", "content": req.question})

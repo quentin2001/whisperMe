@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  List, LayoutGrid, Calendar, Play, MoreVertical, ChevronDown, Trash2
+  List, LayoutGrid, Calendar, Play, MoreVertical, ChevronDown, Trash2, RefreshCw
 } from "lucide-react";
 import { confirm } from "../components/Dialog.jsx";
-import { proxyImage } from "../constants.js";
+import { proxyImage, API_BASE } from "../constants.js";
 import { useTaskStore } from "../store/taskStore.js";
 
 const parseDurationToMinutes = (durationStr) => {
@@ -116,6 +116,23 @@ export default function WorkstationView({
   const [publishedDateFilter, setPublishedDateFilter] = useState("All Time");
   const [durationFilter, setDurationFilter] = useState("All");
   const [viewMode, setViewMode] = useState("grid");
+  const [retryingId, setRetryingId] = useState(null);
+
+  const handleRetry = async (e, taskId) => {
+    e.stopPropagation();
+    setRetryingId(taskId);
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error("Retry failed:", data.detail || "Unknown error");
+      }
+    } catch (err) {
+      console.error("Error retrying task:", err);
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   // Map backend tasks to UI sessions format
   const sessions = tasks.map((task, index) => {
@@ -337,6 +354,24 @@ export default function WorkstationView({
                       <h3 className="font-bold text-base text-[var(--text-primary)] font-display leading-snug group-hover:text-[var(--accent-red)] transition-colors w-full line-clamp-2" title={session.title}>
                         {session.title}
                       </h3>
+                      {(session.rawTask.status === "failed" || session.rawTask.status === "cancelled") && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] font-extrabold tracking-wider px-2 py-0.5 rounded-sm uppercase ${
+                            session.rawTask.status === "failed" ? "bg-red-500/20 text-red-400" : "bg-gray-500/20 text-gray-400"
+                          }`}>
+                            {session.rawTask.status === "failed" ? t("失败", "Failed") : t("已取消", "Cancelled")}
+                          </span>
+                          <button
+                            onClick={(e) => handleRetry(e, session.id)}
+                            disabled={retryingId === session.id}
+                            className="flex items-center gap-1 text-[10px] font-bold text-[var(--accent-gold)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 cursor-pointer border-0 outline-none bg-transparent p-0"
+                            title={t("重试任务", "Retry task")}
+                          >
+                            <RefreshCw size={11} className={retryingId === session.id ? "animate-spin" : ""} />
+                            {retryingId === session.id ? t("重试中", "Retrying") : t("重试", "Retry")}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -432,6 +467,17 @@ export default function WorkstationView({
                 >
                   {t("打开", "Open")}
                 </button>
+                {(session.rawTask.status === "failed" || session.rawTask.status === "cancelled") && (
+                  <button
+                    onClick={(e) => handleRetry(e, session.id)}
+                    disabled={retryingId === session.id}
+                    className="flex items-center gap-1 bg-[var(--accent-gold)]/10 hover:bg-[var(--accent-gold)]/25 text-[var(--accent-gold)] text-xs font-semibold px-3 py-2 rounded-lg transition-all cursor-pointer border-0 outline-none disabled:opacity-50"
+                    title={t("重试任务", "Retry task")}
+                  >
+                    <RefreshCw size={13} className={retryingId === session.id ? "animate-spin" : ""} />
+                    {retryingId === session.id ? t("重试中...", "Retrying...") : t("重试", "Retry")}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={async (e) => {

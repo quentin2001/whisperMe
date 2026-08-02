@@ -369,7 +369,6 @@ export default function App() {
       });
       if (res.status === 200) {
         if (!isSilent) await alert(t("配置已成功更新！", "Configuration updated successfully!"), { variant: 'success' });
-        fetchConfig();
       }
     } catch (e) {
       if (!isSilent) await alert(t("保存配置失败", "Failed to save configuration"));

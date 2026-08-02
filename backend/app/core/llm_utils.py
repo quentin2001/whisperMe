@@ -18,10 +18,31 @@ class LLMError(Exception):
     pass
 
 
+def _is_local_url(url: str) -> bool:
+    clean = url.lower()
+    return "127.0.0.1" in clean or "localhost" in clean or "0.0.0.0" in clean or "::1" in clean or ".local" in clean
+
+
 def _execute_llm_call(api_url: str, payload: dict, headers: dict, timeout: float, label: str) -> str:
     response = None
     
-    # Tier 1: Try system proxy
+    # Fast-path for local LLM URLs (LM Studio, Ollama, vLLM, etc.)
+    if _is_local_url(api_url):
+        try:
+            with httpx.Client(timeout=timeout, trust_env=True) as client:
+                response = client.post(api_url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result["choices"][0]["message"]["content"].strip()
+        except Exception as e_local:
+            print(f"❌ [LOG] {label} 本地 LLM 请求失败: {e_local}")
+            status_code = response.status_code if response is not None else "Unknown"
+            detail_msg = response.text if response is not None else str(e_local)
+            if "timed out" in str(e_local).lower():
+                raise LLMError(f"本地 LLM 推理超时 ({int(timeout)}秒)，建议检查本地大模型服务响应速度或减小问答文本上下文")
+            raise LLMError(f"本地 LLM 服务错误 (code {status_code}): {detail_msg}")
+
+    # Tier 1: Try system proxy for remote endpoints
     try:
         with httpx.Client(timeout=timeout, trust_env=True) as client:
             response = client.post(api_url, json=payload, headers=headers)
@@ -31,7 +52,7 @@ def _execute_llm_call(api_url: str, payload: dict, headers: dict, timeout: float
     except Exception as e_proxy:
         print(f"⚠️ [LOG] {label} 代理请求失败: {e_proxy}。尝试直连...")
 
-    # Tier 2: Direct connection with DoH bypass
+    # Tier 2: Direct connection with DoH bypass for remote endpoints
     try:
         with doh_dns_bypass(api_url):
             with httpx.Client(timeout=timeout, trust_env=False) as client:

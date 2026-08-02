@@ -202,8 +202,8 @@ def ask_podcast(task_id: str, question: str) -> str:
     task = db.get_task(task_id)
     if not task:
         return json.dumps({"error": "未找到该任务"}, ensure_ascii=False)
-    if task.get("status") != "completed":
-        return json.dumps({"error": "任务尚未完成"}, ensure_ascii=False)
+    if task.get("status") not in ("completed", "transcribed"):
+        return json.dumps({"error": "任务尚未转录完成"}, ensure_ascii=False)
 
     transcript_segments = task.get("transcript", [])
     speaker_mappings = task.get("speaker_mappings", {})
@@ -228,7 +228,7 @@ def ask_podcast(task_id: str, question: str) -> str:
     title = task.get("title", "未知标题")
     podcast_name = task.get("podcast_name", "未知播客")
 
-    max_chars = 45000 if config.get("summary_mode", "local") == "local" else 80000
+    max_chars = 18000 if config.get("summary_mode", "local") == "local" else 80000
 
     if len(transcript_text) <= max_chars:
         prompt = f"""你是一个播客内容分析助手。请根据以下播客转录文本回答用户的问题。

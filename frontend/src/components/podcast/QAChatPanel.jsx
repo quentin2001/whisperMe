@@ -13,11 +13,12 @@ export default function QAChatPanel({
   const [qaMessages, setQaMessages] = useState([]);
   const [qaInput, setQaInput] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
+  const isTranscribed = activeTask?.status === "completed" || activeTask?.status === "transcribed";
 
   useEffect(() => {
     setQaInput("");
     setQaLoading(false);
-    if (activeTask?.id && activeTask?.status === "completed") {
+    if (activeTask?.id && (activeTask?.status === "completed" || activeTask?.status === "transcribed")) {
         fetch(`${API_BASE}/api/tasks/${activeTask.id}/qa`)
             .then(res => res.ok ? res.json() : { history: [] })
             .then(data => {
@@ -45,7 +46,7 @@ export default function QAChatPanel({
   };
 
   const handleQASubmit = async () => {
-    if (!qaInput.trim() || qaLoading) return;
+    if (!qaInput.trim() || qaLoading || !isTranscribed) return;
     const question = qaInput.trim();
     setQaInput("");
     setQaMessages(prev => [...prev, { role: "user", content: question }]);
@@ -57,18 +58,29 @@ export default function QAChatPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: 服务端请求失败 (${res.statusText || "Internal Error"})`);
+        }
+      }
       if (res.ok) {
         setQaMessages(data.history || []);
       } else {
-        setQaMessages(prev => prev.slice(0, -1));
-        setQaMessages(prev => [...prev, { role: "user", content: question }, { role: "assistant", content: `错误: ${data.detail || "请求失败"}` }]);
+        setQaMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: "user", content: question },
+          { role: "assistant", content: `错误: ${data.detail || `请求失败 (HTTP ${res.status})`}` }
+        ]);
       }
     } catch (err) {
-      setQaMessages(prev => {
-        const withoutLast = prev.slice(0, -1);
-        return [...withoutLast, { role: "user", content: question }, { role: "assistant", content: `网络错误: ${err.message}` }];
-      });
+      setQaMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: "user", content: question },
+        { role: "assistant", content: `网络错误: ${err.message}` }
+      ]);
     } finally {
       setQaLoading(false);
     }
@@ -96,7 +108,11 @@ export default function QAChatPanel({
         {qaMessages.length === 0 && !qaLoading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <MessageSquare size={32} className="text-[var(--text-muted)] opacity-40" />
-            <p className="text-sm text-[var(--text-muted)]">{t("输入问题，基于转录文本为你解答", "Ask a question about this podcast")}</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {isTranscribed
+                ? t("输入问题，基于转录文本为你解答", "Ask a question about this podcast")
+                : t("⏳ 转录完成后方可进行 AI 问答", "Q&A will be available after transcription completes")}
+            </p>
           </div>
         )}
         {qaMessages.map((msg, i) => (
@@ -130,13 +146,13 @@ export default function QAChatPanel({
           value={qaInput}
           onChange={(e) => setQaInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleQASubmit()}
-          placeholder={t("输入问题...", "Ask a question...")}
+          placeholder={isTranscribed ? t("输入问题...", "Ask a question...") : t("等待转录完成...", "Waiting for transcription...")}
           className="flex-1 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-red)]/50 transition-colors"
-          disabled={qaLoading}
+          disabled={!isTranscribed || qaLoading}
         />
         <button
           onClick={handleQASubmit}
-          disabled={!qaInput.trim() || qaLoading}
+          disabled={!isTranscribed || !qaInput.trim() || qaLoading}
           className="px-4 py-2.5 bg-[var(--accent-red)] text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all cursor-pointer"
         >
           {t("发送", "Send")}
