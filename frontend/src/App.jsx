@@ -266,7 +266,7 @@ export default function App() {
 
   const handleCreateTask = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    const errorMsg = getConfigValidationMessage();
+    const errorMsg = getAsrValidationMessage();
     if (errorMsg) {
       await alert(errorMsg);
       return;
@@ -304,7 +304,7 @@ export default function App() {
   };
 
   const handleLocalFileUpload = async (e) => {
-    const errorMsg = getConfigValidationMessage();
+    const errorMsg = getAsrValidationMessage();
     if (errorMsg) {
       await alert(errorMsg);
       if (e.target) e.target.value = "";
@@ -423,7 +423,7 @@ export default function App() {
     );
   };
 
-  const getConfigValidationMessage = () => {
+  const getAsrValidationMessage = () => {
     if (!configData) return t("无法读取系统配置数据！", "Failed to load system config!");
     
     // ASR 校验
@@ -457,7 +457,12 @@ export default function App() {
         }
       }
     }
+    return null;
+  };
 
+  const getSummaryValidationMessage = () => {
+    if (!configData) return t("无法读取系统配置数据！", "Failed to load system config!");
+    
     // Summary 校验
     if (configData.summary_mode === "local") {
       if (!configData.ollama_url || isPlaceholder(configData.ollama_url) || !configData.ollama_model || isPlaceholder(configData.ollama_model)) {
@@ -477,8 +482,11 @@ export default function App() {
         return t("您启用了在线总结，但设置中大模型总结的模型名称 (Model ID) 未配置！", "Online Summary is active, but the LLM Model ID is missing in settings!");
       }
     }
-
     return null;
+  };
+
+  const getConfigValidationMessage = () => {
+    return getAsrValidationMessage() || getSummaryValidationMessage();
   };
 
   const isConfigInvalid = () => {
@@ -546,8 +554,8 @@ export default function App() {
             
             handleProgressChange={handleProgressChange}
             
-            
-            
+            getSummaryValidationMessage={getSummaryValidationMessage}
+            onJumpToSettings={() => setActiveTab("config")}
             
             
             

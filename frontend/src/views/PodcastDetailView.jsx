@@ -501,7 +501,9 @@ export default function PodcastDetailView({
   onRefreshTask,
   audioPlayerRef,
   togglePlay,
-  handleProgressChange
+  handleProgressChange,
+  getSummaryValidationMessage,
+  onJumpToSettings
 }) {
   const { t } = useTranslation();
   const activeTask = useTaskStore(state => state.activeTask);
@@ -969,8 +971,24 @@ export default function PodcastDetailView({
   };
 
   // Trigger manual AI summary analysis regeneration
-  const triggerAIAnalysis = () => {
+  const triggerAIAnalysis = async () => {
     if (!activeTask) return;
+    if (typeof getSummaryValidationMessage === "function") {
+      const summaryErr = getSummaryValidationMessage();
+      if (summaryErr) {
+        const confirmGo = await confirm(
+          summaryErr + "\n\n" + t("您目前尚未完成 AI 总结大模型配置。是否立即前往系统设置进行配置？", "LLM Summary is not configured. Go to Settings to configure it now?"),
+          {
+            confirmText: t("前往设置", "Go to Settings"),
+            cancelText: t("取消", "Cancel")
+          }
+        );
+        if (confirmGo && typeof onJumpToSettings === "function") {
+          onJumpToSettings();
+        }
+        return;
+      }
+    }
     setShowPromptModal(true);
   };
 

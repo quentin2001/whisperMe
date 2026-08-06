@@ -36,25 +36,6 @@ def run_podcast_pipeline(task_id: str, url: str):
         # Step 0: 物理安全校验，如果任务被中途从数据库删除，立即跳过执行
         task = check_cancelled(task_id)
 
-        # Step 0.5: 检测本地大模型服务是否可用（若配置为本地大模型总结模式）
-        summary_mode = task.get("summary_mode", "local")
-        if summary_mode == "local":
-            import socket
-            ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
-            try:
-                parsed = urllib.parse.urlparse(ollama_url)
-                host = parsed.hostname or "localhost"
-                port = parsed.port or 11434
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(1.0)
-                s.connect((host, port))
-                s.close()
-            except Exception:
-                raise Exception(
-                    f"本地大模型未开启：当前系统配置的是【本地大模型总结模式】，但未检测到正在运行 the 本地推理服务（地址: {ollama_url}）。"
-                    "请先启动您的 LM Studio 或 Ollama 服务，或者在【系统设置】中将 AI 总结引擎切换为【在线 OpenAI 兼容 API】。"
-                )
-            
         # Step 0.8: ASR 断点续传/跳过检查
         # 增量写入后，转录中也会有段落。只有段落+完整transcript同时存在才跳过
         existing_paragraphs = db.get_paragraphs_by_podcast(task_id)
