@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Sliders, Save, ShieldAlert, Cpu, Bell, ChevronDown, GripVertical, RotateCcw, Check, Loader2, AlertCircle, Trash2, Globe, RefreshCw, FileText, Activity, Download, HardDrive, Folder, Sparkles, Plus, Copy, X } from "lucide-react";
 import { API_BASE } from "../constants.js";
 import { useConfigStore } from "../store/configStore.js";
+import { useTaskStore } from "../store/taskStore.js";
 import { useTranslation } from "../contexts/I18nContext";
 import { alert, confirm } from "../components/Dialog.jsx";
 
@@ -587,7 +588,25 @@ Please help me complete the following tasks:
   const handleSystemUpgrade = async () => {
     if (upgrading) return;
     
-    if (!window.confirm(t(
+    // Check for running tasks first to prevent data corruption or interrupted processing
+    const tasks = useTaskStore.getState().tasks || [];
+    const activeTasks = tasks.filter(t =>
+      ["pending", "downloading", "transcribing", "diarizing", "summarizing"].includes(t.status)
+    );
+
+    if (activeTasks.length > 0) {
+      const titles = activeTasks.map(t => `《${t.title || "未命名任务"}》`).slice(0, 3).join("、");
+      const extra = activeTasks.length > 3 ? ` 等 ${activeTasks.length} 个任务` : "";
+      await alert(
+        t(
+          `当前有 ${activeTasks.length} 个任务正在处理中 (${titles}${extra})。\n\n为防止任务数据中断或丢失，请等待当前所有任务处理完成后，再执行一键升级！`,
+          `There are ${activeTasks.length} active tasks processing (${titles}${extra}).\n\nPlease wait for all tasks to complete before upgrading!`
+        )
+      );
+      return;
+    }
+    
+    if (!await confirm(t(
       "您确定要执行一键升级吗？升级完成后服务会自动关闭并重启。",
       "Are you sure you want to perform one-click upgrade? The service will automatically close and restart upon completion."
     ))) {
@@ -1290,41 +1309,46 @@ Please help me complete the following tasks:
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
                 </a>
                 <div>
-                  <h4 className="font-bold text-sm text-[var(--text-primary)] font-display">{t("GitHub 仓库", "GitHub Repository")}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-[var(--text-primary)] font-display">{t("软件版本与更新", "Software Version & Updates")}</h4>
+                    <span className={`text-[10px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded-md border font-mono ${
+                      versionInfo?.has_update
+                        ? "bg-[var(--accent-red-light)] text-[var(--accent-red)] border-[var(--accent-red-light)] animate-pulse"
+                        : "bg-[var(--bg-hover)]/80 text-[var(--text-secondary)] border-[var(--border-primary)]/40"
+                    }`}>
+                      {versionInfo?.has_update
+                        ? `${t("可升级", "UPDATE")} v${versionInfo.latest_version}`
+                        : `v${versionInfo?.current_version || "1.0.0"}`
+                      }
+                    </span>
+                  </div>
                   <p className="text-[11px] text-[var(--text-muted)] font-semibold mt-0.5">quentin2001/whisperMe</p>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <span className={`text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border font-mono ${
-                  versionInfo?.has_update
-                    ? "bg-[var(--accent-red-light)] text-[var(--accent-red)] border-[var(--accent-red-light)] animate-pulse"
-                    : "bg-[var(--bg-hover)]/60 text-[var(--text-muted)] border-[var(--border-primary)]/30"
-                }`}>
-                  {versionInfo?.has_update
-                    ? `${t("有新版本", "UPDATE")} v${versionInfo.latest_version}`
-                    : `v${versionInfo?.current_version || "1.0.0"}`
-                  }
-                </span>
-                <div className="flex items-center gap-2 mt-1">
-                  {versionInfo?.has_update && (
-                    <button
-                      type="button"
-                      onClick={handleSystemUpgrade}
-                      className="text-[10px] text-green-600 hover:text-green-700 hover:underline bg-transparent border-0 cursor-pointer font-extrabold flex items-center gap-1 select-none outline-none"
-                    >
-                      {t("一键升级", "Upgrade Now")}
-                    </button>
-                  )}
-                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCheckVersion(true); }}
-                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:underline bg-transparent border-0 cursor-pointer font-bold flex items-center gap-1 select-none outline-none"
-                    disabled={checkingVersion}>
-                    {checkingVersion ? (
-                      <><Loader2 size={10} className="animate-spin text-[var(--text-muted)]" /><span>{t("检查中...", "Checking...")}</span></>
-                    ) : (
-                      <span>{t("检查更新", "Check Updates")}</span>
-                    )}
+              <div className="flex items-center gap-2 shrink-0">
+                {versionInfo?.has_update && (
+                  <button
+                    type="button"
+                    onClick={handleSystemUpgrade}
+                    disabled={upgrading}
+                    className="bg-[var(--accent-red)] hover:bg-[var(--accent-red-dark)] text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-all cursor-pointer border-0 outline-none flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={upgrading ? "animate-spin" : ""} style={!upgrading ? { animationDuration: '3s' } : {}} />
+                    <span>{upgrading ? t("升级中...", "Upgrading...") : t("一键自动升级", "One-Click Upgrade")}</span>
                   </button>
-                </div>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCheckVersion(true); }}
+                  disabled={checkingVersion}
+                  className="bg-[var(--bg-hover)] hover:bg-[var(--border-primary)]/40 text-[var(--text-primary)] text-xs font-semibold px-3.5 py-2 rounded-lg transition-all cursor-pointer border border-[var(--border-primary)]/40 outline-none flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {checkingVersion ? (
+                    <><Loader2 size={12} className="animate-spin text-[var(--text-muted)]" /><span>{t("检查中...", "Checking...")}</span></>
+                  ) : (
+                    <span>{t("检查更新", "Check Updates")}</span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
