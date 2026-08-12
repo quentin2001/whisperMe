@@ -675,6 +675,75 @@ def select_directory():
         raise HTTPException(status_code=400, detail="User cancelled or failed to select directory")
 
 
+@router.get("/system/detect-models")
+def detect_local_models():
+    """
+    自动探测本地已安装的大模型服务(Ollama / LM Studio)与本地 ASR 模型路径
+    方便 AI Agent 或用户一键配置
+    """
+    from app.config import PROJECT_DIR, config
+    import httpx
+
+    # 1. 探测 Ollama / LM Studio 本地大模型
+    ollama_models = []
+    ollama_running = False
+    ollama_url = config.get("ollama_url", "http://localhost:11434").strip()
+    
+    # Try Ollama native API
+    try:
+        base_url = ollama_url.replace("/v1", "").rstrip("/")
+        r = httpx.get(f"{base_url}/api/tags", timeout=1.5)
+        if r.status_code == 200:
+            ollama_running = True
+            data = r.json()
+            for m in data.get("models", []):
+                name = m.get("name") or m.get("model")
+                if name:
+                    ollama_models.append(name)
+    except Exception:
+        pass
+
+    # Try LM Studio / OpenAI-compatible local API if Ollama tags didn't return
+    if not ollama_models:
+        try:
+            r = httpx.get(f"{ollama_url.rstrip('/')}/models", timeout=1.5)
+            if r.status_code == 200:
+                ollama_running = True
+                data = r.json()
+                for m in data.get("data", []):
+                    if isinstance(m, dict) and m.get("id"):
+                        ollama_models.append(m["id"])
+        except Exception:
+            pass
+
+    # 2. 探测本地 FunASR / Whisper 模型的绝对路径
+    asr_paths = []
+    candidates = [
+        PROJECT_DIR / "models" / "funasr",
+        PROJECT_DIR / "models",
+        Path.home() / ".cache" / "huggingface" / "hub",
+        Path.home() / ".cache" / "modelscope" / "hub"
+    ]
+    for cand in candidates:
+        if cand.exists() and cand.is_dir():
+            norm = str(cand.resolve()).replace("\\", "/")
+            if norm not in asr_paths:
+                asr_paths.append(norm)
+
+    return {
+        "llm": {
+            "service_running": ollama_running,
+            "detected_models": ollama_models,
+            "ollama_url": ollama_url,
+            "current_model": config.get("ollama_model", "")
+        },
+        "asr": {
+            "detected_paths": asr_paths,
+            "current_path": config.get("local_whisper_model_path", "")
+        }
+    }
+
+
 # --- 启动函数 ---
 def start_system_background_tasks():
     t = threading.Thread(target=background_perf_monitor, daemon=True)

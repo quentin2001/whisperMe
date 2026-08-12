@@ -63,10 +63,14 @@ def main():
         shutil.copytree(os.path.join(base_dir, 'backend'), os.path.join(app_dir, 'backend'), ignore=ignore_files)
         shutil.copytree(os.path.join(base_dir, 'frontend', 'dist'), os.path.join(app_dir, 'frontend', 'dist'))
         shutil.copytree(os.path.join(base_dir, 'scripts'), os.path.join(app_dir, 'scripts'), ignore=ignore_files)
+        if os.path.isdir(os.path.join(base_dir, 'assets')):
+            shutil.copytree(os.path.join(base_dir, 'assets'), os.path.join(app_dir, 'assets'), ignore=ignore_files)
         shutil.copy2(os.path.join(base_dir, 'README.md'), app_dir)
     
     # Windows specific
     shutil.copy2(os.path.join(base_dir, 'start.bat'), app_dir_win)
+    if os.path.exists(os.path.join(base_dir, 'whisperMe.lnk')):
+        shutil.copy2(os.path.join(base_dir, 'whisperMe.lnk'), app_dir_win)
     
     # Unix specific
     shutil.copy2(os.path.join(base_dir, 'start.sh'), app_dir_unix)
