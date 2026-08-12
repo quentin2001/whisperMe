@@ -20,11 +20,19 @@ def create_windows_shortcut(root_dir):
     shortcut_path = os.path.join(root_dir, "whisperMe.lnk")
     icon_path = os.path.join(root_dir, "assets", "logo.ico")
     
+    cmd_args = (
+        "/c if exist venv\\\\Scripts\\\\python.exe "
+        "(venv\\\\Scripts\\\\python.exe scripts\\\\launcher.py --foreground) "
+        "else if exist python\\\\python.exe "
+        "(python\\\\python.exe scripts\\\\launcher.py --foreground) "
+        "else (python scripts\\\\launcher.py --foreground)"
+    )
+    
     ps_script = f"""
     $WshShell = New-Object -ComObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
     $Shortcut.TargetPath = "cmd.exe"
-    $Shortcut.Arguments = "/c if exist venv\\\\Scripts\\\\python.exe (venv\\\\Scripts\\\\python.exe scripts\\\\launcher.py --foreground) else (python scripts\\\\launcher.py --foreground)"
+    $Shortcut.Arguments = '{cmd_args}'
     $Shortcut.WorkingDirectory = "{root_dir}"
     $Shortcut.IconLocation = "{icon_path}"
     $Shortcut.Description = "Launch whisperMe AI Podcast Workspace"
@@ -88,6 +96,15 @@ osascript -e "tell application \\"Terminal\\" to do script \\"cd '$APP_DIR' && $
             f.write(launcher_script_content)
             
         os.chmod(launcher_script_path, 0o755)
+
+        # Set execute permissions on start scripts
+        for script_name in ["start.sh", "start.command"]:
+            script_file = os.path.join(root_dir, script_name)
+            if os.path.exists(script_file):
+                try:
+                    os.chmod(script_file, 0o755)
+                except Exception:
+                    pass
             
         # Copy logo.icns
         src_icns = os.path.join(root_dir, "assets", "logo.icns")

@@ -70,6 +70,8 @@ def main():
     
     # Unix specific
     shutil.copy2(os.path.join(base_dir, 'start.sh'), app_dir_unix)
+    if os.path.exists(os.path.join(base_dir, 'start.command')):
+        shutil.copy2(os.path.join(base_dir, 'start.command'), app_dir_unix)
     
     # Download Python embed for Windows
     pyver = "3.12.4"
