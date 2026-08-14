@@ -71,7 +71,7 @@ def create_mac_app_bundle(root_dir):
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.2</string>
+    <string>1.0.3</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.10.0</string>
 </dict>
