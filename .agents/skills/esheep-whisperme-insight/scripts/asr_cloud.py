@@ -290,9 +290,10 @@ def call_custom(file_path: str, api_key: str, endpoint: str, method: str, header
 def probe_local():
     """Probe common local ASR service endpoints."""
     endpoints = [
+        {"name": "FunASR", "url": "http://localhost:10095/"},
+        {"name": "whisperMe", "url": "http://localhost:9101/api/health"},
         {"name": "Ollama", "url": "http://localhost:11434/"},
         {"name": "LM Studio", "url": "http://localhost:1234/v1/models"},
-        {"name": "Whisper local", "url": "http://localhost:10095/v1/models"}
     ]
     
     log_progress("Probing local endpoints...")

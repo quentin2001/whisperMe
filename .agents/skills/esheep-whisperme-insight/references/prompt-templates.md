@@ -1,18 +1,42 @@
 # Prompt Template Library - esheep-whisperme-insight
 
-This document serves as the prompt template library for the **esheep-whisperme-insight** Skill. It provides standard prompt templates and guard prompts extracted from the whisperMe core project for generating structured podcast, audio, and video content analysis reports.
+Agent 在生成深度分析报告前，先根据转录文本判断内容类型和长度，再选用对应模板。
 
 ---
 
-## 1. Deep Analysis Template (深度分析)
+## 0. 内容类型与深度自适应规则
 
-This is the primary prompt template for generating comprehensive podcast value analysis reports, extracted from whisperMe's `prompt_manager.py`.
+Agent 在注入 Prompt 前，先完成以下判断：
+
+### 类型识别（根据转录文本语义自动推断）
+
+| 类型标签 | 识别信号 | 报告风格 |
+|---|---|---|
+| `podcast` | 主持人+嘉宾、话题讨论、闲聊穿插 | 深度分析（观点提炼 + 逻辑链 + 反方视角） |
+| `meeting` | 多人发言、议程/待办/决策、工作汇报 | 会议纪要（决议 + Action Items + 责任人） |
+| `lecture` | 单人长篇授课、教学知识点、板书/PPT引用 | 知识提炼（知识点索引 + 概念关系 + 要点速记） |
+| `interview` | 一问一答、嘉宾背景介绍、主题聚焦 | 对话解析（核心问答 + 人物观点 + 争议空间） |
+| `general` | 无法明确归类 | 通用分析（核心要点 + 观点提炼 + 资源索引） |
+
+### 深度适配（根据转录文本字数）
+
+| 字数范围 | 报告深度 | 产出节数 |
+|---|---|---|
+| < 3,000 字 | **精简模式** — 砍掉次要章节，只保留核心 3-4 节 | 3-4 节 |
+| 3,000 – 30,000 字 | **标准模式** — 完整报告 | 6-8 节 |
+| > 30,000 字 | **深度模式** — 先分段摘要，再合成全局报告 | 8 节 + 分段附录 |
+
+---
+
+## 1. 通用分析模板（所有类型共用的核心骨架）
+
+这是核心 Prompt 模板。Agent 根据上方「类型 × 深度」组合，对章节名称和侧重点做自然适配。
 
 ```text
-请根据下面提供的播客数据，生成一份深度【播客价值分析报告】。
+请根据下面提供的内容数据，生成一份深度【{{CONTENT_TYPE_LABEL}}分析报告】。
 
 核心防伪守则：
-1. 所有结论必须100%基于转录文本，严禁臆测。
+1. 所有结论必须 100% 基于转录文本，严禁臆测。
 2. 未提及的内容必须如实标注"未讨论"。
 3. 引用必须指向具体发言人和原话。
 
@@ -20,69 +44,102 @@ This is the primary prompt template for generating comprehensive podcast value a
 
 请以 Markdown 格式输出：
 
-## 1. 播客概要与含金量评级
+## 1. 概要与价值评级
 - **核心主旨**：精准总结核心主题。
 - **目标受众**：适合哪些细分人群。
-- **含金量评级**：A+ / A / B / C / D，从信息密度、观点独特性、知识实用度三个维度说明理由。
-- **推荐等级**：值得去听 / 仅看总结即可 / 建议避坑。
+- **信息价值评级**：A+ / A / B / C / D，从信息密度、观点独特性、知识实用度三个维度说明理由。
+- **推荐等级**：值得完整收听/阅读 / 看总结即可 / 可跳过。
 
 ## 2. 核心观点与议题提炼
 梳理 3-5 个核心议题，每个包含：议题名称、核心论点、关键论据/金句。
 
 ## 3. 论证逻辑链分析
-对每个核心议题，梳理发言人的完整论证逻辑：
-- **前提假设**：他们基于什么假设在讨论？
-- **推理过程**：从前提到结论的逻辑链条是什么？
-- **隐含前提**：有哪些未明说但暗含的前提条件？
-- **逻辑漏洞**：论证中是否存在跳跃、以偏概全或循环论证？
+对每个核心议题，梳理完整论证逻辑：
+- **前提假设**：基于什么假设在讨论？
+- **推理过程**：从前提到结论的逻辑链条。
+- **隐含前提**：未明说但暗含的前提条件。
+- **逻辑漏洞**：是否存在跳跃、以偏概全或循环论证？
 
 ## 4. 反方观点与争议空间
-- **未被讨论的反面**：播客中只呈现了一面的观点，另一面是什么？
+- **未被讨论的反面**：只呈现了一面的观点，另一面是什么？
 - **潜在争议点**：哪些结论可能引发不同意见？
-- **缺失视角**：如果请一个持相反立场的人来评论，他会怎么说？
+- **缺失视角**：持相反立场的人会怎么说？
 
 ## 5. 发言人画像与立场分析
-- **角色定位**：主持人 vs 嘉宾。
+- **角色定位**：各发言人的角色。
 - **立场与风格**：核心立场、讨论风格、观点倾向。
 - **互动氛围**：和谐互补还是观点交锋。
 
 ## 6. 知识图谱与关联索引
-- **关键概念**：播客中出现的核心概念或术语（附简要解释）。
+- **关键概念**：核心概念或术语（附简要解释）。
 - **概念关联**：这些概念之间的关系。
-- **延伸阅读**：基于讨论内容推荐的进一步学习方向。
+- **延伸阅读**：推荐的进一步学习方向。
 
 ## 7. 提及引用与资源索引
 - **金句摘录**：2-5 句最有洞察力的原话。
-- **书籍/文章**：提到的具体书名或文章。
-- **影视作品**：提到的电影、纪录片。
-- **工具/产品**：提到的软件、平台、App。
-- **人物**：提到的公众人物。
-- **关键数据/事实**：具体数字、统计。
+- **书籍/文章/影视/工具/人物/数据**：分类列出所有被提及的资源。
 
 ## 8. 事实一致性与局限性声明
-播客简介中提到但转录中未展开的内容（若有则列出，若无则说明一致）。
+内容简介中提到但转录中未展开的内容（若有则列出，若无则说明一致）。
 ```
 
 ---
 
-## 2. Speaker Guard Prompt (单发言人防幻觉约束)
+## 2. 会议纪要专用适配（类型 = `meeting`）
 
-When the transcript has no speaker differentiation (e.g. all speech tags are identical or unknown), prepend this guard prompt to prevent hallucinations:
+当识别为会议内容时，Agent 用以下章节**替换**通用模板中的 §3-§5：
 
 ```text
-[🚨 极重要防错声明]
-检测到本期播客的转录文本中没有区分发言人（所有发言标记均为相同角色或未知）。
-请务必遵守以下刚性约束：
-1. 严禁尝试在总结或分析中臆测、脑补出任何具体的发言人姓名、嘉宾画像或主持人角色。
-2. 在原计划输出"发言人画像与立场分析"章节时，请将其重命名为"议题正反核心视点交锋与视角分析"。
-3. 纯粹从播客讨论的议题语义逻辑出发，提炼不同观点的正反论据、共识与分歧。
+## 3. 决议与共识清单
+逐条列出本次会议达成的明确决议和共识。
+
+## 4. Action Items（待办事项）
+| 序号 | 待办事项 | 责任人 | 截止时间 | 备注 |
+|---|---|---|---|---|
+| 1 | ... | ... | ... | ... |
+
+## 5. 未决问题与分歧
+- 尚未达成共识的议题。
+- 需要后续跟进或升级讨论的问题。
 ```
 
 ---
 
-## 3. Template Adaptation Notes
+## 3. 知识讲座专用适配（类型 = `lecture`）
 
-- **Placeholder Replacement**: The `{{TRANSCRIPT_DATA}}` placeholder must be replaced with the actual transcript text when the Agent injects it into prompt execution.
-- **Content Adaptation**: For non-podcast media types (such as meetings, lectures, panel discussions, or interviews), the Agent should naturally adapt section headings and terminology while maintaining the core structure.
-- **Anti-Hallucination Guardrails**: The core anti-hallucination rules (100% text-based conclusions, marking unmentioned items as "未讨论", exact citations) are critical and must strictly be preserved across all executions.
-- **Long Transcript Handling**: For very long transcripts (>50,000 characters), the Agent should process and summarize the transcript in chunks first, then synthesize the overall report according to this template.
+当识别为授课/讲座内容时，Agent 用以下章节**替换**通用模板中的 §3-§5：
+
+```text
+## 3. 知识点索引与要点速记
+按讲授顺序，逐个提炼知识点，每个包含：知识点名称、核心定义、关键例证。
+
+## 4. 概念关系图谱
+梳理知识点之间的前置依赖、因果和对比关系。
+
+## 5. 易混淆点与常见误区
+讲者强调的注意事项、易错点、反直觉结论。
+```
+
+---
+
+## 4. 单发言人防幻觉守则
+
+当转录文本中没有区分发言人（所有发言标记均为相同角色或未知）时，在 Prompt 最前方追加：
+
+```text
+[防错声明]
+转录文本中没有区分发言人。请严格遵守：
+1. 严禁臆测任何具体发言人姓名或嘉宾画像。
+2. 将"发言人画像与立场分析"章节改为"核心视点交锋与视角分析"。
+3. 纯粹从议题语义逻辑出发，提炼不同观点的正反论据与分歧。
+```
+
+---
+
+## 5. 使用说明
+
+- **`{{CONTENT_TYPE_LABEL}}`**: Agent 根据类型识别结果填入（如"播客内容"、"会议"、"讲座"、"访谈"）。
+- **`{{TRANSCRIPT_DATA}}`**: 替换为实际的去噪转录文本。
+- **章节裁剪**: 精简模式下，Agent 自行裁剪次要章节（如 §6 知识图谱、§8 一致性声明），只保留高价值核心节。
+- **防幻觉守则**: 不可省略，所有类型均必须保留核心防伪守则。
+- **长文本处理**: 超过 30,000 字时，先按自然段落/时间段分块摘要，再合成全局报告。
