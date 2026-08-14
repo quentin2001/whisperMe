@@ -6,28 +6,44 @@ import sys
 # Set standard output encoding to UTF-8 to prevent GBK errors
 sys.stdout.reconfigure(encoding='utf-8')
 
-db_path = "whisperMe.db"
-if not os.path.exists(db_path):
-    # Try parent directory if run from scripts folder
-    db_path = os.path.join("..", "whisperMe.db")
-    if not os.path.exists(db_path):
-        print(f"Database not found at {db_path}")
-        exit(1)
+# Search for database in standard locations
+candidates = [
+    os.path.join("data", "whisperMe.db"),
+    "whisperMe.db",
+    os.path.join("..", "data", "whisperMe.db"),
+    os.path.join("..", "whisperMe.db")
+]
+db_path = None
+for p in candidates:
+    if os.path.exists(p):
+        db_path = p
+        break
 
+if not db_path:
+    print("Database not found in candidates:", candidates)
+    sys.exit(1)
+
+print(f"Connecting to database: {db_path}")
 conn = sqlite3.connect(db_path)
 conn.row_factory = sqlite3.Row
 cursor = conn.cursor()
 
-target_ids = ["9fae2ee6-b71a-43b1-8c21-714dcac387ef", "9da70a1a-3fbd-4223-b7f6-bbb975d80f58"]
+# Query completed tasks that have valid cover images and summaries
+cursor.execute("""
+    SELECT * FROM tasks 
+    WHERE status = 'completed' 
+      AND image_url IS NOT NULL 
+      AND image_url != ''
+    ORDER BY created_at DESC
+""")
+rows = cursor.fetchall()
+print(f"Found {len(rows)} completed tasks with covers.")
+
 mock_tasks = []
 
-for tid in target_ids:
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (tid,))
-    row = cursor.fetchone()
-    if not row:
-        print(f"Warning: Task {tid} not found in database.")
-        continue
+for row in rows:
     t = dict(row)
+    tid = t["id"]
     
     # Get paragraphs
     cursor.execute("SELECT * FROM paragraphs WHERE podcast_id = ? ORDER BY start_time", (tid,))
@@ -60,19 +76,20 @@ for tid in target_ids:
             qa_history = []
 
     # Extract the original public CDN audio URL from metadata if available
-    audio_url = t.get("audio_url") or ""
-    if not (audio_url.startswith("http://") or audio_url.startswith("https://")):
-        audio_url = metadata.get("audio_url") or ""
+    audio_url = ""
+    if metadata.get("audio_url") and (metadata["audio_url"].startswith("http://") or metadata["audio_url"].startswith("https://")):
+        audio_url = metadata["audio_url"]
+    elif t.get("audio_url") and (t["audio_url"].startswith("http://") or t["audio_url"].startswith("https://")):
+        audio_url = t["audio_url"]
     
-    if not (audio_url.startswith("http://") or audio_url.startswith("https://")):
-        # Fallback to sample audio if no public CDN url was parsed
+    if not audio_url:
         audio_url = "https://www.w3schools.com/html/horse.mp3"
 
     mock_task = {
         "id": t["id"],
         "url": t["url"],
-        "asr_mode": t["asr_mode"],
-        "summary_mode": t["summary_mode"],
+        "asr_mode": t.get("asr_mode", "online"),
+        "summary_mode": t.get("summary_mode", "online"),
         "title": t["title"],
         "podcast_name": t["podcast_name"],
         "status": t["status"],
@@ -100,5 +117,6 @@ if not os.path.exists("frontend"):
 with open(out_path, "w", encoding="utf-8") as f:
     f.write(js_content)
 
-print(f"Exported {len(mock_tasks)} tasks to {out_path}")
+print(f"✅ Successfully exported {len(mock_tasks)} rich podcast tasks with covers to {out_path}")
 conn.close()
+

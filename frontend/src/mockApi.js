@@ -60,8 +60,8 @@ if (isDemoMode) {
       // GET /api/version/check
       if (urlStr.includes("/api/version/check")) {
         return jsonResponse({
-          current_version: "1.2.0",
-          latest_version: "1.2.0",
+          current_version: "1.0.3",
+          latest_version: "1.0.3",
           has_update: false,
           release_url: "https://github.com/quentin2001/whisperMe/releases",
           release_notes: "当前已是最新版本！"
