@@ -2,7 +2,7 @@
 
 # 0. Build artifacts & runtime
 release/
-frontend/dist/
+temp_deps/
 ffmpeg/
 .whisperMe.pid
 whisperMe.lnk
@@ -23,6 +23,8 @@ backend/data/
 downloads/
 temp_sandbox/
 transcripts/
+temp_*.txt
+temp_*.json
 # Test/example audio (not needed for production)
 frontend/public/amen_break*
 
@@ -50,6 +52,7 @@ frontend/dist/
 frontend/.svelte-kit/
 frontend/.next/
 frontend/build/
+frontend/lint_output.txt
 
 # 8. Local Scratch scripts & Design prototypes
 scratch/
@@ -86,5 +89,6 @@ frontend/public/favicon-32.png
 # 13. AI Agent Tooling (OpenSpec, Claude etc.)
 openspec/
 .claude/
+.superpowers/
 docs/superpowers/
 CLAUDE.md
