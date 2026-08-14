@@ -147,34 +147,25 @@ class PodcastSummarizer:
         total_transcript_chars = sum(len(l) for l in transcript_text_lines)
         print(f"📊 [LOG] 总结输入统计 - 模式: {summary_mode} | 转录行数: {len(transcript_text_lines)} | 转录字符数: {total_transcript_chars} | 分段阈值: {chunk_threshold}")
 
-        # 6. 动态加载 Prompt，支持前端实时编辑
+        # 6. 动态加载 Prompt，支持前端实时编辑与模板选择
         if custom_prompt:
             user_prompt = custom_prompt
-            print(f"📝 [LOG] 使用前端传入的自定义 Prompt（{len(custom_prompt)} 字符）")
+            print(f"📝 [LOG] 使用传入的自定义 Prompt（{len(custom_prompt)} 字符）")
         else:
-            # 6.1. 优先使用 default_template_id 对应的模板（尊重用户在设置中选择的默认模板）
+            # 6.1. 优先使用 default_template_id 对应的模板（完全尊重用户在设置或配置中选择的默认模板）
             prompt_dict = load_prompt()
             default_template_id = prompt_dict.get("default_template_id", "standard")
+            effective_template_id = default_template_id
+            print(f"📋 [LOG] 使用默认模板: {effective_template_id}")
 
-            # 6.2. 本地模式自适应：如果用户未设置过默认模板（仍为 standard），自动切换到精简速览
-            #      本地 7B 模型更擅长遵循简短指令，且输出更快
-            if summary_mode != "online" and default_template_id == "standard":
-                effective_template_id = "concise"
-                print(f"⚡ [LOG] 本地模式自动优化：使用精简速览模板（concise）以加速生成。如需完整分析请在前端手动选择模板。")
-            else:
-                effective_template_id = default_template_id
-                print(f"📋 [LOG] 使用默认模板: {effective_template_id}")
-
-            # 6.3. 按模板 ID 加载 prompt 内容
+            # 6.2. 按模板 ID 加载 prompt 内容
             template_prompt = get_template_prompt(effective_template_id)
             if template_prompt:
                 user_prompt = template_prompt
             else:
                 user_prompt = prompt_dict.get("prompt", "")
                 if not user_prompt:
-                    base_prompt = prompt_dict.get("base_prompt", "")
-                    action_prompt = prompt_dict.get("action_prompt", "")
-                    user_prompt = f"{base_prompt}\n\n{{{{PODCAST_DATA}}}}\n\n{action_prompt}"
+                    user_prompt = BUILTIN_TEMPLATES.get("standard", {}).get("prompt", "")
 
         # 6.5. 如果未开启或未识别出多个发言人，动态注入 Prompt 刚性约束
         unique_speakers = set(seg.get("speaker") for seg in transcript_segments if seg.get("speaker"))
@@ -184,7 +175,7 @@ class PodcastSummarizer:
 检测到本期播客的转录文本中没有区分发言人（所有发言标记均为相同角色或未知）。
 请务必遵守以下刚性约束：
 1. 严禁尝试在总结或分析中臆测、脑补出任何具体的发言人姓名、嘉宾画像或主持人角色（如 Host、Guest 名字）。
-2. 在原计划输出“## 3. 发言人画像与立场分析”章节时，请将其重命名为“## 3. 议题正反核心视点交锋与视角分析”。
+2. 在输出涉及“发言人画像与立场”章节时，请将其重命名为“议题核心视点交锋与多维视角分析”。
 3. 纯粹从播客讨论的议题语义逻辑出发，提炼不同观点的正反论据、共识与分歧，以客观内容取代针对具体人名的画像分析。
 """
             user_prompt = guard_instruction + "\n" + user_prompt
@@ -231,8 +222,8 @@ class PodcastSummarizer:
 
 请针对以上第 {i+1}/{total_chunks} 段转录内容，生成一份**该段落的局部总结报告**。要求：
 1. 严格遵守上方的核心防伪守则。
-2. 按照标准报告结构输出，但仅覆盖本段中讨论的内容。
-3. 如果本段内容较少，可以简化结构，重点提炼核心观点和金句。"""
+2. 按照目标报告结构输出，但仅覆盖本段中讨论的内容。
+3. 重点提炼本段的核心观点、金句与关键事实。"""
                     # 制作静态的 System Prompt，用于触发 Prefix Caching 缓存
                     system_prompt = user_prompt.replace("{{PODCAST_DATA}}", "\n[请仔细阅读下一条消息中提供的转录文本，并根据本指令生成总结报告]\n")
                     chunk_prompt_user = chunk_data + chunk_suffix
@@ -241,21 +232,25 @@ class PodcastSummarizer:
                     partial_summaries.append(partial)
                     print(f"✅ [LOG] 第 {i+1}/{total_chunks} 段总结完成")
 
-                # 合并阶段：将所有分段总结合并为最终报告
+                # 合并阶段：将所有分段总结合并为最终报告，保持用户选择的模板结构
                 all_partial = "\n\n---\n\n".join(
                     [f"### 第 {i+1} 段总结\n\n{s}" for i, s in enumerate(partial_summaries)]
                 )
+                target_structure_instruction = user_prompt.replace("{{PODCAST_DATA}}", "").strip()
+
                 merge_prompt = f"""请根据以下一份播客的多段分段总结报告，合并生成一份**完整、连贯、无重复**的最终播客价值总结分析报告。
 
 **播客标题**：《{metadata.get('title', '未知标题')}》
 **所属节目**：{metadata.get('podcast_name', '未知播客')}
 
-以下是各段总结报告：
+以下是各段分段总结报告：
 ---
 {all_partial}
 ---
 
-请将以上各段总结合并为一份**完整、连贯、无重复**的最终播客价值总结分析报告，按照标准报告结构组织，去除重复内容，保留所有核心观点、金句和可执行建议。"""
+请严格按照以下目标报告结构与格式要求，将以上各段分段总结合并为最终报告（去除各段间的重复内容，保留所有核心观点、高光金句与关键引用）：
+
+{target_structure_instruction}"""
                 print(f"🔗 [LOG] 正在合并 {total_chunks} 段总结为最终报告...")
                 summary_md = call_llm(merge_prompt, summary_mode=summary_mode, label="LLM合并总结", timeout=600.0, temperature=0.2)
                 print("🟢 [LOG] 长播客分段总结报告生成完成！")

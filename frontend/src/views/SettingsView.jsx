@@ -215,30 +215,33 @@ export default function SettingsView({
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   useEffect(() => {
+    setLoadingTemplate(true);
     fetch(`${API_BASE}/api/prompt/templates`)
       .then(r => r.json())
       .then(data => {
         if (data && typeof data === "object") {
           const list = Object.entries(data).map(([id, info]) => ({ id, ...info }));
           setTemplates(list);
-          const standardTpl = list.find(t => t.id === "standard");
-          if (standardTpl) {
-            setEditName(standardTpl.name || "");
-            setEditDesc(standardTpl.description || "");
+          const defaultTpl = list.find(t => t.is_default) || list.find(t => t.id === "standard");
+          const targetId = defaultTpl ? defaultTpl.id : "standard";
+          setSelectedTemplate(targetId);
+          if (defaultTpl) {
+            setEditName(defaultTpl.name || "");
+            setEditDesc(defaultTpl.description || "");
           }
+          return targetId;
         }
+        return "standard";
       })
-      .catch(() => {});
-
-    // Auto-select standard template on mount
-    setLoadingTemplate(true);
-    fetch(`${API_BASE}/api/prompt/template/standard`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.prompt) {
-          setPromptData({ prompt: data.prompt });
-          setEditPrompt(data.prompt);
-        }
+      .then((targetId) => {
+        return fetch(`${API_BASE}/api/prompt/template/${targetId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.prompt) {
+              setPromptData({ prompt: data.prompt });
+              setEditPrompt(data.prompt);
+            }
+          });
       })
       .catch(() => {})
       .finally(() => setLoadingTemplate(false));

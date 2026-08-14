@@ -563,22 +563,27 @@ export default function PodcastDetailView({
 
   useEffect(() => {
     if (showPromptModal) {
-      setSelectedTemplate("standard");
       setLoadingTemplate(true);
       
-      // 1. Fetch templates
-      fetchTemplates();
+      // 1. Fetch templates and pre-select default template
+      fetchTemplates().then((list) => {
+        const defaultTpl = list.find(tpl => tpl.is_default);
+        const targetId = defaultTpl ? defaultTpl.id : "standard";
+        setSelectedTemplate(targetId);
 
-      // 2. Fetch standard template prompt
-      fetch(`${API_BASE}/api/prompt/template/standard`)
-        .then(r => r.json())
-        .then(data => {
-          if (data && data.prompt) {
-            setCustomPrompt(data.prompt);
-          }
-          setLoadingTemplate(false);
-        })
-        .catch(() => setLoadingTemplate(false));
+        // 2. Fetch target default template prompt
+        fetch(`${API_BASE}/api/prompt/template/${targetId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.prompt) {
+              setCustomPrompt(data.prompt);
+            }
+            setLoadingTemplate(false);
+          })
+          .catch(() => setLoadingTemplate(false));
+      }).catch(() => {
+        setLoadingTemplate(false);
+      });
     }
   }, [showPromptModal]);
 
