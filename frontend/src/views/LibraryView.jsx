@@ -725,20 +725,17 @@ export default function LibraryView({
                     <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] font-bold text-xs absolute inset-0">
                       {(session.podcastName || session.title || "?").charAt(0)}
                     </div>
-                    <img
-                      src={session.thumbnail}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover absolute inset-0"
-                      onError={(e) => { 
-                        if (!e.target.dataset.retried) {
-                          e.target.dataset.retried = 'true';
-                          e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + 'retry=' + Date.now();
-                        } else {
+                    {session.thumbnail && (
+                      <img
+                        src={session.thumbnail}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover absolute inset-0 z-1"
+                        onError={(e) => { 
                           e.target.style.display = 'none'; 
-                        }
-                      }}
-                    />
+                        }}
+                      />
+                    )}
                     {session.status === 'IN_PROGRESS' && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                         <span className="w-2 h-2 bg-[var(--accent-red)] rounded-full animate-ping" />

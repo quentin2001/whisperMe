@@ -295,20 +295,25 @@ export default function WorkstationView({
             >
               {/* Media Thumbnail Container */}
               <div className="aspect-[4/3] bg-neutral-900 relative overflow-hidden shrink-0">
-                <img
-                  src={session.thumbnail}
-                  alt={session.title}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-500 opacity-90"
-                  onError={(e) => { 
-                    if (!e.target.dataset.retried) {
-                      e.target.dataset.retried = 'true';
-                      e.target.src = e.target.src + (e.target.src.includes('?') ? '&' : '?') + 'retry=' + Date.now();
-                    } else {
+                <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-950 flex flex-col items-center justify-center text-white/50 p-4 text-center select-none">
+                  <span className="text-2xl font-bold uppercase font-mono tracking-widest text-[var(--accent-red)]/70">
+                    {(session.rawTask.podcast_name || session.title || "WM").slice(0, 2)}
+                  </span>
+                  <span className="text-[10px] mt-1 text-[var(--text-muted)] line-clamp-1 max-w-[80%]">
+                    {session.rawTask.podcast_name || session.title}
+                  </span>
+                </div>
+                {session.thumbnail && (
+                  <img
+                    src={session.thumbnail}
+                    alt={session.title}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-500 opacity-95 relative z-1"
+                    onError={(e) => { 
                       e.target.style.display = 'none'; 
-                    }
-                  }}
-                />
+                    }}
+                  />
+                )}
                 
                 {/* Duration indicator tag */}
                 <span className="absolute top-3 right-3 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono font-extrabold px-2.5 py-1 rounded-sm">
