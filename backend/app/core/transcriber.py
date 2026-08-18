@@ -22,6 +22,48 @@ from app.config import (
 from app.core.network import doh_dns_bypass
 
 
+def clean_sensevoice_text(text: str) -> str:
+    """
+    清洗 SenseVoice 输出的富文本标签，返回纯净逐字稿文本。
+    - 移除 <|zh|>, <|HAPPY|>, <|Speech|>, <|withitn|> 等内部标记
+    - 移除占位符 (如 'The.')
+    - 规范化多余空白
+    """
+    if not text:
+        return ""
+    # 移除 <|...|> 特殊 token
+    t = re.sub(r"<\|[^\>]+?\|>", "", text)
+    # 移除模型占位符
+    t = t.replace("The.", "")
+    # 规范化连续空格
+    return re.sub(r"[ \t]+", " ", t).strip()
+
+
+def detect_funasr_model_type(model_path_or_name: str) -> str:
+    """
+    判断 FunASR 模型类别: 'sensevoice' 或 'paraformer'
+    """
+    if not model_path_or_name:
+        return "paraformer"
+
+    path_str = str(model_path_or_name)
+    path_lower = path_str.lower().replace("\\", "/")
+    if "sensevoice" in path_lower:
+        return "sensevoice"
+
+    if os.path.isdir(path_str):
+        if os.path.exists(os.path.join(path_str, "chn_jpn_yue_eng_ko_spectok.bpe.model")) or os.path.exists(os.path.join(path_str, "am.mvn")):
+            return "sensevoice"
+        for root, dirs, files in os.walk(path_str):
+            if any("sensevoice" in d.lower() for d in dirs):
+                return "sensevoice"
+            if "chn_jpn_yue_eng_ko_spectok.bpe.model" in files:
+                return "sensevoice"
+            break
+
+    return "paraformer"
+
+
 class ModelCacheManager:
     def __init__(self):
         self.cached_model = None
@@ -33,6 +75,7 @@ class ModelCacheManager:
         self.pyannote_diarization = None
         self.pyannote_embedding = None
         self.funasr_model = None
+        self.funasr_model_type = None
         self.lock = threading.Lock()
         self._watcher_thread = None
         self.running = False
@@ -62,6 +105,7 @@ class ModelCacheManager:
                         self.pyannote_diarization = None
                         self.pyannote_embedding = None
                         self.funasr_model = None
+                        self.funasr_model_type = None
                         
                         import gc
                         import sys
@@ -162,82 +206,18 @@ class ModelCacheManager:
     def get_funasr_model(self, device: str):
         self.start_watcher()
         with self.lock:
-            if self.funasr_model is not None:
-                pass
-                self.last_used_time = time.time()
-                return self.funasr_model
-            
+            custom_path = config.get("local_whisper_model_path", "")
             models_dir = os.path.join(PROJECT_DIR, "models", "funasr")
             os.environ["MODELSCOPE_CACHE"] = models_dir
-            pass
 
+            # 智能检测模型类别 ('sensevoice' 或 'paraformer')
+            model_type = detect_funasr_model_type(custom_path)
+
+            if self.funasr_model is not None and getattr(self, "funasr_model_type", None) == model_type:
+                self.last_used_time = time.time()
+                return self.funasr_model, model_type
+            
             from funasr import AutoModel
-            custom_path = config.get("local_whisper_model_path", "")
-            
-            # Default model IDs for ModelScope and HuggingFace
-            ms_model = "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
-            hf_model = "funasr/paraformer-zh"  # Fallback for HF
-            
-            # Determine default local paths to enable 100% offline loading without any network queries
-            local_ms_model_dir = os.path.join(models_dir, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
-            local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
-            local_punc_dir = os.path.join(models_dir, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
-            
-            vad_param = "fsmn-vad"
-            punc_param = "ct-punc"
-            
-            # Resolve custom path
-            if custom_path:
-                # If custom_path is relative, make it absolute relative to project root
-                if not os.path.isabs(custom_path):
-                    custom_path_abs = os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
-                else:
-                    custom_path_abs = custom_path
-                
-                if os.path.isdir(custom_path_abs):
-                    # Check if the folder directly contains the model configurations
-                    if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.onnx")):
-                        ms_model = custom_path_abs
-                        hf_model = custom_path_abs
-                    else:
-                        # Check if it is the parent models/funasr folder containing the iic subfolder
-                        potential_ms = os.path.join(custom_path_abs, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
-                        if os.path.exists(potential_ms) and os.path.isdir(potential_ms):
-                            ms_model = potential_ms
-                            
-                            potential_vad = os.path.join(custom_path_abs, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
-                            if os.path.exists(potential_vad) and os.path.isdir(potential_vad):
-                                vad_param = potential_vad
-                                
-                            potential_punc = os.path.join(custom_path_abs, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
-                            if os.path.exists(potential_punc) and os.path.isdir(potential_punc):
-                                punc_param = potential_punc
-                        else:
-                            ms_model = custom_path
-                            hf_model = custom_path
-                else:
-                    # If it is NOT a directory (e.g. legacy 'paraformer-zh' string),
-                    # check if it matches paraformer to use local offline model dirs.
-                    if "paraformer" in custom_path.lower():
-                        if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
-                            ms_model = local_ms_model_dir
-                        if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
-                            vad_param = local_vad_dir
-                        if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
-                            punc_param = local_punc_dir
-                    else:
-                        ms_model = custom_path
-                        hf_model = custom_path
-            else:
-                # Default empty path logic: check if the default project folder has the ModelScope model
-                if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
-                    ms_model = local_ms_model_dir
-                
-                if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
-                    vad_param = local_vad_dir
-                    
-                if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
-                    punc_param = local_punc_dir
 
             if device == "cuda":
                 device_str = "cuda:0"
@@ -245,21 +225,117 @@ class ModelCacheManager:
                 device_str = "mps"
             else:
                 device_str = "cpu"
-            try:
-                pass
-                model = AutoModel(model=ms_model, model_revision="v2.0.4",
-                                  vad_model=vad_param, vad_model_revision="v2.0.4",
-                                  punc_model=punc_param, punc_model_revision="v2.0.4",
-                                  device=device_str, disable_update=True, hub="ms")
-            except Exception as ms_ex:
-                pass
-                model = AutoModel(model=hf_model, model_revision="v2.0.4",
-                                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-                                  punc_model="ct-punc", punc_model_revision="v2.0.4",
-                                  device=device_str, disable_update=True, hub="hf")
+
+            if model_type == "sensevoice":
+                # SenseVoice 专用解析逻辑（内聚标点，无需外挂 punc）
+                sv_model = "iic/SenseVoiceSmall"
+                if custom_path:
+                    custom_path_abs = custom_path if os.path.isabs(custom_path) else os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                    if os.path.isdir(custom_path_abs):
+                        if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.pt")):
+                            sv_model = custom_path_abs
+                        else:
+                            nested_sv = os.path.join(custom_path_abs, "iic", "SenseVoiceSmall")
+                            if os.path.exists(nested_sv) and os.path.isdir(nested_sv):
+                                sv_model = nested_sv
+                    else:
+                        sv_model = custom_path
+                else:
+                    default_sv1 = os.path.join(PROJECT_DIR, "models", "SenseVoiceSmall")
+                    default_sv2 = os.path.join(models_dir, "iic", "SenseVoiceSmall")
+                    if os.path.exists(default_sv1) and os.path.isdir(default_sv1):
+                        sv_model = default_sv1
+                    elif os.path.exists(default_sv2) and os.path.isdir(default_sv2):
+                        sv_model = default_sv2
+
+                local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+                vad_param = local_vad_dir if (os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir)) else "fsmn-vad"
+
+                print(f"⏩ [LOG] 正在加载 FunASR SenseVoiceSmall 模型: {sv_model}")
+                try:
+                    model = AutoModel(
+                        model=sv_model,
+                        vad_model=vad_param,
+                        vad_kwargs={"max_single_segment_time": 30000},
+                        device=device_str,
+                        disable_update=True,
+                        hub="ms"
+                    )
+                except Exception as ms_ex:
+                    model = AutoModel(
+                        model=sv_model,
+                        vad_model="fsmn-vad",
+                        vad_kwargs={"max_single_segment_time": 30000},
+                        device=device_str,
+                        disable_update=True,
+                        hub="hf"
+                    )
+            else:
+                # Paraformer 默认加载逻辑 (保持原有完全向后兼容)
+                ms_model = "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+                hf_model = "funasr/paraformer-zh"
+                
+                local_ms_model_dir = os.path.join(models_dir, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+                local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+                local_punc_dir = os.path.join(models_dir, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
+                
+                vad_param = "fsmn-vad"
+                punc_param = "ct-punc"
+                
+                if custom_path:
+                    custom_path_abs = custom_path if os.path.isabs(custom_path) else os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                    if os.path.isdir(custom_path_abs):
+                        if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.onnx")):
+                            ms_model = custom_path_abs
+                            hf_model = custom_path_abs
+                        else:
+                            potential_ms = os.path.join(custom_path_abs, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
+                            if os.path.exists(potential_ms) and os.path.isdir(potential_ms):
+                                ms_model = potential_ms
+                                potential_vad = os.path.join(custom_path_abs, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+                                if os.path.exists(potential_vad) and os.path.isdir(potential_vad):
+                                    vad_param = potential_vad
+                                potential_punc = os.path.join(custom_path_abs, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
+                                if os.path.exists(potential_punc) and os.path.isdir(potential_punc):
+                                    punc_param = potential_punc
+                            else:
+                                ms_model = custom_path
+                                hf_model = custom_path
+                    else:
+                        if "paraformer" in custom_path.lower():
+                            if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
+                                ms_model = local_ms_model_dir
+                            if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
+                                vad_param = local_vad_dir
+                            if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
+                                punc_param = local_punc_dir
+                        else:
+                            ms_model = custom_path
+                            hf_model = custom_path
+                else:
+                    if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
+                        ms_model = local_ms_model_dir
+                    if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
+                        vad_param = local_vad_dir
+                    if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
+                        punc_param = local_punc_dir
+
+                print(f"⏩ [LOG] 正在加载 FunASR Paraformer 模型: {ms_model}")
+                try:
+                    model = AutoModel(model=ms_model, model_revision="v2.0.4",
+                                      vad_model=vad_param, vad_model_revision="v2.0.4",
+                                      punc_model=punc_param, punc_model_revision="v2.0.4",
+                                      device=device_str, disable_update=True, hub="ms")
+                except Exception as ms_ex:
+                    model = AutoModel(model=hf_model, model_revision="v2.0.4",
+                                      vad_model="fsmn-vad", vad_model_revision="v2.0.4",
+                                      punc_model="ct-punc", punc_model_revision="v2.0.4",
+                                      device=device_str, disable_update=True, hub="hf")
+
             self.funasr_model = model
+            self.funasr_model_type = model_type
             self.last_used_time = time.time()
-            return model
+            return model, model_type
             
     def preload_models(self):
         if config.get("preload_models", True):
@@ -594,94 +670,140 @@ class PodcastTranscriber:
                     whisper_segments_raw = []
             else:
                 # 使用 FunASR 进行本地转写
-                model = model_cache_manager.get_funasr_model(device_to_use)
-                pass
+                model, funasr_type = model_cache_manager.get_funasr_model(device_to_use)
                 try:
-                    res = model.generate(input=short_wav_path, batch_size_s=300, sentence_timestamp=True)
-                    whisper_segments_raw = []
-                    if res and len(res) > 0:
-                        if "sentence_info" in res[0] and res[0]["sentence_info"]:
-                            for sentence in res[0]["sentence_info"]:
-                                # FunASR returns start/end in ms, convert to seconds
-                                whisper_segments_raw.append(WhisperSegmentDummy(
-                                    start=sentence.get("start", 0) / 1000.0,
-                                    end=sentence.get("end", 0) / 1000.0,
-                                    text=sentence.get("text", "")
-                                ))
-                        elif "timestamp" in res[0] and res[0]["timestamp"]:
-                            # Fallback: character-level timestamps without sentence segmentation.
-                            # FunASR's text is post-processed (no spaces), but timestamp[] entries
-                            # are per-token. For Chinese CharTokenizer, 1 char ≈ 1 timestamp entry.
-                            full_text = res[0].get("text", "")
-                            timestamps = res[0]["timestamp"]  # [[start_ms, end_ms], ...]
-                            print(f"⚠️ [LOG] FunASR 返回结果缺少 sentence_info，使用字符级时间戳构建段落 (字数: {len(full_text)}, ts: {len(timestamps)})")
-
-                            # Split into sentences by Chinese punctuation
-                            parts = re.split(r'([。！？；…?])', full_text) if full_text else []
-                            sentence_list = []
-                            current = ""
-                            for p in parts:
-                                if not p:
-                                    continue
-                                current += p
-                                if p in "。！？；…?":
+                    if funasr_type == "sensevoice":
+                        # SenseVoice 专属高性能推理参数与分段
+                        res = model.generate(
+                            input=short_wav_path,
+                            language="auto",
+                            use_itn=True,
+                            batch_size_s=60,
+                            merge_vad=True,
+                            merge_length_s=15,
+                        )
+                        whisper_segments_raw = []
+                        if res and len(res) > 0:
+                            raw_text = res[0].get("text", "")
+                            clean_text = clean_sensevoice_text(raw_text)
+                            if clean_text:
+                                # 按中英文常见句子终结标点进行自然断句
+                                parts = re.split(r'([。！？；…\?\!])', clean_text)
+                                sentence_list = []
+                                current = ""
+                                for p in parts:
+                                    if not p:
+                                        continue
+                                    current += p
+                                    if p in "。！？；…?!":
+                                        sentence_list.append(current.strip())
+                                        current = ""
+                                if current.strip():
                                     sentence_list.append(current.strip())
-                                    current = ""
-                            if current.strip():
-                                sentence_list.append(current.strip())
 
-                            # Map each sentence to timestamps using character positions.
-                            # IMPORTANT: Punctuation characters (。！？；…?,) are inserted by
-                            # the CT-punc model AFTER timestamps are generated. They do NOT
-                            # have corresponding entries in the timestamp[] array. We must
-                            # count only speech characters when advancing through timestamps.
-                            _PUNC_CHARS = set("。！？；…?,.!;:，、")
-                            char_pos = 0
-                            for sent in sentence_list:
-                                speech_len = sum(1 for c in sent if c not in _PUNC_CHARS)
-                                if char_pos < len(timestamps) and speech_len > 0:
-                                    end_pos = min(char_pos + speech_len, len(timestamps))
-                                    seg_start = timestamps[char_pos][0] / 1000.0
-                                    seg_end   = timestamps[end_pos - 1][1] / 1000.0
+                                # 准确获取音频总时长以进行时间步长等比例对齐
+                                total_audio_sec = 0.0
+                                try:
+                                    import wave as _wave
+                                    with _wave.open(short_wav_path, "rb") as w:
+                                        total_audio_sec = w.getnframes() / float(w.getframerate())
+                                except Exception:
+                                    pass
+
+                                total_chars = sum(len(s) for s in sentence_list) if sentence_list else 1
+                                current_time = 0.0
+
+                                for sentence in sentence_list:
+                                    if total_audio_sec > 0:
+                                        seg_dur = max((len(sentence) / total_chars) * total_audio_sec, 0.5)
+                                    else:
+                                        seg_dur = max(len(sentence) / 3.5, 1.5)
+
                                     whisper_segments_raw.append(WhisperSegmentDummy(
-                                        start=seg_start,
-                                        end=seg_end,
-                                        text=sent
+                                        start=current_time,
+                                        end=current_time + seg_dur,
+                                        text=sentence
                                     ))
-                                    char_pos = end_pos
-                        elif "text" in res[0] and res[0]["text"]:
-                            # Last resort: model generated full text but without any timestamps
-                            full_text = res[0]["text"]
-                            print(f"⚠️ [LOG] FunASR 返回结果缺少时间戳信息。已采用全文断句估计模式 (字数: {len(full_text)})")
-
-                            # Estimate and split sentences by Chinese punctuation
-                            sentences = re.split(r'([。！？；…?])', full_text)
-                            sentence_list = []
-                            current_sentence = ""
-                            for part in sentences:
-                                if not part:
-                                    continue
-                                current_sentence += part
-                                if part in "。！？；…?":
-                                    sentence_list.append(current_sentence.strip())
-                                    current_sentence = ""
-                            if current_sentence.strip():
-                                sentence_list.append(current_sentence.strip())
-
-                            current_time = 0.0
-                            for sentence in sentence_list:
-                                N = len(sentence)
-                                duration_est = max(N / 3.5, 1.5) # Estimate 3.5 Chinese characters per second, min 1.5s
-                                whisper_segments_raw.append(WhisperSegmentDummy(
-                                    start=current_time,
-                                    end=current_time + duration_est,
-                                    text=sentence
-                                ))
-                                current_time += duration_est
+                                    current_time += seg_dur
+                            else:
+                                print("⚠️ [LOG] SenseVoice 识别文本为空")
                         else:
-                            print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+                            print("⚠️ [LOG] SenseVoice 返回结果为空")
                     else:
-                        print("⚠️ [LOG] FunASR 返回结果为空")
+                        # Paraformer 原有推理逻辑
+                        res = model.generate(input=short_wav_path, batch_size_s=300, sentence_timestamp=True)
+                        whisper_segments_raw = []
+                        if res and len(res) > 0:
+                            if "sentence_info" in res[0] and res[0]["sentence_info"]:
+                                for sentence in res[0]["sentence_info"]:
+                                    whisper_segments_raw.append(WhisperSegmentDummy(
+                                        start=sentence.get("start", 0) / 1000.0,
+                                        end=sentence.get("end", 0) / 1000.0,
+                                        text=sentence.get("text", "")
+                                    ))
+                            elif "timestamp" in res[0] and res[0]["timestamp"]:
+                                full_text = res[0].get("text", "")
+                                timestamps = res[0]["timestamp"]
+                                print(f"⚠️ [LOG] FunASR 返回结果缺少 sentence_info，使用字符级时间戳构建段落 (字数: {len(full_text)}, ts: {len(timestamps)})")
+
+                                parts = re.split(r'([。！？；…?])', full_text) if full_text else []
+                                sentence_list = []
+                                current = ""
+                                for p in parts:
+                                    if not p:
+                                        continue
+                                    current += p
+                                    if p in "。！？；…?":
+                                        sentence_list.append(current.strip())
+                                        current = ""
+                                if current.strip():
+                                    sentence_list.append(current.strip())
+
+                                _PUNC_CHARS = set("。！？；…?,.!;:，、")
+                                char_pos = 0
+                                for sent in sentence_list:
+                                    speech_len = sum(1 for c in sent if c not in _PUNC_CHARS)
+                                    if char_pos < len(timestamps) and speech_len > 0:
+                                        end_pos = min(char_pos + speech_len, len(timestamps))
+                                        seg_start = timestamps[char_pos][0] / 1000.0
+                                        seg_end   = timestamps[end_pos - 1][1] / 1000.0
+                                        whisper_segments_raw.append(WhisperSegmentDummy(
+                                            start=seg_start,
+                                            end=seg_end,
+                                            text=sent
+                                        ))
+                                        char_pos = end_pos
+                            elif "text" in res[0] and res[0]["text"]:
+                                full_text = res[0]["text"]
+                                print(f"⚠️ [LOG] FunASR 返回结果缺少时间戳信息。已采用全文断句估计模式 (字数: {len(full_text)})")
+
+                                sentences = re.split(r'([。！？；…?])', full_text)
+                                sentence_list = []
+                                current_sentence = ""
+                                for part in sentences:
+                                    if not part:
+                                        continue
+                                    current_sentence += part
+                                    if part in "。！？；…?":
+                                        sentence_list.append(current_sentence.strip())
+                                        current_sentence = ""
+                                if current_sentence.strip():
+                                    sentence_list.append(current_sentence.strip())
+
+                                current_time = 0.0
+                                for sentence in sentence_list:
+                                    N = len(sentence)
+                                    duration_est = max(N / 3.5, 1.5)
+                                    whisper_segments_raw.append(WhisperSegmentDummy(
+                                        start=current_time,
+                                        end=current_time + duration_est,
+                                        text=sentence
+                                    ))
+                                    current_time += duration_est
+                            else:
+                                print("⚠️ [LOG] FunASR 返回结果为空或解析失败")
+                        else:
+                            print("⚠️ [LOG] FunASR 返回结果为空")
                 except Exception as e:
                     import traceback as _traceback
                     _err_detail = _traceback.format_exc()
@@ -704,7 +826,12 @@ class PodcastTranscriber:
             rtf = asr_duration / max(duration, 1.0)
             speed_ratio = max(duration, 1.0) / max(asr_duration, 0.001)
             
-            engine_name = 'Faster-Whisper' if is_whisper else 'FunASR Paraformer'
+            if is_whisper:
+                engine_name = 'Faster-Whisper'
+            elif not is_whisper and 'funasr_type' in locals() and funasr_type == 'sensevoice':
+                engine_name = 'FunASR SenseVoiceSmall'
+            else:
+                engine_name = 'FunASR Paraformer'
             print(f"📊 [ASR REPORT] Engine: {engine_name} | Audio: {duration/60.0:.1f}m | Time: {asr_duration:.1f}s | Speed: {speed_ratio:.1f}x (RTF: {rtf:.3f})")
 
             batch_buffer = []
