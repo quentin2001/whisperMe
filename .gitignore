@@ -92,3 +92,20 @@ openspec/
 .superpowers/
 docs/superpowers/
 CLAUDE.md
+
+# 14. Local Tool Workspaces (never publish — machine-local scratch, logs & session state)
+#     Editor / AI-tooling workspaces drop throwaway probe scripts, run logs and
+#     session state into a hidden directory at the repository root. None of it is
+#     part of the product, and none of it should ever reach the remote repository.
+.workbuddy/
+codebuddy/
+
+# 15. Generated Deliverables (produced at runtime by the delivery pipeline)
+#     Output of the one-click delivery flow — belongs to the machine, not the source tree.
+deliveries/
+
+# 16. Local Build Backups
+#     Timestamped snapshots of frontend/dist taken before a build. `frontend/dist/`
+#     is already ignored above; these backups must be ignored as well.
+frontend/dist.bak*/
+dist.bak*/
