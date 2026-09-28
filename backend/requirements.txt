@@ -14,3 +14,4 @@ mcp
 imageio-ffmpeg
 funasr
 modelscope
+python-docx

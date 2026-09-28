@@ -242,8 +242,8 @@ def get_task_transcript(task_id: str, format: str = "text"):
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="未找到该任务")
-    if task.get("status") != "completed":
-        raise HTTPException(status_code=400, detail="任务尚未完成，无法导出转录文本")
+    if task.get("status") not in ("completed", "transcribed", "summarizing"):
+        raise HTTPException(status_code=400, detail="任务尚未完成转录，无法导出转录文本")
 
     transcript = task.get("transcript", [])
     speaker_mappings = task.get("speaker_mappings", {})
@@ -270,21 +270,87 @@ def get_task_transcript(task_id: str, format: str = "text"):
         from app.utils.formatters import format_vtt
         return PlainTextResponse(format_vtt(items, resolve_speaker), media_type="text/vtt", headers={"Content-Disposition": f"attachment; filename=transcript.vtt"})
 
-    if format == "markdown":
+    if format in ("markdown", "md"):
         from fastapi.responses import PlainTextResponse
+        from urllib.parse import quote
         from app.utils.formatters import format_markdown
-        title = task.get("title", "未知标题")
-        safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60]
+        title = task.get("title", "逐字稿")
+        safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60] or "transcript"
+        filename = f"{safe_name}_逐字稿.md"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
         return PlainTextResponse(
-            format_markdown(task),
-            media_type="text/markdown",
-            headers={"Content-Disposition": f'attachment; filename="{safe_name}.md"'}
+            format_markdown(task, items, resolve_speaker),
+            media_type="text/markdown; charset=utf-8",
+            headers=headers
+        )
+
+    if format == "docx":
+        from fastapi.responses import StreamingResponse
+        from urllib.parse import quote
+        from app.utils.docx_formatter import generate_transcript_docx
+
+        buf = generate_transcript_docx(task, items, resolve_speaker)
+        title = task.get("title", "逐字稿")
+        safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60] or "transcript"
+        filename = f"{safe_name}_逐字稿.docx"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers
         )
 
     # 默认 text 格式
     from fastapi.responses import PlainTextResponse
     from app.utils.formatters import format_text
     return PlainTextResponse(format_text(items, resolve_speaker), media_type="text/plain")
+
+@router.get("/{task_id}/summary/export")
+def export_task_summary(task_id: str, format: str = "docx"):
+    """导出 AI 总结分析报告（支持 docx / markdown 格式）"""
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="未找到该任务")
+    if not task.get("summary"):
+        raise HTTPException(status_code=400, detail="该任务尚未生成 AI 总结报告，无法导出")
+
+    title = task.get("title", "AI总结")
+    safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60] or "summary"
+
+    if format in ("markdown", "md"):
+        from fastapi.responses import PlainTextResponse
+        from urllib.parse import quote
+        filename = f"{safe_name}_AI总结.md"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
+        return PlainTextResponse(task["summary"], media_type="text/markdown", headers=headers)
+
+    if format == "docx":
+        from fastapi.responses import StreamingResponse
+        from urllib.parse import quote
+        from app.utils.docx_formatter import generate_summary_docx
+
+        buf = generate_summary_docx(task)
+        filename = f"{safe_name}_AI总结报告.docx"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers
+        )
+
+    raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
 
 @router.post("/{task_id}/qa")
 def ask_podcast(task_id: str, req: QARequest):
@@ -694,7 +760,7 @@ def refresh_metadata(task_id: str):
         raise HTTPException(status_code=404, detail="未找到任务")
     
     url = task.get("url")
-    if not url:
+    if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="本地上传任务没有源链接，无法刷新元数据")
         
     try:
@@ -732,6 +798,8 @@ def refresh_metadata(task_id: str):
                 "audio_url": updated_t.get("audio_url")
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"刷新元数据失败: {str(e)}")
 
