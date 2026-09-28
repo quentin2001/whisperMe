@@ -262,7 +262,127 @@ class TestTranscriptExport:
         assert "speaker_mappings" in data
         assert data["task_id"] == sample_task["id"]
 
+    def test_export_transcript_docx(self, client, sample_task):
+        """导出 DOCX 格式逐字稿"""
+        import io
+        import docx
+        resp = client.get(f"/api/tasks/{sample_task['id']}/transcript?format=docx")
+        assert resp.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in resp.headers["content-type"]
+        doc = docx.Document(io.BytesIO(resp.content))
+        assert len(doc.paragraphs) > 0
+
+    def test_export_transcript_markdown(self, client, sample_task):
+        """导出 Markdown 格式逐字稿"""
+        resp = client.get(f"/api/tasks/{sample_task['id']}/transcript?format=markdown")
+        assert resp.status_code == 200
+        assert "text/markdown" in resp.headers["content-type"]
+        assert "## 完整逐字稿" in resp.text
+        assert sample_task["title"] in resp.text
+
+    def test_export_transcript_md_alias(self, client, sample_task):
+        """支持 format=md 简写导出"""
+        resp = client.get(f"/api/tasks/{sample_task['id']}/transcript?format=md")
+        assert resp.status_code == 200
+        assert "## 完整逐字稿" in resp.text
+
     def test_export_transcript_not_completed(self, client, sample_pending_task):
         """未完成任务无法导出"""
         resp = client.get(f"/api/tasks/{sample_pending_task['id']}/transcript")
         assert resp.status_code == 400
+
+
+class TestSummaryExport:
+    """GET /api/tasks/{task_id}/summary/export"""
+
+    def test_export_summary_docx_success(self, client, sample_task, _isolate_test_env):
+        """导出 AI 总结 DOCX 格式"""
+        import io
+        import docx
+        db = _isolate_test_env
+        db.update_task_field(
+            sample_task["id"],
+            summary="# 深度洞察\n\n这是总结内容。\n\n| 序号 | 要点 |\n|---|---|\n| 1 | 核心观点 |"
+        )
+
+        resp = client.get(f"/api/tasks/{sample_task['id']}/summary/export?format=docx")
+        assert resp.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in resp.headers["content-type"]
+        doc = docx.Document(io.BytesIO(resp.content))
+        assert len(doc.paragraphs) > 0
+        assert len(doc.tables) == 1
+
+    def test_export_summary_markdown_success(self, client, sample_task, _isolate_test_env):
+        """导出 AI 总结 Markdown 格式"""
+        db = _isolate_test_env
+        db.update_task_field(sample_task["id"], summary="# 深度洞察\n\n总结文本")
+
+        resp = client.get(f"/api/tasks/{sample_task['id']}/summary/export?format=markdown")
+        assert resp.status_code == 200
+        assert "# 深度洞察" in resp.text
+
+    def test_export_summary_no_summary(self, client, sample_task, _isolate_test_env):
+        """无总结时导出返回 400"""
+        db = _isolate_test_env
+        db.update_task_field(sample_task["id"], summary="")
+        resp = client.get(f"/api/tasks/{sample_task['id']}/summary/export?format=docx")
+        assert resp.status_code == 400
+
+    def test_export_summary_not_found(self, client):
+        """任务不存在返回 404"""
+        resp = client.get("/api/tasks/nonexistent-id/summary/export?format=docx")
+        assert resp.status_code == 404
+
+
+class TestMetadataRefresh:
+    """POST /api/tasks/{task_id}/metadata/refresh"""
+
+    def test_refresh_metadata_success(self, client, sample_task, monkeypatch):
+        """成功刷新在线播客元数据和评论"""
+        from app.routers import tasks as tasks_router
+
+        mock_comments = [
+            {"author": "听友A", "content": "这期播客太精彩了！", "likes": 12},
+            {"author": "听友B", "content": "收获满满", "likes": 8}
+        ]
+        def mock_parse_metadata(url):
+            return {
+                "title": "已更新的标题",
+                "podcast_name": "测试播客",
+                "shownotes": "最新更新的大纲",
+                "like_count": 99,
+                "comment_count": 2,
+                "comments": mock_comments,
+                "image_url": "https://example.com/cover2.jpg",
+                "pub_date": "2026-08-27",
+                "source": "xiaoyuzhou"
+            }
+
+        monkeypatch.setattr(tasks_router.downloader, "parse_metadata", mock_parse_metadata)
+
+        resp = client.post(f"/api/tasks/{sample_task['id']}/metadata/refresh")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["task"]["title"] == "已更新的标题"
+        assert len(data["task"]["metadata"]["comments"]) == 2
+        assert data["task"]["metadata"]["comments"][0]["author"] == "听友A"
+
+    def test_refresh_metadata_nonexistent_task(self, client):
+        """任务不存在返回 404"""
+        resp = client.post("/api/tasks/nonexistent-id/metadata/refresh")
+        assert resp.status_code == 404
+
+    def test_refresh_metadata_local_upload_task(self, client, _isolate_test_env):
+        """本地音频文件无网络 URL 返回 400"""
+        db = _isolate_test_env
+        db.add_task("local-upload-1", "/path/to/local/file.mp3", asr_mode="upload")
+        db.update_task_field(
+            "local-upload-1",
+            metadata={"source": "local", "comments": []}
+        )
+
+        resp = client.post("/api/tasks/local-upload-1/metadata/refresh")
+        assert resp.status_code == 400
+        assert "本地上传任务没有源链接" in resp.json()["detail"]
+
