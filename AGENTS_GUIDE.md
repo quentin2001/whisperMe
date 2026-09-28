@@ -107,6 +107,32 @@ python scripts/whisperme-cli.py prompt show --json
 python scripts/whisperme-cli.py prompt set "Your custom summary prompt template..." --json
 ```
 
+### Document Export over HTTP (Word / Markdown)
+
+The CLI above is text-only. When a binary or richly formatted file is needed
+(typically for delivery to an end reader), call the REST endpoints directly —
+they return properly named file attachments:
+
+```bash
+# Transcript export — formats: text (default), srt, vtt, markdown|md, docx
+curl -OJ "http://127.0.0.1:9101/api/tasks/<task_id>/transcript?format=docx"
+
+# AI summary report export — formats: docx (default), markdown|md
+curl -OJ "http://127.0.0.1:9101/api/tasks/<task_id>/summary/export?format=docx"
+```
+
+Notes:
+
+- Transcript export is allowed once transcription finished — i.e. when the task
+  status is `completed`, `transcribed` or `summarizing`. Other statuses return
+  HTTP 400 with an explanatory message.
+- Summary export requires `summary` to be non-empty, otherwise HTTP 400.
+- Both endpoints emit `Content-Disposition` with an RFC 5987 encoded filename,
+  so non-ASCII titles download correctly under Windows and macOS.
+- The `docx` output is intentionally brand-neutral: no product name or footer
+  is embedded, since the file is meant to be handed to third parties as-is.
+  See `backend/app/utils/docx_formatter.py`.
+
 ---
 
 ## 4. MCP (Model Context Protocol) Integration
