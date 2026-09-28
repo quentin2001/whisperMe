@@ -450,9 +450,13 @@ class PodcastTranscriber:
             
             # 立即在内存中进行特征提取
             speaker_embeddings = {}
-            if unique_speakers:
+            # 声纹特征模型加载失败（如 pyannote/embedding 为 gated 模型且未获授权）时会返回 None，
+            # 此时必须降级：保留已得到的说话人分段结果，仅跳过声纹特征提取，避免整个任务失败
+            emb_model = model_cache_manager.get_pyannote_embedding(device_to_use) if unique_speakers else None
+            if unique_speakers and emb_model is None:
+                print("⚠️ [LOG] pyannote embedding 模型不可用（可能未接受 HF 模型条款），跳过声纹特征提取，保留说话人分段结果。")
+            if unique_speakers and emb_model is not None:
                 pass
-                emb_model = model_cache_manager.get_pyannote_embedding(device_to_use)
                 inference = Inference(emb_model, window="whole", device=torch.device(device_to_use))
                 
                 for speaker in unique_speakers:
@@ -528,7 +532,8 @@ class PodcastTranscriber:
             import traceback
             traceback.print_exc()
             pass
-            return []
+            # 必须返回与正常路径一致的二元组，否则调用方解包会抛 ValueError 导致整个任务失败
+            return [], {}
 
     def _find_speaker(self, seg, diarization_segments: list[dict]) -> str:
         """Match a transcript segment to the closest diarization speaker."""
@@ -873,8 +878,10 @@ class PodcastTranscriber:
                         pass
                     batch_buffer = []
 
-                # Progress update
-                current_progress = 60.0 + (seg.end / max(duration, 1.0)) * 15.0
+                # Progress update：
+                # 本地路径的心跳线程已把进度平滑推到 74%，这里只负责 74 → 75 的收尾，
+                # 避免从 74% 回退到 60% 造成进度条倒退（在线路径无心跳，仅作收尾同样安全）
+                current_progress = 74.0 + (seg.end / max(duration, 1.0)) * 1.0
                 current_progress = min(current_progress, 75.0)
                 current_progress_int = int(current_progress)
                 if current_progress_int > last_progress_int:

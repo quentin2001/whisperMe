@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 import traceback
 import urllib.parse
 from app.config import config, HF_TOKEN
@@ -22,6 +23,39 @@ def check_cancelled(task_id: str) -> dict:
     if not task or task.get("status") == "cancelled":
         raise Exception("TASK_CANCELLED")
     return task
+
+
+def _progress_heartbeat(task_id: str, wav_path: str, stop_event, start_pct: float = 60.0, end_pct: float = 74.0):
+    """
+    本地 ASR 进度心跳（估算值）。
+
+    本地 FunASR/Whisper 是整段一次性推理，推理过程中没有任何进度钩子，
+    因此进度条会长时间停在 60% 不动，容易被误认为任务卡死。
+    这里按音频时长估算转录耗时，平滑推进进度；转录真正结束后由主流程接管，
+    心跳上限刻意压在 end_pct，不会越过真实流程写入的进度。
+    """
+    try:
+        import wave as _wave
+        with _wave.open(wav_path, "rb") as w:
+            total_sec = w.getnframes() / float(w.getframerate())
+    except Exception:
+        return
+
+    if total_sec <= 0:
+        return
+
+    # FunASR Paraformer 实测约 60x 实时，这里取 50x 保守估算，
+    # 避免进度跑得比真实完成还快（否则会在上限处静止等太久）。
+    est_seconds = max(total_sec / 50.0, 5.0)
+    t0 = time.time()
+    while not stop_event.wait(2.0):
+        frac = min((time.time() - t0) / est_seconds, 1.0)
+        pct = round(start_pct + (end_pct - start_pct) * frac, 1)
+        try:
+            db.update_task_field(task_id, progress=pct)
+        except Exception:
+            pass
+
 
 def run_podcast_pipeline(task_id: str, url: str):
     """
@@ -178,13 +212,27 @@ def run_podcast_pipeline(task_id: str, url: str):
         # For local ASR (FunASR/Whisper), always use 16kHz standardized WAV to avoid timestamp stretching.
         # For online ASR, use local_mp3 to reduce upload payload.
         audio_to_transcribe = standardized_wav if asr_mode == "local" else local_mp3
-        merged_transcript = transcriber.transcribe_and_merge(
-            audio_to_transcribe,
-            diar_data,
-            progress_callback=progress_callback,
-            asr_mode=asr_mode,
-            on_segment_batch=on_segment_batch
-        )
+
+        # 本地 ASR 整段一次性推理、无进度钩子，用心跳线程平滑推进进度条（避免长时间停在 60%）。
+        # 在线 ASR 走分片上传，provider 会回报真实进度，无需心跳。
+        heartbeat_stop = threading.Event()
+        if asr_mode == "local" and standardized_wav:
+            threading.Thread(
+                target=_progress_heartbeat,
+                args=(task_id, standardized_wav, heartbeat_stop),
+                daemon=True
+            ).start()
+
+        try:
+            merged_transcript = transcriber.transcribe_and_merge(
+                audio_to_transcribe,
+                diar_data,
+                progress_callback=progress_callback,
+                asr_mode=asr_mode,
+                on_segment_batch=on_segment_batch
+            )
+        finally:
+            heartbeat_stop.set()
         timing_stats['语音识别转录'] = time.time() - t_transcribe_start
         db.update_task_field(task_id, transcript=merged_transcript, progress=75.0)
 
