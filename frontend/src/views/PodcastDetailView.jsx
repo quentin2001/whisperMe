@@ -527,6 +527,7 @@ export default function PodcastDetailView({
   const [showSpeakerModal, setShowSpeakerModal] = useState(false);
   const [isTriggeringRestore, setIsTriggeringRestore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isRefreshingComments, setIsRefreshingComments] = useState(false);
 
   // Prompt Selector Modal States
   const [showPromptModal, setShowPromptModal] = useState(false);
@@ -826,6 +827,35 @@ export default function PodcastDetailView({
     }
   };
 
+  // 刷新最新评论
+  const handleRefreshComments = async () => {
+    if (!activeTask?.id) return;
+    if (!activeTask.url || activeTask.metadata?.source === "local" || !activeTask.url.startsWith("http")) {
+      await alert(t("本地导入或无有效网络链接的任务无法抓取在线评论", "Local tasks without a valid web link cannot fetch online comments."));
+      return;
+    }
+
+    setIsRefreshingComments(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${activeTask.id}/metadata/refresh`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        if (onRefreshTask) {
+          await onRefreshTask();
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        await alert(data.detail || t("刷新评论失败，请重试。", "Failed to refresh comments. Please try again."));
+      }
+    } catch (err) {
+      console.error("Error refreshing comments:", err);
+      await alert(t("刷新评论时发生网络错误。", "Network error while refreshing comments."));
+    } finally {
+      setIsRefreshingComments(false);
+    }
+  };
+
   // Translate seconds to MM:SS string helper
   const formatTime = (secondsCount) => {
     if (isNaN(secondsCount) || secondsCount === null) return "00:00";
@@ -854,13 +884,87 @@ export default function PodcastDetailView({
     return `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}.${ms.toString().padStart(3,"0")}`;
   };
 
+  const checkTranscriptExportable = () => {
+    if (!activeTask) return false;
+
+    // 正在下载、声纹分离、实时转写或排队中
+    if (["pending", "downloading", "diarizing", "transcribing"].includes(activeTask.status)) {
+      const progressText = typeof activeTask.progress === "number" && activeTask.progress > 0 
+        ? ` (${Math.round(activeTask.progress)}%)` 
+        : "";
+      alert(
+        t(
+          `当前音频正在实时转录处理中${progressText}，逐字稿尚未就绪。请等待转录完成后再导出。`,
+          `Audio transcription is currently in progress${progressText}. Please wait until transcription completes before exporting.`
+        ),
+        {
+          title: t("转录尚未完成", "Transcription In Progress"),
+          variant: "warning",
+          confirmText: t("知道了", "OK")
+        }
+      );
+      return false;
+    }
+
+    if (activeTask.status === "failed") {
+      alert(
+        t("该任务转录失败，无法导出逐字稿文件。", "Transcription failed for this task. Cannot export transcript."),
+        {
+          title: t("转录失败", "Transcription Failed"),
+          variant: "warning",
+          confirmText: t("知道了", "OK")
+        }
+      );
+      return false;
+    }
+
+    if (activeTask.status === "cancelled") {
+      alert(
+        t("该任务已被取消，无法导出逐字稿文件。", "This task was cancelled. Cannot export transcript."),
+        {
+          title: t("任务已取消", "Task Cancelled"),
+          variant: "warning",
+          confirmText: t("知道了", "OK")
+        }
+      );
+      return false;
+    }
+
+    if (!["completed", "transcribed", "summarizing"].includes(activeTask.status)) {
+      alert(
+        t("当前音频尚未完成转录，暂无法导出逐字稿。", "Audio transcription is not complete yet. Cannot export transcript."),
+        {
+          title: t("转录尚未完成", "Transcription In Progress"),
+          variant: "warning",
+          confirmText: t("知道了", "OK")
+        }
+      );
+      return false;
+    }
+
+    if (!paragraphs || paragraphs.length === 0) {
+      alert(
+        t("暂无可导出的转录文本内容。", "No transcript content available to export."),
+        {
+          title: t("提示", "Notice"),
+          variant: "info",
+          confirmText: t("知道了", "OK")
+        }
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const handleExport = (format) => {
-    if (!paragraphs || paragraphs.length === 0) return;
+    if (!checkTranscriptExportable()) return;
     const title = activeTask.title || "transcript";
     const safeName = title.replace(/[<>:"/\\|?*]/g, "_").slice(0, 60);
     let content = "";
     let ext = "";
     let mimeType = "text/plain";
+    let downloadFileName = "";
 
     if (format === "srt") {
       ext = "srt";
@@ -868,7 +972,8 @@ export default function PodcastDetailView({
         const speaker = p.speaker ? `${p.speaker}: ` : "";
         return `${i+1}\n${formatSrtTime(p.start_time)} --> ${formatSrtTime(p.end_time)}\n${speaker}${p.text}`;
       }).join("\n\n");
-    } else {
+      downloadFileName = `${safeName}.${ext}`;
+    } else if (format === "vtt") {
       ext = "vtt";
       mimeType = "text/vtt";
       const body = paragraphs.map((p, i) => {
@@ -876,13 +981,47 @@ export default function PodcastDetailView({
         return `${i+1}\n${formatVttTime(p.start_time)} --> ${formatVttTime(p.end_time)}\n${speaker}${p.text}`;
       }).join("\n\n");
       content = "WEBVTT\n\n" + body;
+      downloadFileName = `${safeName}.${ext}`;
+    } else if (format === "md" || format === "markdown") {
+      ext = "md";
+      mimeType = "text/markdown";
+      const metadata = activeTask.metadata || {};
+      const podcast = activeTask.podcast_name || "";
+      const duration = metadata.duration || (paragraphs.length > 0 ? formatTime(paragraphs[paragraphs.length - 1].end_time) : "");
+
+      let doc = "---\n";
+      doc += `title: "${title}"\n`;
+      if (podcast) doc += `podcast: "${podcast}"\n`;
+      if (metadata.pub_date) doc += `date: ${metadata.pub_date}\n`;
+      if (duration) doc += `duration: "${duration}"\n`;
+      if (activeTask.url) doc += `url: "${activeTask.url}"\n`;
+      doc += "---\n\n";
+
+      doc += `# ${title}\n\n`;
+      if (podcast) {
+        doc += `> **${t("播客", "Podcast")}**：${podcast}`;
+        if (duration) doc += ` · **${t("时长", "Duration")}**：${duration}`;
+        if (metadata.pub_date) doc += ` · **${t("日期", "Date")}**：${metadata.pub_date}`;
+        doc += ` · **${t("段落数", "Paragraphs")}**：${paragraphs.length}\n\n`;
+      }
+      doc += `---\n\n## ${t("完整逐字稿", "Full Transcript")}\n\n`;
+
+      doc += paragraphs.map((p) => {
+        const timeRange = `[${formatTime(p.start_time)} - ${formatTime(p.end_time)}]`;
+        const speaker = p.speaker ? `${p.speaker}` : t("发言人", "Speaker");
+        const text = (p.text || "").trim();
+        return `**${timeRange} ${speaker}**\n\n${text}`;
+      }).join("\n\n");
+
+      content = doc + "\n";
+      downloadFileName = `${safeName}_逐字稿.md`;
     }
 
     const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${safeName}.${ext}`;
+    a.download = downloadFileName || `${safeName}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -925,6 +1064,34 @@ export default function PodcastDetailView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportDocx = (type) => {
+    if (!activeTask) return;
+    if (type === "transcript") {
+      if (!checkTranscriptExportable()) return;
+    }
+    if (type === "summary") {
+      if (!activeTask.summary) {
+        alert(
+          t("该任务尚未生成 AI 总结报告，请先运行 AI 深度总结。", "No AI summary has been generated yet. Please run AI Summary first."),
+          {
+            title: t("暂无总结内容", "No Summary Available"),
+            variant: "warning",
+            confirmText: t("知道了", "OK")
+          }
+        );
+        return;
+      }
+    }
+    const url = type === "summary"
+      ? `/api/tasks/${activeTask.id}/summary/export?format=docx`
+      : `/api/tasks/${activeTask.id}/transcript?format=docx`;
+    const a = document.createElement("a");
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   // Seeking handlers
@@ -1101,6 +1268,14 @@ export default function PodcastDetailView({
     };
   });
 
+  // 依赖 paragraphs，必须在其声明之后求值（TDZ：const 在初始化前不可访问）
+  const isTranscriptReady = Boolean(
+    activeTask &&
+    ["completed", "transcribed", "summarizing"].includes(activeTask.status) &&
+    paragraphs &&
+    paragraphs.length > 0
+  );
+
   const displayTitle = activeTask.title || "Untitled Session";
   const statusMap = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", pending: "Queued", downloading: "Downloading", transcribing: "Transcribing", summarizing: "Summarizing", transcribed: "Transcribed" };
   const displayStatus = statusMap[activeTask.status] || "In Progress";
@@ -1209,6 +1384,7 @@ export default function PodcastDetailView({
               <button
                 onClick={() => handleExport("srt")}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                title={!isTranscriptReady ? t("转录尚未完成，点击查看提示", "Transcription in progress, click for details") : t("导出 SRT 字幕", "Export SRT subtitles")}
               >
                 <Download size={13} className="text-[var(--accent-red)]" />
                 <span>SRT</span>
@@ -1216,9 +1392,26 @@ export default function PodcastDetailView({
               <button
                 onClick={() => handleExport("vtt")}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                title={!isTranscriptReady ? t("转录尚未完成，点击查看提示", "Transcription in progress, click for details") : t("导出 VTT 字幕", "Export VTT subtitles")}
               >
                 <Download size={13} className="text-[var(--accent-red)]" />
                 <span>VTT</span>
+              </button>
+              <button
+                onClick={() => handleExport("md")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                title={!isTranscriptReady ? t("转录尚未完成，点击查看提示", "Transcription in progress, click for details") : t("导出 Markdown 逐字稿", "Export Markdown transcript")}
+              >
+                <Download size={13} className="text-[var(--accent-red)]" />
+                <span>MD</span>
+              </button>
+              <button
+                onClick={() => handleExportDocx("transcript")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                title={!isTranscriptReady ? t("转录尚未完成，点击查看提示", "Transcription in progress, click for details") : t("导出排版优雅的 Word 逐字稿", "Export formatted Word transcript")}
+              >
+                <Download size={13} className="text-[var(--accent-red)]" />
+                <span>DOCX</span>
               </button>
             </div>
           </div>
@@ -1304,9 +1497,25 @@ export default function PodcastDetailView({
 
             {detailSubTab === "comments" && (
               <div className="bg-[var(--bg-card)] border border-[var(--border-primary)]/40 rounded-xl p-6 shadow-xs animate-fade-in select-text">
-                <div className="flex items-center gap-2 pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
-                  <MessageSquare size={18} className="text-[var(--accent-red)]" />
-                  <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
+                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-primary)]/30 mb-5 text-[var(--accent-red)] select-none">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={18} className="text-[var(--accent-red)]" />
+                    <h3 className="text-[13px] font-extrabold uppercase tracking-widest text-[var(--text-primary)] font-display">{t("听众热门评论", "Hot Listener Comments")}</h3>
+                    {commentsList.length > 0 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-hover)] text-[var(--text-muted)]">
+                        {commentsList.length}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleRefreshComments}
+                    disabled={isRefreshingComments}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={t("重新抓取并更新最新热门评论", "Re-fetch and update latest listener comments")}
+                  >
+                    <RefreshCw size={13} className={isRefreshingComments ? "animate-spin text-[var(--accent-red)]" : "text-[var(--accent-red)]"} />
+                    <span>{isRefreshingComments ? t("正在刷新...", "Refreshing...") : t("刷新最新评论", "Refresh Comments")}</span>
+                  </button>
                 </div>
 
                 <div className="flex flex-col gap-4">
@@ -1350,6 +1559,16 @@ export default function PodcastDetailView({
                         <span>MD</span>
                       </button>
                     )}
+                    {activeTask.summary && (
+                      <button
+                        onClick={() => handleExportDocx("summary")}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                        title={t("导出排版优雅的 Word AI 总结报告", "Export formatted Word AI summary report")}
+                      >
+                        <Download size={13} className="text-[var(--accent-red)]" />
+                        <span>DOCX</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1374,7 +1593,7 @@ export default function PodcastDetailView({
                       <span>
                         {!(activeTask.status === "completed" || activeTask.status === "transcribed" || activeTask.status === "failed") 
                           ? t("⏳ 转录中，完成后可运行AI总结", "Run AI Summary (available after transcription)") 
-                          : t("✨ 运行 AI 深度总结", "Run AI Summary")}
+                          : t("运行 AI 深度总结", "Run AI Summary")}
                       </span>
                     </button>
                   </div>
