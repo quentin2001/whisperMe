@@ -914,12 +914,11 @@ class PodcastTranscriber:
             return {}
 
         try:
+            import torch
             from pyannote.audio import Model, Inference
             from pyannote.core import Segment
             import numpy as np
 
-            model = model_cache_manager.get_pyannote_embedding(device_to_use)
-            
             # 动态分配推理计算设备
             device_to_use = self.device
             if device_to_use == "cuda":
@@ -929,6 +928,8 @@ class PodcastTranscriber:
                         device_to_use = "cpu"
                 except Exception:
                     pass
+
+            model = model_cache_manager.get_pyannote_embedding(device_to_use)
             inference = Inference(model, window="whole", device=torch.device(device_to_use))
             
             # Find unique speakers

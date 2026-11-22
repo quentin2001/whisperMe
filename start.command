@@ -3,15 +3,19 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
 
-echo "[1/2] Checking and cleaning up old instances..."
+echo "[1/2] Checking for existing whisperMe instances..."
+if curl -s -f -m 1 http://127.0.0.1:9101/api/health >/dev/null 2>&1; then
+    echo "[INFO] whisperMe is already running! Opening browser..."
+    if command -v open >/dev/null 2>&1; then
+        open http://localhost:9101
+    fi
+    exit 0
+fi
+
 if [ -f .whisperMe.pid ]; then
     PID=$(cat .whisperMe.pid)
     kill -9 "$PID" 2>/dev/null
     rm -f .whisperMe.pid
-fi
-
-if lsof -Pi :9101 -sTCP:LISTEN -t >/dev/null ; then
-    lsof -Pi :9101 -sTCP:LISTEN -t | xargs kill -9 2>/dev/null
 fi
 
 sleep 1

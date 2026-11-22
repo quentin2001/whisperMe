@@ -3,7 +3,8 @@ import { MOCK_TASKS } from "./mockData.js";
 const isDemoMode =
   window.location.hostname.endsWith(".github.io") ||
   window.location.search.includes("demo=true") ||
-  import.meta.env.VITE_DEMO === "true";
+  import.meta.env.VITE_DEMO === "true" ||
+  import.meta.env.VITE_DEMO_MODE === "true";
 
 if (isDemoMode) {
   console.log("🚀 whisperMe is running in STATIC DEMO MODE. All API requests are intercepted locally.");

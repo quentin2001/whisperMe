@@ -27,7 +27,7 @@
   "summary_mode": "online",
   "online_summary_api_key": "",
   "online_summary_base_url": "",
-  "online_summary_model": "",,
+  "online_summary_model": "",
   "enable_llm_semantic_sewing": false,
   "webhook_url": "",
   "custom_storage_dir": "",

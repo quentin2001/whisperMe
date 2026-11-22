@@ -61,7 +61,12 @@ def make_request(method, endpoint, payload=None):
     try:
         with urllib.request.urlopen(req, data=data, timeout=10) as response:
             res_body = response.read().decode('utf-8')
-            return json.loads(res_body) if res_body else {"status": "success"}
+            if not res_body:
+                return {"status": "success"}
+            try:
+                return json.loads(res_body)
+            except json.JSONDecodeError:
+                return {"content": res_body}
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8')
         try:
@@ -273,14 +278,18 @@ def cmd_task(args):
         
     elif args.sub == "list":
         res = make_request("GET", "/api/tasks")
-        if args.json or "error" in res:
-            print_result(res, as_json=args.json, exit_code=2 if "error" in res else 0)
+        if isinstance(res, dict) and "error" in res:
+            print_result(res, as_json=args.json, exit_code=2)
+        elif args.json:
+            print_result(res, as_json=True)
         else:
+            task_list = res if isinstance(res, list) else res.get("tasks", [])
             # 人类友好输出
             print(f"{'ID':<38} | {'状态':<15} | {'进度':<5} | {'标题'}")
             print("-" * 80)
-            for t in res.get("tasks", []):
-                print(f"{t['id']} | {t['status']:<15} | {t.get('progress', 0):>3}% | {t.get('title', '未知')[:30]}")
+            for t in task_list:
+                if isinstance(t, dict):
+                    print(f"{t.get('id', ''):<38} | {t.get('status', '未知'):<15} | {t.get('progress', 0):>3}% | {t.get('title', '未知')[:30]}")
                 
     elif args.sub == "status":
         res = make_request("GET", f"/api/tasks/{args.id}")
@@ -327,11 +336,14 @@ def cmd_health(args):
     if "error" in res_perf:
         print_result({"status": "unreachable", "error": res_perf["error"]}, as_json=args.json, exit_code=2)
     else:
+        cpu_val = res_perf.get("cpu", {})
+        ram_val = res_perf.get("ram", {})
+        vram_val = res_perf.get("vram", {})
         out = {
             "status": "healthy",
-            "cpu_percent": res_perf.get("cpu_percent"),
-            "ram_used_gb": res_perf.get("ram_used_gb"),
-            "gpu": res_perf.get("gpu"),
+            "cpu_percent": cpu_val.get("percent") if isinstance(cpu_val, dict) else res_perf.get("cpu_percent"),
+            "ram_used_gb": ram_val.get("used_gb") if isinstance(ram_val, dict) else res_perf.get("ram_used_gb"),
+            "gpu": vram_val if vram_val else res_perf.get("gpu"),
             "dependencies": res_deps
         }
         print_result(out, as_json=args.json)
@@ -416,7 +428,11 @@ def main():
     # version
     subparsers.add_parser("version", help="版本信息")
 
-    args = parser.parse_args()
+    force_json = "--json" in sys.argv
+    clean_argv = [a for a in sys.argv[1:] if a != "--json"]
+    args = parser.parse_args(clean_argv)
+    if force_json:
+        args.json = True
 
     # 路由
     if args.cmd == "config": cmd_config(args)
