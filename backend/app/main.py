@@ -56,6 +56,15 @@ app.include_router(upload_router)
 app.include_router(config_router)
 app.include_router(system_router)
 
+@app.get("/api/health")
+async def health_check():
+    """统一轻量健康检查端点，供本地脚本与 Agent 探测"""
+    return {
+        "status": "ok",
+        "app": "whisperMe",
+        "version": CURRENT_VERSION
+    }
+
 # --- MCP Server 挂载 ---
 try:
     from app.mcp_server import mcp as mcp_server

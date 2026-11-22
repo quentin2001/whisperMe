@@ -7,7 +7,8 @@ const isDemo =
   typeof window !== "undefined" &&
   (window.location.hostname.endsWith(".github.io") ||
    window.location.search.includes("demo=true") ||
-   import.meta.env.VITE_DEMO === "true");
+   import.meta.env.VITE_DEMO === "true" ||
+   import.meta.env.VITE_DEMO_MODE === "true");
 
 /**
  * 将图片 URL 通过后端代理加载，解决浏览器无法直接访问某些 CDN 的问题
