@@ -66,9 +66,15 @@ def main():
         if os.path.isdir(os.path.join(base_dir, 'assets')):
             shutil.copytree(os.path.join(base_dir, 'assets'), os.path.join(app_dir, 'assets'), ignore=ignore_files)
         shutil.copy2(os.path.join(base_dir, 'README.md'), app_dir)
+        if os.path.exists(os.path.join(base_dir, 'VERSION')):
+            shutil.copy2(os.path.join(base_dir, 'VERSION'), app_dir)
+        if os.path.exists(os.path.join(base_dir, 'LICENSE')):
+            shutil.copy2(os.path.join(base_dir, 'LICENSE'), app_dir)
     
     # Windows specific
     shutil.copy2(os.path.join(base_dir, 'start.bat'), app_dir_win)
+    if os.path.exists(os.path.join(base_dir, 'stop.bat')):
+        shutil.copy2(os.path.join(base_dir, 'stop.bat'), app_dir_win)
     if os.path.exists(os.path.join(base_dir, 'whisperMe.lnk')):
         shutil.copy2(os.path.join(base_dir, 'whisperMe.lnk'), app_dir_win)
     

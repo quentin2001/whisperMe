@@ -83,3 +83,15 @@ class TestVersionCheck:
         data = resp.json()
         assert "current_version" in data
         assert isinstance(data["has_update"], bool)
+
+
+class TestHealthCheck:
+    """GET /api/health"""
+
+    def test_health_check_ok(self, client):
+        resp = client.get("/api/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("status") == "ok"
+        assert data.get("app") == "whisperMe"
+        assert "version" in data

@@ -10,7 +10,8 @@ export const I18nProvider = ({ children }) => {
   const isDemo =
     window.location.hostname.endsWith(".github.io") ||
     window.location.search.includes("demo=true") ||
-    import.meta.env.VITE_DEMO === "true";
+    import.meta.env.VITE_DEMO === "true" ||
+    import.meta.env.VITE_DEMO_MODE === "true";
 
   const lang = configData?.language || (isDemo ? 'en' : 'zh');
 
