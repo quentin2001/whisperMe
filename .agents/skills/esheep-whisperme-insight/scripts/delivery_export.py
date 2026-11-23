@@ -138,8 +138,8 @@ def main():
     # 4. 计算交付目录路径
     title = task.get("title", "未知标题")
     podcast = task.get("podcast_name", "精选播客")
-    clean_title = sanitize_filename(title, 40)
-    clean_podcast = sanitize_filename(podcast, 30)
+    clean_title = sanitize_filename(title, 80)
+    clean_podcast = sanitize_filename(podcast, 40)
 
     if args.output_dir:
         target_dir = Path(args.output_dir)
