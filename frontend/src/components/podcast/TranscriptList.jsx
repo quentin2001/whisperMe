@@ -1,16 +1,24 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 import { useTranslation } from "../../contexts/I18nContext";
+import { usePlayerStore } from "../../store/playerStore.js";
 
 const TranscriptList = memo(function TranscriptList({
   activeTask,
   paragraphs,
   searchWord,
-  currentTime,
+  currentTime: propCurrentTime,
   activeBubbleRef,
+  isUserScrolling = false,
   jumpToTimeSeconds
 }) {
   const { t } = useTranslation();
+  const storeTime = usePlayerStore(state => state.currentTime);
+  const currentTime = propCurrentTime !== undefined ? propCurrentTime : storeTime;
+
+  const internalBubbleRef = useRef(null);
+  const bubbleRef = activeBubbleRef || internalBubbleRef;
+  const prevActiveParagraphIdRef = useRef(null);
 
   // Find the active paragraph ID using closest-previous-start logic:
   // Segment starts at or before currentTime (and ends before next segment starts).
@@ -21,6 +29,19 @@ const TranscriptList = memo(function TranscriptList({
       break;
     }
   }
+
+  // Decoupled scrollIntoView: only scroll when activeParagraphId changes!
+  useEffect(() => {
+    if (activeParagraphId && activeParagraphId !== prevActiveParagraphIdRef.current) {
+      prevActiveParagraphIdRef.current = activeParagraphId;
+      if (bubbleRef.current && typeof bubbleRef.current.scrollIntoView === 'function' && !isUserScrolling) {
+        bubbleRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }
+    }
+  }, [activeParagraphId, isUserScrolling, bubbleRef]);
 
   return (
     <>
@@ -113,7 +134,7 @@ const TranscriptList = memo(function TranscriptList({
               <div 
                 key={p.id}
                 onClick={() => jumpToTimeSeconds(p.start_time)}
-                ref={isActive ? activeBubbleRef : null}
+                ref={isActive ? bubbleRef : null}
                 className={`p-4 rounded-lg cursor-pointer transition-all border border-l-4 ${
                   isActive 
                     ? "bg-[var(--accent-red)]/[0.03] border-transparent border-l-[#f62440]" 

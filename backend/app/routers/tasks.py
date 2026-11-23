@@ -306,6 +306,25 @@ def get_task_transcript(task_id: str, format: str = "text"):
             headers=headers
         )
 
+    if format == "pdf":
+        from fastapi.responses import Response
+        from urllib.parse import quote
+        from app.utils.pdf_formatter import generate_transcript_pdf
+
+        pdf_bytes = generate_transcript_pdf(task, items, resolve_speaker=resolve_speaker)
+        title = task.get("title", "逐字稿")
+        safe_name = "".join(c for c in title if c not in '<>:"/\\|?*')[:60] or "transcript"
+        filename = f"{safe_name}_逐字稿.pdf"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers=headers
+        )
+
     # 默认 text 格式
     from fastapi.responses import PlainTextResponse
     from app.utils.formatters import format_text
@@ -347,6 +366,23 @@ def export_task_summary(task_id: str, format: str = "docx"):
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers
+        )
+
+    if format == "pdf":
+        from fastapi.responses import Response
+        from urllib.parse import quote
+        from app.utils.pdf_formatter import generate_summary_pdf
+
+        pdf_bytes = generate_summary_pdf(task)
+        filename = f"{safe_name}_AI总结报告.pdf"
+        encoded_filename = quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
+        }
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
             headers=headers
         )
 

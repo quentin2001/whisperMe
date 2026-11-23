@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -52,6 +53,14 @@ class UpdateConfigRequest(BaseModel):
     language: str = "en"
     enable_autostart_windows: bool = False
     enable_speaker_inference: bool = False
+    local_whisper_model_size: Optional[str] = None
+    local_model_idle_timeout: Optional[int] = None
+    enable_auto_cleanup: Optional[bool] = None
+    cleanup_threshold_days: Optional[int] = None
+    max_concurrent_tasks: Optional[int] = None
+    preload_models: Optional[bool] = None
+    use_mp3_chunks: Optional[bool] = None
+    use_hf_mirror: Optional[bool] = None
 
 class TestConfigRequest(BaseModel):
     api_key: str = ""
@@ -144,7 +153,9 @@ def list_asr_providers():
 
 @router.post("/config")
 def update_global_config(req: UpdateConfigRequest):
-    new_cfg = req.model_dump()
+    current_cfg = load_config_dict()
+    incoming = {k: v for k, v in req.model_dump().items() if v is not None}
+    new_cfg = {**current_cfg, **incoming}
     save_config(new_cfg)
     
     # 强制将新变量重写回内存 config 字典中，完成实时热更新

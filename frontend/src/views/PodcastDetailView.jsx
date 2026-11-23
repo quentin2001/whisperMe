@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Play, Pause, ChevronLeft, Search, CheckCircle2,
   Volume2, VolumeX, SkipBack, SkipForward, Sparkles, Sliders, RefreshCw,
@@ -508,7 +508,6 @@ export default function PodcastDetailView({
   const { t } = useTranslation();
   const activeTask = useTaskStore(state => state.activeTask);
   const isPlaying = usePlayerStore(state => state.isPlaying);
-  const currentTime = usePlayerStore(state => state.currentTime);
   const duration = usePlayerStore(state => state.duration);
   const playbackRate = usePlayerStore(state => state.playbackRate);
   const setPlaybackRate = usePlayerStore(state => state.setPlaybackRate);
@@ -1094,6 +1093,34 @@ export default function PodcastDetailView({
     document.body.removeChild(a);
   };
 
+  const handleExportPdf = (type) => {
+    if (!activeTask) return;
+    if (type === "transcript") {
+      if (!checkTranscriptExportable()) return;
+    }
+    if (type === "summary") {
+      if (!activeTask.summary) {
+        alert(
+          t("该任务尚未生成 AI 总结报告，请先运行 AI 深度总结。", "No AI summary has been generated yet. Please run AI Summary first."),
+          {
+            title: t("暂无总结内容", "No Summary Available"),
+            variant: "warning",
+            confirmText: t("知道了", "OK")
+          }
+        );
+        return;
+      }
+    }
+    const url = type === "summary"
+      ? `/api/tasks/${activeTask.id}/summary/export?format=pdf`
+      : `/api/tasks/${activeTask.id}/transcript?format=pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Seeking handlers
   const jumpToTimeSeconds = (secs) => {
     if (!audioPlayerRef.current) return;
@@ -1195,78 +1222,70 @@ export default function PodcastDetailView({
     };
   }, [isDragging]);
 
-  // Auto scroll transcript to active dialogue bubble
-  useEffect(() => {
-    if (activeBubbleRef.current && !isUserScrolling) {
-      activeBubbleRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }
-  }, [currentTime, isUserScrolling]);
+  // Map backend paragraphs (memoized to avoid re-calculating 1000+ paragraphs on unrelated renders)
+  const paragraphs = useMemo(() => {
+    return (activeTask?.paragraphs || []).map((p, idx) => {
+      const rawSpeaker = p.speaker || `Speaker ${idx + 1}`;
+      const displaySpeaker = activeTask?.speaker_mappings?.[rawSpeaker] || rawSpeaker;
 
-  // Map backend paragraphs
-  const paragraphs = (activeTask.paragraphs || []).map((p, idx) => {
-    const rawSpeaker = p.speaker || `Speaker ${idx + 1}`;
-    const displaySpeaker = activeTask.speaker_mappings?.[rawSpeaker] || rawSpeaker;
-
-    let sentences = [];
-    if (p.sentences) {
-      if (Array.isArray(p.sentences)) {
-        sentences = p.sentences;
-      } else if (typeof p.sentences === "string") {
-        try {
-          sentences = JSON.parse(p.sentences);
-        } catch (e) {
-          console.error("Failed to parse sentences JSON:", e);
+      let sentences = [];
+      if (p.sentences) {
+        if (Array.isArray(p.sentences)) {
+          sentences = p.sentences;
+        } else if (typeof p.sentences === "string") {
+          try {
+            sentences = JSON.parse(p.sentences);
+          } catch (e) {
+            console.error("Failed to parse sentences JSON:", e);
+          }
         }
       }
-    }
 
-    if (!Array.isArray(sentences) || sentences.length === 0) {
-      sentences = [{
-        start: p.start_time ?? 0,
-        end: p.end_time ?? 0,
-        text: p.content || ""
-      }];
-    } else {
-      const parsedList = sentences.map(s => ({
-        start: s.start !== undefined ? s.start : (s.start_time !== undefined ? s.start_time : (p.start_time ?? 0)),
-        end: s.end !== undefined ? s.end : (s.end_time !== undefined ? s.end_time : (p.end_time ?? 0)),
-        text: s.text || s.content || ""
-      }));
+      if (!Array.isArray(sentences) || sentences.length === 0) {
+        sentences = [{
+          start: p.start_time ?? 0,
+          end: p.end_time ?? 0,
+          text: p.content || ""
+        }];
+      } else {
+        const parsedList = sentences.map(s => ({
+          start: s.start !== undefined ? s.start : (s.start_time !== undefined ? s.start_time : (p.start_time ?? 0)),
+          end: s.end !== undefined ? s.end : (s.end_time !== undefined ? s.end_time : (p.end_time ?? 0)),
+          text: s.text || s.content || ""
+        }));
 
-      const merged = [];
-      let temp = null;
-      for (const s of parsedList) {
-        if (!temp) {
-          temp = { ...s };
-        } else {
-          temp.text += s.text;
-          temp.end = s.end;
+        const merged = [];
+        let temp = null;
+        for (const s of parsedList) {
+          if (!temp) {
+            temp = { ...s };
+          } else {
+            temp.text += s.text;
+            temp.end = s.end;
+          }
+          const textVal = temp.text.trim();
+          const lastChar = textVal.charAt(textVal.length - 1);
+          const isTerminal = /[。？！\.?!;；]/.test(lastChar) || (temp.text.length > 55 && /[，,]/.test(lastChar));
+          if (isTerminal || s === parsedList[parsedList.length - 1]) {
+            merged.push(temp);
+            temp = null;
+          }
         }
-        const textVal = temp.text.trim();
-        const lastChar = textVal.charAt(textVal.length - 1);
-        const isTerminal = /[。？！\.?!;；]/.test(lastChar) || (temp.text.length > 55 && /[，,]/.test(lastChar));
-        if (isTerminal || s === parsedList[parsedList.length - 1]) {
-          merged.push(temp);
-          temp = null;
-        }
+        sentences = merged;
       }
-      sentences = merged;
-    }
 
-    return {
-      id: p.id || `p-${idx}`,
-      speaker: displaySpeaker,
-      timeStart: formatTime(p.start_time),
-      timeEnd: formatTime(p.end_time),
-      text: p.content || "",
-      start_time: p.start_time,
-      end_time: p.end_time,
-      sentences: sentences
-    };
-  });
+      return {
+        id: p.id || `p-${idx}`,
+        speaker: displaySpeaker,
+        timeStart: formatTime(p.start_time),
+        timeEnd: formatTime(p.end_time),
+        text: p.content || "",
+        start_time: p.start_time,
+        end_time: p.end_time,
+        sentences: sentences
+      };
+    });
+  }, [activeTask?.paragraphs, activeTask?.speaker_mappings]);
 
   // 依赖 paragraphs，必须在其声明之后求值（TDZ：const 在初始化前不可访问）
   const isTranscriptReady = Boolean(
@@ -1413,6 +1432,14 @@ export default function PodcastDetailView({
                 <Download size={13} className="text-[var(--accent-red)]" />
                 <span>DOCX</span>
               </button>
+              <button
+                onClick={() => handleExportPdf("transcript")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                title={!isTranscriptReady ? t("转录尚未完成，点击查看提示", "Transcription in progress, click for details") : t("导出出版级 PDF 逐字稿", "Export publication-grade PDF transcript")}
+              >
+                <Download size={13} className="text-[var(--accent-red)]" />
+                <span>PDF</span>
+              </button>
             </div>
           </div>
           
@@ -1421,10 +1448,9 @@ export default function PodcastDetailView({
             activeTask={activeTask}
             paragraphs={paragraphs}
             searchWord={searchWord}
-            currentTime={currentTime}
             activeBubbleRef={activeBubbleRef}
+            isUserScrolling={isUserScrolling}
             jumpToTimeSeconds={jumpToTimeSeconds}
-            
           />
         </div>
 
@@ -1569,6 +1595,16 @@ export default function PodcastDetailView({
                         <span>DOCX</span>
                       </button>
                     )}
+                    {activeTask.summary && (
+                      <button
+                        onClick={() => handleExportPdf("summary")}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-primary)]/40 hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs font-bold rounded-lg transition-all cursor-pointer"
+                        title={t("导出出版级商务卡片 PDF 总结报告", "Export publication-grade PDF summary report")}
+                      >
+                        <Download size={13} className="text-[var(--accent-red)]" />
+                        <span>PDF</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1618,7 +1654,6 @@ export default function PodcastDetailView({
         activeTask={activeTask}
         isPlaying={isPlaying}
         togglePlay={togglePlay}
-        currentTime={currentTime}
         duration={duration}
         playbackRate={playbackRate}
         handleProgressChange={handleProgressChange}

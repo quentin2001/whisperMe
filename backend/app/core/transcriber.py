@@ -20,6 +20,7 @@ from app.config import (
     PROJECT_DIR
 )
 from app.core.network import doh_dns_bypass
+from app.core.llm_utils import call_llm
 
 
 def clean_sensevoice_text(text: str) -> str:
@@ -75,9 +76,20 @@ class ModelCacheManager:
         self.pyannote_embedding = None
         self.funasr_model = None
         self.funasr_model_type = None
+        self.active_tasks = 0
         self.lock = threading.Lock()
         self._watcher_thread = None
         self.running = False
+
+    def acquire_active_task(self):
+        with self.lock:
+            self.active_tasks += 1
+            self.last_used_time = time.time()
+
+    def release_active_task(self):
+        with self.lock:
+            self.active_tasks = max(0, self.active_tasks - 1)
+            self.last_used_time = time.time()
 
     def start_watcher(self):
         with self.lock:
@@ -92,7 +104,11 @@ class ModelCacheManager:
         while self.running:
             time.sleep(10)
             with self.lock:
-                if self.cached_model is not None:
+                # 保护：如果有正在执行的任务，绝不卸载模型
+                if getattr(self, "active_tasks", 0) > 0:
+                    continue
+
+                if any([self.cached_model, getattr(self, 'funasr_model', None), getattr(self, 'pyannote_diarization', None)]):
                     timeout = int(config.get("local_model_idle_timeout", 300))
                     if time.time() - self.last_used_time > timeout:
                         pass
@@ -331,6 +347,13 @@ class PodcastTranscriber:
         pass
 
     def run_diarization_and_embedding(self, wav_path: str) -> tuple[list[dict], dict[str, list[float]]]:
+        model_cache_manager.acquire_active_task()
+        try:
+            return self._run_diarization_and_embedding_impl(wav_path)
+        finally:
+            model_cache_manager.release_active_task()
+
+    def _run_diarization_and_embedding_impl(self, wav_path: str) -> tuple[list[dict], dict[str, list[float]]]:
         """
         运行 pyannote.audio 进行声纹识别与说话人分割，并在同一批次直接从内存中提取特征向量
         """
@@ -496,6 +519,17 @@ class PodcastTranscriber:
     def transcribe_and_merge(self, wav_path: str, diarization_segments: list[dict],
                              progress_callback=None, asr_mode: str = "local",
                              on_segment_batch=None) -> list[dict]:
+        model_cache_manager.acquire_active_task()
+        try:
+            return self._transcribe_and_merge_impl(
+                wav_path, diarization_segments, progress_callback, asr_mode, on_segment_batch
+            )
+        finally:
+            model_cache_manager.release_active_task()
+
+    def _transcribe_and_merge_impl(self, wav_path: str, diarization_segments: list[dict],
+                                  progress_callback=None, asr_mode: str = "local",
+                                  on_segment_batch=None) -> list[dict]:
         """
         运行 faster-whisper 或在线 ASR，并将识别的段落与 pyannote 声纹时间轴交叉重叠合并
         """

@@ -164,7 +164,7 @@ export default function AudioPlayerControl({
   activeTask,
   isPlaying,
   togglePlay,
-  currentTime,
+  currentTime: propCurrentTime,
   duration,
   playbackRate,
   handleProgressChange,
@@ -179,6 +179,8 @@ export default function AudioPlayerControl({
   handleRedownloadAudio
 }) {
   const { t } = useTranslation();
+  const storeTime = usePlayerStore(state => state.currentTime);
+  const currentTime = propCurrentTime !== undefined ? propCurrentTime : storeTime;
   const displayTitle = activeTask?.title || "Untitled Session";
 
   return (

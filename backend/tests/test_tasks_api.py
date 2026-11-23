@@ -272,6 +272,13 @@ class TestTranscriptExport:
         doc = docx.Document(io.BytesIO(resp.content))
         assert len(doc.paragraphs) > 0
 
+    def test_export_transcript_pdf(self, client, sample_task):
+        """导出 PDF 格式逐字稿"""
+        resp = client.get(f"/api/tasks/{sample_task['id']}/transcript?format=pdf")
+        assert resp.status_code == 200
+        assert "application/pdf" in resp.headers["content-type"]
+        assert resp.content.startswith(b"%PDF")
+
     def test_export_transcript_markdown(self, client, sample_task):
         """导出 Markdown 格式逐字稿"""
         resp = client.get(f"/api/tasks/{sample_task['id']}/transcript?format=markdown")
@@ -311,6 +318,19 @@ class TestSummaryExport:
         doc = docx.Document(io.BytesIO(resp.content))
         assert len(doc.paragraphs) > 0
         assert len(doc.tables) == 1
+
+    def test_export_summary_pdf_success(self, client, sample_task, _isolate_test_env):
+        """导出 AI 总结 PDF 格式"""
+        db = _isolate_test_env
+        db.update_task_field(
+            sample_task["id"],
+            summary="# 深度洞察\n\n这是总结内容。\n\n| 序号 | 要点 |\n|---|---|\n| 1 | 核心观点 |"
+        )
+
+        resp = client.get(f"/api/tasks/{sample_task['id']}/summary/export?format=pdf")
+        assert resp.status_code == 200
+        assert "application/pdf" in resp.headers["content-type"]
+        assert resp.content.startswith(b"%PDF")
 
     def test_export_summary_markdown_success(self, client, sample_task, _isolate_test_env):
         """导出 AI 总结 Markdown 格式"""

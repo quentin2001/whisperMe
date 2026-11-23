@@ -8,6 +8,7 @@ import urllib.parse
 import urllib.request
 import json
 import threading
+from pathlib import Path
 from fastapi import APIRouter, Response, HTTPException
 from app.config import config, STORAGE_BASE, CURRENT_VERSION
 from app.core.queue_manager import queue_manager
@@ -105,35 +106,29 @@ def background_perf_monitor():
 
             # 3. GPU
             try:
-                subprocess.check_output("nvidia-smi -L", shell=True, stderr=subprocess.STDOUT)
-                has_gpu = True
-            except Exception:
-                has_gpu = False
-
-            if has_gpu:
-                try:
-                    vram_out = subprocess.check_output("nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore")
-                    parts = vram_out.strip().split(",")
-                    if len(parts) >= 3:
-                        t_mb = float(parts[0].strip())
-                        u_mb = float(parts[1].strip())
+                gpu_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                gpu_res = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=name,temperature.gpu,utilization.gpu,memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"],
+                    capture_output=True, text=True, timeout=3, creationflags=gpu_flags
+                )
+                if gpu_res.returncode == 0 and gpu_res.stdout.strip():
+                    line = gpu_res.stdout.strip().splitlines()[0]
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 6:
+                        name, temp_s, util_s, total_s, used_s, free_s = parts[:6]
+                        t_mb = float(total_s)
+                        u_mb = float(used_s)
                         perf_data["vram"].update({
                             "has_gpu": True,
+                            "gpu_name": name,
+                            "gpu_temp": float(temp_s) if temp_s else 0.0,
+                            "gpu_util": float(util_s) if util_s else 0.0,
                             "total": t_mb,
                             "used": u_mb,
-                            "percent": round((u_mb / t_mb) * 100, 1)
+                            "percent": round((u_mb / t_mb) * 100, 1) if t_mb > 0 else 0.0
                         })
-                    
-                    name_out = subprocess.check_output("nvidia-smi --query-gpu=name --format=csv,noheader", shell=True).decode("utf-8", errors="ignore").strip()
-                    if name_out: perf_data["vram"]["gpu_name"] = name_out
-                    
-                    util_out = subprocess.check_output("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore").strip()
-                    if util_out: perf_data["vram"]["gpu_util"] = float(util_out)
-                    
-                    temp_out = subprocess.check_output("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits", shell=True).decode("utf-8", errors="ignore").strip()
-                    if temp_out: perf_data["vram"]["gpu_temp"] = float(temp_out)
-                except Exception:
-                    pass
+            except Exception:
+                pass
                     
             # 4. Disk
             try:
@@ -148,12 +143,16 @@ def background_perf_monitor():
                 
             # 5. Queue
             try:
-                qs = queue_manager.task_queue.qsize()
-                if queue_manager.get_current_task_id() is not None:
-                    qs += 1
-                perf_data["queue"]["size"] = qs
+                from app.database import db
+                c = db.core.conn.cursor()
+                c.execute("SELECT COUNT(*) as cnt FROM tasks WHERE status IN ('pending', 'downloading', 'transcribing', 'summarizing', 'diarizing')")
+                row = c.fetchone()
+                perf_data["queue"]["size"] = row["cnt"] if row else 0
             except Exception:
-                pass
+                try:
+                    perf_data["queue"]["size"] = len(queue_manager.get_current_task_ids())
+                except Exception:
+                    pass
                 
             # 6. LLM Status
             try:
