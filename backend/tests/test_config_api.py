@@ -63,6 +63,33 @@ class TestUpdateConfig:
         resp3 = client.get("/api/config")
         assert resp3.json()["ollama_model"] == "qwen2.5:14b"
 
+    def test_update_config_preserves_and_updates_extended_fields(self, client):
+        """测试新增的 8 个扩展配置字段的更新与持久化"""
+        resp = client.get("/api/config")
+        cfg = resp.json()
+        cfg["local_whisper_model_size"] = "base"
+        cfg["local_model_idle_timeout"] = 600
+        cfg["enable_auto_cleanup"] = True
+        cfg["cleanup_threshold_days"] = 45
+        cfg["max_concurrent_tasks"] = 2
+        cfg["preload_models"] = False
+        cfg["use_mp3_chunks"] = True
+        cfg["use_hf_mirror"] = False
+
+        resp2 = client.post("/api/config", json=cfg)
+        assert resp2.status_code == 200
+
+        resp3 = client.get("/api/config")
+        updated = resp3.json()
+        assert updated["local_whisper_model_size"] == "base"
+        assert updated["local_model_idle_timeout"] == 600
+        assert updated["enable_auto_cleanup"] is True
+        assert updated["cleanup_threshold_days"] == 45
+        assert updated["max_concurrent_tasks"] == 2
+        assert updated["preload_models"] is False
+        assert updated["use_mp3_chunks"] is True
+        assert updated["use_hf_mirror"] is False
+
 
 class TestAsrProviders:
     """GET /api/asr-providers"""
