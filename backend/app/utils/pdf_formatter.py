@@ -46,9 +46,47 @@ def find_edge_executable(custom_path: Optional[str] = None) -> str:
         return which_edge
     return DEFAULT_EDGE_PATH
 
-def _format_seconds(secs: Optional[float]) -> str:
-    """Format seconds into MM:SS or HH:MM:SS."""
-    if secs is None or secs < 0:
+def parse_duration_seconds(duration_val: Any) -> float:
+    """Parse duration into float seconds from int, float, or string (e.g. '51:24', '01:05:30', '803')."""
+    if duration_val is None:
+        return 0.0
+    if isinstance(duration_val, (int, float)):
+        return max(0.0, float(duration_val))
+    if isinstance(duration_val, str):
+        val = duration_val.strip()
+        if not val:
+            return 0.0
+        if ":" in val:
+            parts = val.split(":")
+            try:
+                if len(parts) == 2:
+                    return int(parts[0]) * 60 + float(parts[1])
+                elif len(parts) == 3:
+                    return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+            except (ValueError, TypeError):
+                pass
+        try:
+            return max(0.0, float(val))
+        except (ValueError, TypeError):
+            pass
+    return 0.0
+
+def _format_seconds(secs: Any) -> str:
+    """Format seconds into MM:SS or HH:MM:SS, robust to int, float, or formatted strings."""
+    if isinstance(secs, str):
+        val = secs.strip()
+        if ":" in val:
+            return val
+        secs = parse_duration_seconds(val)
+    elif secs is None:
+        return "00:00"
+    else:
+        try:
+            secs = float(secs)
+        except (ValueError, TypeError):
+            return "00:00"
+
+    if secs < 0:
         return "00:00"
     hrs = int(secs // 3600)
     mins = int((secs % 3600) // 60)
@@ -643,8 +681,20 @@ def transform_summary_markdown_to_html(task: dict, markdown_text: str) -> str:
     clean_title = re.sub(r'^[《<"\']+|[》>"\']+$', '', doc_title).strip()
     
     podcast_name = task.get("podcast_name", "") or "精选播客"
-    duration = task.get("duration", 0)
-    duration_str = f"{int(duration // 60)} 分钟" if duration else "13 分 23 秒"
+    raw_duration = task.get("duration")
+    if raw_duration:
+        if isinstance(raw_duration, str) and ":" in raw_duration:
+            duration_str = raw_duration
+        else:
+            duration_secs = parse_duration_seconds(raw_duration)
+            if duration_secs >= 60:
+                duration_str = f"{int(duration_secs // 60)} 分钟"
+            elif duration_secs > 0:
+                duration_str = f"{int(duration_secs)} 秒"
+            else:
+                duration_str = "13 分钟"
+    else:
+        duration_str = "13 分 23 秒"
     created_at = task.get("created_at", "")[:10] or "2026-11-23"
     
     rating = "A+ (卓越)"
