@@ -91,14 +91,37 @@ SAMPLE_PARAGRAPHS = [
     {"start_time": 1.16, "end_time": 2.50, "speaker": "冤种小徐", "content": "但不知道自己毕业以后能赚多少钱"}
 ]
 
-def test_find_edge_executable():
+def test_find_edge_executable(tmp_path):
+    # 1. 自定义路径直接命中测试
+    dummy = tmp_path / "msedge.exe"
+    dummy.write_text("dummy")
+    assert find_edge_executable(str(dummy)) == str(dummy)
+
+    # 2. 系统路径探测（Windows 上若有 Edge 则验证存在，CI Linux 无 Edge 环境则验证优雅兜底回退字符串）
     path = find_edge_executable()
-    assert os.path.isfile(path), f"Edge executable should be found at {path}"
+    assert isinstance(path, str) and len(path) > 0
+    if os.path.isfile(DEFAULT_EDGE_PATH):
+        assert os.path.isfile(path)
 
 def test_format_seconds():
     assert _format_seconds(0) == "00:00"
     assert _format_seconds(65) == "01:05"
     assert _format_seconds(3665) == "01:01:05"
+    # String duration support
+    assert _format_seconds("51:24") == "51:24"
+    assert _format_seconds("01:05:30") == "01:05:30"
+    assert _format_seconds("803") == "13:23"
+    assert _format_seconds(None) == "00:00"
+    assert _format_seconds("invalid") == "00:00"
+
+def test_duration_string_in_summary_and_transcript():
+    task_with_str_dur = dict(SAMPLE_TASK)
+    task_with_str_dur["duration"] = "51:24"
+    html = transform_summary_markdown_to_html(task_with_str_dur, SAMPLE_MARKDOWN)
+    assert "51:24" in html
+    
+    html_trans = transform_transcript_to_html(task_with_str_dur, SAMPLE_PARAGRAPHS)
+    assert html_trans is not None
 
 def test_transform_summary_markdown_elements():
     html = transform_summary_markdown_to_html(SAMPLE_TASK, SAMPLE_MARKDOWN)
