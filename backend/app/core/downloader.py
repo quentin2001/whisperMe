@@ -12,6 +12,7 @@ from app.core.network_utils import get_audio_duration_str
 from app.core.strategies.local_strategy import LocalStrategy
 from app.core.strategies.xiaoyuzhou_strategy import XiaoyuzhouStrategy
 from app.core.strategies.bilibili_strategy import BilibiliStrategy
+from app.core.strategies.douyin_strategy import DouyinStrategy
 from app.core.strategies.netease_strategy import NeteaseStrategy
 from app.core.strategies.ximalaya_strategy import XimalayaStrategy
 from app.core.strategies.lizhi_strategy import LizhiStrategy
@@ -25,6 +26,7 @@ class PodcastDownloader:
             LocalStrategy(),
             XiaoyuzhouStrategy(),
             BilibiliStrategy(),
+            DouyinStrategy(),
             NeteaseStrategy(),
             XimalayaStrategy(),
             LizhiStrategy(),

@@ -108,8 +108,16 @@ def main():
         except Exception as e:
             sys.stderr.write(f"[ERROR] 读取任务 JSON 失败: {e}\n")
             sys.exit(1)
+    elif args.summary_file and os.path.exists(args.summary_file):
+        # 允许仅传入 --summary-file 针对已有交付件重新生成或增补格式
+        stem = Path(args.summary_file).stem
+        clean_stem = re.sub(r'_(?:AI深度总结报告|总结|summary)$', '', stem)
+        m = re.match(r'^(?:【(.*?)】)?(.*)$', clean_stem)
+        podcast = m.group(1) if m and m.group(1) else "精选播客"
+        title = m.group(2) if m and m.group(2) else clean_stem
+        task = {"title": title, "podcast_name": podcast}
     else:
-        sys.stderr.write("[ERROR] 必须提供 --task-id 或 --task-json\n")
+        sys.stderr.write("[ERROR] 必须提供 --task-id 或 --task-json（或有效 --summary-file）\n")
         sys.exit(1)
 
     # 2. 获取总结内容
@@ -153,7 +161,7 @@ def main():
     req_formats = set()
     raw_formats = args.formats.lower().strip()
     if raw_formats == "all":
-        req_formats = {"docx", "md", "srt"}
+        req_formats = {"pdf", "docx", "md", "srt"}
     else:
         for f in raw_formats.split(","):
             f = f.strip()
@@ -163,6 +171,8 @@ def main():
                 req_formats.add("md")
             elif f in ("srt", "vtt"):
                 req_formats.add(f)
+            elif f == "pdf":
+                req_formats.add("pdf")
 
     # 说话人解析函数
     def resolve_speaker(spk):
@@ -172,10 +182,17 @@ def main():
 
     # 导入生成引擎
     from app.utils.docx_formatter import generate_transcript_docx, generate_summary_docx
+    from app.utils.pdf_formatter import generate_transcript_pdf, generate_summary_pdf
     from app.utils.formatters import format_markdown, format_srt, format_vtt
 
     # ==================== 逐字稿导出 ====================
     if paragraphs:
+        # PDF 逐字稿
+        if "pdf" in req_formats:
+            pdf_path = target_dir / f"{clean_title}_逐字稿.pdf"
+            generate_transcript_pdf(task, paragraphs, resolve_speaker, output_path=pdf_path)
+            exported_files.append({"type": "transcript_pdf", "path": str(pdf_path), "size": pdf_path.stat().st_size})
+
         # DOCX 逐字稿
         if "docx" in req_formats:
             docx_path = target_dir / f"{clean_title}_逐字稿.docx"
@@ -204,6 +221,12 @@ def main():
     if summary:
         task_with_summary = dict(task)
         task_with_summary["summary"] = summary
+
+        # PDF 深度总结
+        if "pdf" in req_formats:
+            summary_pdf_path = target_dir / f"{clean_title}_AI深度总结报告.pdf"
+            generate_summary_pdf(task_with_summary, output_path=summary_pdf_path)
+            exported_files.append({"type": "summary_pdf", "path": str(summary_pdf_path), "size": summary_pdf_path.stat().st_size})
 
         # DOCX 深度总结
         if "docx" in req_formats:

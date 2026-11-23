@@ -29,10 +29,25 @@ class TestDLSRoute:
         strategy = self.downloader._get_strategy("https://b23.tv/abcXYZ")
         assert "Bilibili" in strategy.__class__.__name__
 
+    def test_douyin_long_url_route(self):
+        """抖音长链接 → DouyinStrategy"""
+        strategy = self.downloader._get_strategy("https://www.douyin.com/video/7706576702873800699")
+        assert "Douyin" in strategy.__class__.__name__
+
+    def test_douyin_short_url_route(self):
+        """抖音短链接 → DouyinStrategy"""
+        strategy = self.downloader._get_strategy("https://v.douyin.com/iJabcdef/")
+        assert "Douyin" in strategy.__class__.__name__
+
+    def test_douyin_ies_url_route(self):
+        """抖音 ies 链接 → DouyinStrategy"""
+        strategy = self.downloader._get_strategy("https://www.iesdouyin.com/share/video/7706576702873800699/")
+        assert "Douyin" in strategy.__class__.__name__
+
     def test_local_file_route(self):
         """本地文件路径 → LocalStrategy"""
         # 需要真实存在的文件
-        fixture_path = os.path.abspath("tests/fixtures/short_audio.mp3")
+        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "short_audio.mp3")
         assert os.path.exists(fixture_path), f"Fixture not found: {fixture_path}"
         strategy = self.downloader._get_strategy(fixture_path)
         assert "Local" in strategy.__class__.__name__
@@ -75,7 +90,7 @@ class TestDLSStrategyBehavior:
         """本地策略返回正确元数据结构"""
         from app.core.strategies.local_strategy import LocalStrategy
         strategy = LocalStrategy()
-        fixture = os.path.abspath("tests/fixtures/short_audio.mp3")
+        fixture = os.path.join(os.path.dirname(__file__), "fixtures", "short_audio.mp3")
         meta = strategy.parse_metadata(fixture)
         assert meta["source"] == "local"
         assert meta["podcast_name"] == "本地导入"

@@ -25,9 +25,9 @@ class TestSenseVoiceUtils:
         assert detect_funasr_model_type("iic/SenseVoiceSmall") == "sensevoice"
         assert detect_funasr_model_type(r"E:\Projects\whisperMe\models\SenseVoiceSmall") == "sensevoice"
         assert detect_funasr_model_type(r"models/sensevoice_custom") == "sensevoice"
+        assert detect_funasr_model_type(r"E:\Projects\whisperMe\models\funasr") == "sensevoice"
 
     def test_detect_funasr_model_type_paraformer(self):
         assert detect_funasr_model_type("") == "paraformer"
         assert detect_funasr_model_type("paraformer-zh") == "paraformer"
         assert detect_funasr_model_type("iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch") == "paraformer"
-        assert detect_funasr_model_type(r"E:\Projects\whisperMe\models\funasr") == "paraformer"

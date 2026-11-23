@@ -16,7 +16,7 @@ class TestFFMStandardize:
         from app.core.downloader import PodcastDownloader
         downloader = PodcastDownloader()
 
-        fixture = os.path.abspath("tests/fixtures/short_audio.mp3")
+        fixture = os.path.join(os.path.dirname(__file__), "fixtures", "short_audio.mp3")
         assert os.path.exists(fixture)
 
         output = downloader.preprocess_audio(fixture)
@@ -62,7 +62,7 @@ class TestFFMCorrupt:
         from app.core.downloader import PodcastDownloader
         downloader = PodcastDownloader()
 
-        fixture = os.path.abspath("tests/fixtures/corrupt_audio.mp3")
+        fixture = os.path.join(os.path.dirname(__file__), "fixtures", "corrupt_audio.mp3")
         assert os.path.exists(fixture)
 
         try:

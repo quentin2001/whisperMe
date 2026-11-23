@@ -59,7 +59,6 @@ def detect_funasr_model_type(model_path_or_name: str) -> str:
                 return "sensevoice"
             if "chn_jpn_yue_eng_ko_spectok.bpe.model" in files:
                 return "sensevoice"
-            break
 
     return "paraformer"
 
@@ -226,111 +225,47 @@ class ModelCacheManager:
             else:
                 device_str = "cpu"
 
-            if model_type == "sensevoice":
-                # SenseVoice 专用解析逻辑（内聚标点，无需外挂 punc）
-                sv_model = "iic/SenseVoiceSmall"
-                if custom_path:
-                    custom_path_abs = custom_path if os.path.isabs(custom_path) else os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
-                    if os.path.isdir(custom_path_abs):
-                        if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.pt")):
-                            sv_model = custom_path_abs
-                        else:
-                            nested_sv = os.path.join(custom_path_abs, "iic", "SenseVoiceSmall")
-                            if os.path.exists(nested_sv) and os.path.isdir(nested_sv):
-                                sv_model = nested_sv
+            # 锁定 FunASR 引擎为 SenseVoiceSmall + FSMN-VAD
+            model_type = "sensevoice"
+            sv_model = "iic/SenseVoiceSmall"
+            if custom_path:
+                custom_path_abs = custom_path if os.path.isabs(custom_path) else os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
+                if os.path.isdir(custom_path_abs):
+                    if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.pt")):
+                        sv_model = custom_path_abs
                     else:
-                        sv_model = custom_path
+                        nested_sv = os.path.join(custom_path_abs, "iic", "SenseVoiceSmall")
+                        if os.path.exists(nested_sv) and os.path.isdir(nested_sv):
+                            sv_model = nested_sv
                 else:
-                    default_sv1 = os.path.join(PROJECT_DIR, "models", "SenseVoiceSmall")
-                    default_sv2 = os.path.join(models_dir, "iic", "SenseVoiceSmall")
-                    if os.path.exists(default_sv1) and os.path.isdir(default_sv1):
-                        sv_model = default_sv1
-                    elif os.path.exists(default_sv2) and os.path.isdir(default_sv2):
-                        sv_model = default_sv2
-
-                local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
-                vad_param = local_vad_dir if (os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir)) else "fsmn-vad"
-
-                print(f"⏩ [LOG] 正在加载 FunASR SenseVoiceSmall 模型: {sv_model}")
-                try:
-                    model = AutoModel(
-                        model=sv_model,
-                        vad_model=vad_param,
-                        vad_kwargs={"max_single_segment_time": 30000},
-                        device=device_str,
-                        disable_update=True,
-                        hub="ms"
-                    )
-                except Exception as ms_ex:
-                    model = AutoModel(
-                        model=sv_model,
-                        vad_model="fsmn-vad",
-                        vad_kwargs={"max_single_segment_time": 30000},
-                        device=device_str,
-                        disable_update=True,
-                        hub="hf"
-                    )
+                    sv_model = custom_path
             else:
-                # Paraformer 默认加载逻辑 (保持原有完全向后兼容)
-                ms_model = "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
-                hf_model = "funasr/paraformer-zh"
-                
-                local_ms_model_dir = os.path.join(models_dir, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
-                local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
-                local_punc_dir = os.path.join(models_dir, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
-                
-                vad_param = "fsmn-vad"
-                punc_param = "ct-punc"
-                
-                if custom_path:
-                    custom_path_abs = custom_path if os.path.isabs(custom_path) else os.path.abspath(os.path.join(PROJECT_DIR, custom_path))
-                    if os.path.isdir(custom_path_abs):
-                        if os.path.exists(os.path.join(custom_path_abs, "configuration.json")) or os.path.exists(os.path.join(custom_path_abs, "model.onnx")):
-                            ms_model = custom_path_abs
-                            hf_model = custom_path_abs
-                        else:
-                            potential_ms = os.path.join(custom_path_abs, "iic", "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch")
-                            if os.path.exists(potential_ms) and os.path.isdir(potential_ms):
-                                ms_model = potential_ms
-                                potential_vad = os.path.join(custom_path_abs, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
-                                if os.path.exists(potential_vad) and os.path.isdir(potential_vad):
-                                    vad_param = potential_vad
-                                potential_punc = os.path.join(custom_path_abs, "iic", "punc_ct-transformer_cn-en-common-vocab471067-large")
-                                if os.path.exists(potential_punc) and os.path.isdir(potential_punc):
-                                    punc_param = potential_punc
-                            else:
-                                ms_model = custom_path
-                                hf_model = custom_path
-                    else:
-                        if "paraformer" in custom_path.lower():
-                            if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
-                                ms_model = local_ms_model_dir
-                            if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
-                                vad_param = local_vad_dir
-                            if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
-                                punc_param = local_punc_dir
-                        else:
-                            ms_model = custom_path
-                            hf_model = custom_path
-                else:
-                    if os.path.exists(local_ms_model_dir) and os.path.isdir(local_ms_model_dir):
-                        ms_model = local_ms_model_dir
-                    if os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir):
-                        vad_param = local_vad_dir
-                    if os.path.exists(local_punc_dir) and os.path.isdir(local_punc_dir):
-                        punc_param = local_punc_dir
+                default_sv = os.path.join(models_dir, "iic", "SenseVoiceSmall")
+                if os.path.exists(default_sv) and os.path.isdir(default_sv):
+                    sv_model = default_sv
 
-                print(f"⏩ [LOG] 正在加载 FunASR Paraformer 模型: {ms_model}")
-                try:
-                    model = AutoModel(model=ms_model, model_revision="v2.0.4",
-                                      vad_model=vad_param, vad_model_revision="v2.0.4",
-                                      punc_model=punc_param, punc_model_revision="v2.0.4",
-                                      device=device_str, disable_update=True, hub="ms")
-                except Exception as ms_ex:
-                    model = AutoModel(model=hf_model, model_revision="v2.0.4",
-                                      vad_model="fsmn-vad", vad_model_revision="v2.0.4",
-                                      punc_model="ct-punc", punc_model_revision="v2.0.4",
-                                      device=device_str, disable_update=True, hub="hf")
+            local_vad_dir = os.path.join(models_dir, "iic", "speech_fsmn_vad_zh-cn-16k-common-pytorch")
+            vad_model = local_vad_dir if (os.path.exists(local_vad_dir) and os.path.isdir(local_vad_dir)) else "fsmn-vad"
+
+            print(f"⏩ [LOG] 正在加载 FunASR SenseVoiceSmall 模型: {sv_model}")
+            try:
+                model = AutoModel(
+                    model=sv_model,
+                    vad_model=vad_model,
+                    vad_kwargs={"max_single_segment_time": 30000},
+                    device="cuda:0",
+                    disable_update=True,
+                    hub="ms"
+                )
+            except Exception as ms_ex:
+                model = AutoModel(
+                    model=sv_model,
+                    vad_model=vad_model,
+                    vad_kwargs={"max_single_segment_time": 30000},
+                    device=device_str,
+                    disable_update=True,
+                    hub="ms"
+                )
 
             self.funasr_model = model
             self.funasr_model_type = model_type

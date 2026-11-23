@@ -2,6 +2,7 @@ from .base import DownloaderStrategy
 from .local_strategy import LocalStrategy
 from .xiaoyuzhou_strategy import XiaoyuzhouStrategy
 from .bilibili_strategy import BilibiliStrategy
+from .douyin_strategy import DouyinStrategy
 from .netease_strategy import NeteaseStrategy
 from .ximalaya_strategy import XimalayaStrategy
 from .lizhi_strategy import LizhiStrategy
@@ -13,6 +14,7 @@ __all__ = [
     "LocalStrategy",
     "XiaoyuzhouStrategy",
     "BilibiliStrategy",
+    "DouyinStrategy",
     "NeteaseStrategy",
     "XimalayaStrategy",
     "LizhiStrategy",
