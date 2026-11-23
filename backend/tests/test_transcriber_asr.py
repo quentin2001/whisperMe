@@ -21,13 +21,18 @@ class TestSenseVoiceUtils:
         assert "The." not in cleaned
         assert "这是一个关于测试的句子。" in cleaned
 
-    def test_detect_funasr_model_type_sensevoice(self):
+    def test_detect_funasr_model_type_sensevoice(self, tmp_path):
         assert detect_funasr_model_type("iic/SenseVoiceSmall") == "sensevoice"
-        assert detect_funasr_model_type(r"E:\Projects\whisperMe\models\SenseVoiceSmall") == "sensevoice"
+        assert detect_funasr_model_type(r"models/SenseVoiceSmall") == "sensevoice"
         assert detect_funasr_model_type(r"models/sensevoice_custom") == "sensevoice"
-        assert detect_funasr_model_type(r"E:\Projects\whisperMe\models\funasr") == "sensevoice"
+        # 验证目录探测逻辑（使用跨平台 tmp_path 而非硬编码本地绝对路径）
+        fake_model_dir = tmp_path / "custom_model"
+        fake_model_dir.mkdir()
+        (fake_model_dir / "chn_jpn_yue_eng_ko_spectok.bpe.model").write_text("dummy")
+        assert detect_funasr_model_type(str(fake_model_dir)) == "sensevoice"
 
     def test_detect_funasr_model_type_paraformer(self):
         assert detect_funasr_model_type("") == "paraformer"
         assert detect_funasr_model_type("paraformer-zh") == "paraformer"
         assert detect_funasr_model_type("iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch") == "paraformer"
+        assert detect_funasr_model_type("/nonexistent/path/funasr") == "paraformer"
